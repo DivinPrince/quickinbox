@@ -309,13 +309,32 @@ try {
     const to = page.locator('input[placeholder*="recipient"]').first();
     const toField = (await toAlt.count()) ? toAlt : to;
     await typeInto(page, toField, "elon@x.com", 22);
-    await typeInto(page, page.getByPlaceholder(/^Subject$/i), `Mail on ${DOMAIN} — built for founders`, 14);
+    await typeInto(
+      page,
+      page.getByPlaceholder(/^Subject$/i),
+      `Self-hosted email for ${DOMAIN} — brief note`,
+      12,
+    );
 
     const editor = page.locator('[contenteditable="true"]').first();
     await click(page, editor);
     await page.keyboard.type(
-      `Elon — spun up real mail on ${DOMAIN} in a few minutes. Self-hosted inbox, Resend under the hood. Thought you'd appreciate the ship velocity.`,
-      { delay: 14 },
+      [
+        `Mr. Musk,`,
+        ``,
+        `I am writing to share a brief note about QuickMail, a self-hosted email product we run on ${DOMAIN}.`,
+        ``,
+        `It provides a full inbox on your own domain, with delivery handled through Resend. The goal is simple: reliable mail you control, without depending on a consumer mailbox provider.`,
+        ``,
+        `If this is ever relevant to teams at X or Tesla who need domain-owned email infrastructure, I would welcome the chance to send a short overview.`,
+        ``,
+        `Thank you for your time.`,
+        ``,
+        `Respectfully,`,
+        `Divin Prince`,
+        `hello@${DOMAIN}`,
+      ].join("\n"),
+      { delay: 10 },
     );
     await sleep(240);
     await snap(page, "compose");
