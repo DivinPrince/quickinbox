@@ -1,10 +1,12 @@
 # Cinematic demo (silent)
 
-Records a quick product walkthrough with a visible cursor, auto-zooms, light 3D
-tilts, and small burned-in captions. No narration.
+Records a quick product walkthrough with a visible cursor, a spring follow-cam
+that tracks the mouse (not discrete zoom in/out), light parallax tilt, and small
+burned-in captions. No narration.
 
 Uses the `demo-video` skill patterns from DivinPrince/dpskills, adapted for a
-silent cinematic cut.
+silent cinematic cut. The camera keeps a resting scale and eases a layout-space
+focus point so the subject stays near the frame center as the cursor moves.
 
 ## Prerequisites
 

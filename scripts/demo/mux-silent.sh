@@ -21,10 +21,10 @@ need ffprobe
 ASS_ESC="${ASS//\:/\\:}"
 ASS_ESC="${ASS_ESC//\'/\\\'}"
 
-# Soft vignette + slight contrast for a more cinematic finish (no audio).
+# Light grade only — no centered vignette (it fights the mouse follow-cam).
 ffmpeg -y \
   -i "$WEBM" \
-  -vf "ass=${ASS_ESC},eq=contrast=1.04:saturation=1.05,vignette=PI/6" \
+  -vf "ass=${ASS_ESC},eq=contrast=1.03:saturation=1.04" \
   -c:v libx264 -pix_fmt yuv420p -preset medium -crf 18 \
   -an \
   -movflags +faststart \
