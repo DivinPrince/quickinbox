@@ -308,14 +308,14 @@ try {
     const toAlt = page.getByPlaceholder(/recipient@example.com/i);
     const to = page.locator('input[placeholder*="recipient"]').first();
     const toField = (await toAlt.count()) ? toAlt : to;
-    await typeInto(page, toField, "maya@northwind.studio", 20);
-    await typeInto(page, page.getByPlaceholder(/^Subject$/i), `Quick update from ${DOMAIN}`, 16);
+    await typeInto(page, toField, "elon@x.com", 22);
+    await typeInto(page, page.getByPlaceholder(/^Subject$/i), `Mail on ${DOMAIN} — built for founders`, 14);
 
     const editor = page.locator('[contenteditable="true"]').first();
     await click(page, editor);
     await page.keyboard.type(
-      `Hey Maya — mail on ${DOMAIN} is live. Sending this from the QuickMail composer.`,
-      { delay: 16 },
+      `Elon — spun up real mail on ${DOMAIN} in a few minutes. Self-hosted inbox, Resend under the hood. Thought you'd appreciate the ship velocity.`,
+      { delay: 14 },
     );
     await sleep(240);
     await snap(page, "compose");
@@ -361,8 +361,8 @@ try {
     await showCaption(page, byId["08-users"].caption);
     await sleep(350);
     const nameField = page.getByPlaceholder("Display name");
-    await typeInto(page, nameField, "Maya Chen", 24);
-    await typeInto(page, page.getByLabel("Address"), "maya", 26);
+    await typeInto(page, nameField, "Support", 24);
+    await typeInto(page, page.getByLabel("Address"), "support", 22);
     await typeInto(page, page.getByPlaceholder("Temporary password"), "temppass123", 16);
     await snap(page, "admin-new-user");
     await click(page, page.getByRole("button", { name: /^Create$/i }));

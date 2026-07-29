@@ -21,8 +21,8 @@
   },
   {
     "id": "05-compose",
-    "caption": "Write and send",
-    "holdSec": 7.5
+    "caption": "Email Elon Musk",
+    "holdSec": 8.0
   },
   {
     "id": "06-starred",
@@ -36,7 +36,7 @@
   },
   {
     "id": "08-users",
-    "caption": "Add a new user",
+    "caption": "Add support@ mailbox",
     "holdSec": 7.5
   }
 ]

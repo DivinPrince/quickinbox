@@ -25,13 +25,11 @@ function buildSeed(mailbox: string, domain: string): SeedMessage[] {
 	return [
 		{
 			direction: 'inbound',
-			from: 'maya@northwind.studio',
+			from: 'priya@northwind.studio',
 			to: mailbox,
 			subject: `Launch checklist for ${domain}`,
-			bodyText:
-				'Hey — can we lock the hero copy and the MX records today? I left notes in the shared doc.',
-			bodyHtml:
-				'<p>Hey — can we lock the <strong>hero copy</strong> and the MX records today?</p><p>I left notes in the shared doc. Ping me when you are free.</p>',
+			bodyText: `Hey — can we lock the hero copy and confirm MX for ${domain} today? I left notes in the shared doc. Ping me when you're free.`,
+			bodyHtml: `<p>Hey — can we lock the <strong>hero copy</strong> and confirm MX for <strong>${domain}</strong> today?</p><p>I left notes in the shared doc. Ping me when you're free.</p>`,
 			isRead: false,
 			minutesAgo: 18,
 			messageId: '<seed-launch-1@northwind.studio>'
@@ -39,9 +37,9 @@ function buildSeed(mailbox: string, domain: string): SeedMessage[] {
 		{
 			direction: 'outbound',
 			from: mailbox,
-			to: 'maya@northwind.studio',
+			to: 'priya@northwind.studio',
 			subject: `Re: Launch checklist for ${domain}`,
-			bodyText: `Hero copy is frozen. MX is live on ${domain} — receiving looks good from my tests.`,
+			bodyText: `Hero copy is frozen. MX is live on ${domain} — receiving looks good from my tests. Sending the checklist back with checkmarks.`,
 			bodyHtml: `<p>Hero copy is frozen. MX is live on <strong>${domain}</strong> — receiving looks good from my tests.</p><p>Sending the checklist back with checkmarks.</p>`,
 			isRead: true,
 			status: 'delivered',
@@ -51,15 +49,16 @@ function buildSeed(mailbox: string, domain: string): SeedMessage[] {
 		},
 		{
 			direction: 'inbound',
-			from: 'jordan@atelier.mail',
+			from: 'billing@stripe.com',
 			to: mailbox,
-			subject: 'Invoice #4821 — QuickMail hosting',
-			bodyText: 'Attached is invoice 4821 for March. Card on file will be charged Friday.',
+			subject: 'Your receipt from Stripe #2094-4821',
+			bodyText:
+				'Thanks for your payment of $29.00 to QuickMail Hosting. This email is a receipt for your recent payment. Amount: $29.00 USD. Payment method: Visa ending in 4242. Next charge: April 1.',
 			bodyHtml:
-				'<p>Attached is invoice <strong>#4821</strong> for March.</p><p>Card on file will be charged Friday. Reply if anything looks off.</p>',
+				'<p>Thanks for your payment of <strong>$29.00</strong> to QuickMail Hosting.</p><p>This email is a receipt for your recent payment.</p><p>Amount: $29.00 USD<br>Payment method: Visa ending in 4242<br>Next charge: April 1</p>',
 			isRead: false,
 			minutesAgo: 55,
-			messageId: '<seed-invoice@atelier.mail>'
+			messageId: '<seed-invoice@stripe.com>'
 		},
 		{
 			direction: 'inbound',
@@ -67,9 +66,9 @@ function buildSeed(mailbox: string, domain: string): SeedMessage[] {
 			to: mailbox,
 			subject: 'Design review: settings + composer',
 			bodyText:
-				'Composer spacing feels right. One note: the domain switcher could use a stronger active state.',
+				'Composer spacing feels right. One note: the domain switcher could use a stronger active state. Happy to mock a variant this afternoon.',
 			bodyHtml:
-				'<p>Composer spacing feels right.</p><p>One note: the <em>domain switcher</em> could use a stronger active state. Happy to mock a variant.</p>',
+				'<p>Composer spacing feels right.</p><p>One note: the <em>domain switcher</em> could use a stronger active state. Happy to mock a variant this afternoon.</p>',
 			isRead: true,
 			isStarred: true,
 			minutesAgo: 140,
@@ -77,35 +76,35 @@ function buildSeed(mailbox: string, domain: string): SeedMessage[] {
 		},
 		{
 			direction: 'inbound',
-			from: 'alex@fieldnotes.app',
+			from: 'alex@vercel.com',
 			to: mailbox,
-			subject: `Welcome to your own mail on ${domain}`,
-			bodyText:
-				'This is a sample welcome note so the inbox never looks empty during demos. Star what matters, archive the rest.',
-			bodyHtml: `<p>Welcome to mail on <strong>${domain}</strong>.</p><p>This is a sample welcome note so the inbox never looks empty during demos. Star what matters, archive the rest.</p>`,
+			subject: `DNS for ${domain} looks good`,
+			bodyText: `Checked the records for ${domain} — MX and SPF are resolving cleanly. Let me know if you want help with DKIM next.`,
+			bodyHtml: `<p>Checked the records for <strong>${domain}</strong> — MX and SPF are resolving cleanly.</p><p>Let me know if you want help with DKIM next.</p>`,
 			isRead: true,
 			minutesAgo: 360,
-			messageId: '<seed-welcome@fieldnotes.app>'
+			messageId: '<seed-dns@vercel.com>'
 		},
 		{
 			direction: 'inbound',
-			from: 'ops@cloudlane.dev',
+			from: 'ops@resend.com',
 			to: mailbox,
-			subject: 'Weekly digest — edge mail volume',
-			bodyText: 'You processed 412 messages this week. Peak hour was Tuesday 14:00 UTC.',
+			subject: 'Weekly digest — delivery for your domain',
+			bodyText:
+				'You sent 412 messages this week. Peak hour was Tuesday 14:00 UTC. Delivery rate stayed at 99.4%.',
 			bodyHtml:
-				'<p>You processed <strong>412</strong> messages this week.</p><p>Peak hour was Tuesday 14:00 UTC. Delivery rate stayed at 99.4%.</p>',
+				'<p>You sent <strong>412</strong> messages this week.</p><p>Peak hour was Tuesday 14:00 UTC. Delivery rate stayed at 99.4%.</p>',
 			isRead: false,
 			minutesAgo: 900,
-			messageId: '<seed-digest@cloudlane.dev>'
+			messageId: '<seed-digest@resend.com>'
 		},
 		{
 			direction: 'outbound',
 			from: mailbox,
 			to: 'partners@brightline.co',
-			subject: 'Intro — self-hosted mail for your domain',
-			bodyText: `Sharing a quick walkthrough of QuickMail on ${domain}. Happy to hop on a call this week.`,
-			bodyHtml: `<p>Sharing a quick walkthrough of QuickMail on <strong>${domain}</strong>.</p><p>Happy to hop on a call this week.</p>`,
+			subject: `Intro — mail on ${domain}`,
+			bodyText: `Sharing a quick walkthrough of self-hosted mail on ${domain}. Happy to hop on a call this week if useful.`,
+			bodyHtml: `<p>Sharing a quick walkthrough of self-hosted mail on <strong>${domain}</strong>.</p><p>Happy to hop on a call this week if useful.</p>`,
 			isRead: true,
 			status: 'delivered',
 			minutesAgo: 1200,
@@ -115,10 +114,10 @@ function buildSeed(mailbox: string, domain: string): SeedMessage[] {
 			direction: 'outbound',
 			from: mailbox,
 			to: '',
-			subject: 'Notes for Friday demo',
-			bodyText: 'Draft: open with onboarding, then inbox, compose, star, settings.',
+			subject: 'Notes for Friday',
+			bodyText: 'Open with domain setup, then inbox, compose, star, settings, add support user.',
 			bodyHtml:
-				'<p>Draft notes for Friday:</p><ul><li>Open with onboarding</li><li>Inbox with seeded threads</li><li>Compose + star + settings</li></ul>',
+				'<p>Friday notes:</p><ul><li>Domain setup</li><li>Inbox + thread</li><li>Compose</li><li>Star + settings</li><li>Add support user</li></ul>',
 			isRead: true,
 			status: 'draft',
 			minutesAgo: 40,
