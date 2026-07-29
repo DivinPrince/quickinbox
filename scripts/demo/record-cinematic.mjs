@@ -92,9 +92,11 @@ async function moveTo(page, locator, steps = 18) {
 }
 
 async function click(page, locator) {
+  // Camera transforms on <body> can skew hit-testing — flatten before acting.
+  await zoomReset(page, 120).catch(() => {});
   await locator.scrollIntoViewIfNeeded().catch(() => {});
   await moveTo(page, locator);
-  await locator.click();
+  await locator.click({ force: true });
 }
 
 async function typeInto(page, locator, text, delay = 22) {
@@ -290,16 +292,18 @@ try {
     );
     await sleep(300);
 
-    const send = page.getByRole("button", { name: /^Send$/i });
+    const send = page.locator('form.compose-page button.btn-primary[type="submit"]');
+    await send.waitFor({ state: "visible", timeout: 10_000 });
     await zoomTo(page, send, { scale: 1.16, tilt: 1.4, ms: 400 });
     await click(page, send);
     await page.waitForURL(/\/(inbox|sent|mail)/, { timeout: 20_000 }).catch(() => {});
     await sleep(500);
+    await zoomTo(page, page.locator("main").first(), { scale: 1.08, tilt: 1.0, ms: 500 });
   });
 
   await scene("06-starred", async () => {
     await zoomReset(page, 300);
-    const starred = page.getByRole("link", { name: /Starred/i });
+    const starred = page.locator('a.nav-link[href="/starred"]');
     await zoomTo(page, starred, { scale: 1.2, tilt: -1.6, ms: 420 });
     await click(page, starred);
     await page.waitForURL(/\/starred/, { timeout: 10_000 });
@@ -313,12 +317,12 @@ try {
 
   await scene("07-sent", async () => {
     await zoomReset(page, 280);
-    const sent = page.getByRole("link", { name: /^Sent$/i });
+    const sent = page.locator('a.nav-link[href="/sent"]');
     await click(page, sent);
     await page.waitForURL(/\/sent/, { timeout: 10_000 });
     await sleep(500);
     await zoomTo(page, page.locator("main").first(), { scale: 1.1, tilt: 1.0, ms: 500 });
-    const drafts = page.getByRole("link", { name: /Drafts/i });
+    const drafts = page.locator('a.nav-link[href="/drafts"]');
     await click(page, drafts);
     await page.waitForURL(/\/drafts/, { timeout: 10_000 });
     await sleep(600);
@@ -326,14 +330,14 @@ try {
 
   await scene("08-settings", async () => {
     await zoomReset(page, 280);
-    const settings = page.getByRole("link", { name: /Settings/i });
+    const settings = page.locator('a.nav-link[href="/settings"]');
     await zoomTo(page, settings, { scale: 1.18, tilt: -1.4, ms: 420 });
     await click(page, settings);
     await page.waitForURL(/\/settings/, { timeout: 10_000 });
     await sleep(500);
     await zoomTo(page, page.locator("main").first(), { scale: 1.12, tilt: 1.5, ms: 700 });
     await sleep(700);
-    const admin = page.getByRole("link", { name: /^Admin$/i });
+    const admin = page.locator('a.nav-link[href="/admin"]');
     if (await admin.count()) {
       await click(page, admin);
       await page.waitForURL(/\/admin/, { timeout: 10_000 });
