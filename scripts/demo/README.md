@@ -1,7 +1,8 @@
 # Silent demo (no auto-zoom)
 
-Records a product walkthrough with a visible custom cursor and small burned-in
-captions. No narration, no camera zoom.
+Records a product walkthrough with a larger custom cursor and top-right
+slide-in caption chips (not bottom subtitles). No narration, no camera zoom.
+Also writes PNG screenshots per beat under `$DEMO_OUT/shots`.
 
 Uses the `demo-video` skill patterns from DivinPrince/dpskills.
 
