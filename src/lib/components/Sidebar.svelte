@@ -65,7 +65,12 @@
 		</a>
 	</div>
 
-	<a href="/compose" class="new-message" title="New message">
+	<a
+		href="/compose"
+		class="new-message"
+		title="New message"
+		onclick={() => (mobileOpen = false)}
+	>
 		<Icon name="pencil-line" size={collapsed ? 18 : 16} />
 		{#if !collapsed}<span>New message</span>{/if}
 	</a>

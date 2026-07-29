@@ -149,17 +149,15 @@ async function navTo(page, href) {
   await openNav(page);
   const link = page.locator(`aside.sidebar a[href="${href}"]`).first();
   await link.waitFor({ state: "visible", timeout: 8_000 });
-  await click(page, link);
-  await page.waitForURL((url) => url.pathname === href || url.pathname.startsWith(`${href}/`), {
-    timeout: 12_000,
-  });
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === href || url.pathname.startsWith(`${href}/`), {
+      timeout: 12_000,
+    }),
+    click(page, link),
+  ]);
+  // Drawer may stay open for links that don't auto-close (e.g. New message).
   await closeNav(page);
-  // Hard navigation keeps the drawer from covering the page on mobile.
-  if (!page.url().includes(href)) {
-    await page.goto(`${APP_URL}${href}`, { waitUntil: "networkidle" });
-  }
-  await closeNav(page);
-  await sleep(200);
+  await sleep(250);
 }
 
 const browser = await chromium.launch({
@@ -322,12 +320,12 @@ try {
 
   await scene("05-compose", async () => {
     await showCaption(page, byId["05-compose"].caption);
-    await page.goto(`${APP_URL}/compose`, { waitUntil: "networkidle" });
-    await closeNav(page);
+    // Client-side nav (full reload used to SSR-crash compose before DOMParser guard).
+    await navTo(page, "/compose");
     await showCaption(page, byId["05-compose"].caption);
     await sleep(280);
 
-    const toField = page.locator("#to").first();
+    const toField = page.locator("#to, input[placeholder*='recipient']").first();
     await toField.waitFor({ state: "visible", timeout: 15_000 });
     await typeInto(page, toField, "elon@x.com", 18);
     await typeInto(

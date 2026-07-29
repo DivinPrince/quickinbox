@@ -1,6 +1,20 @@
+/** Strip tags without DOMParser so this is safe during SSR. */
 export function htmlToPlainText(html: string): string {
-	const doc = new DOMParser().parseFromString(html, 'text/html');
-	return (doc.body.textContent ?? '').replace(/\n{3,}/g, '\n\n').trim();
+	if (typeof DOMParser !== 'undefined') {
+		const doc = new DOMParser().parseFromString(html, 'text/html');
+		return (doc.body.textContent ?? '').replace(/\n{3,}/g, '\n\n').trim();
+	}
+
+	return html
+		.replace(/<br\s*\/?>/gi, '\n')
+		.replace(/<\/p>/gi, '\n')
+		.replace(/<[^>]+>/g, '')
+		.replace(/&nbsp;/g, ' ')
+		.replace(/&amp;/g, '&')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/\n{3,}/g, '\n\n')
+		.trim();
 }
 
 export function isHtmlEmpty(html: string): boolean {
