@@ -1,5 +1,5 @@
 <script lang="ts">
-	/** Compact Resend lettermark tile for pairing with our logo. */
+	/** Official Resend lettermark tile for pairing with our logo. */
 	let {
 		size = 48,
 		class: className = ''
@@ -13,15 +13,15 @@
 	class={className}
 	width={size}
 	height={size}
-	viewBox="0 0 64 64"
+	viewBox="0 0 1800 1800"
 	xmlns="http://www.w3.org/2000/svg"
 	role="img"
 	aria-label="Resend"
+	aria-hidden="true"
 >
-	<rect width="64" height="64" rx="16.5" fill="#0a0a0a" />
-	<!-- Simplified Resend-style R: single intentional stroke -->
+	<rect width="1800" height="1800" rx="412" fill="#0a0a0a" />
 	<path
-		d="M20 46 V18 H34.5 C41.5 18 46 22.2 46 28.2 C46 33.2 43.2 36.6 38.8 37.8 L48 46 H41.2 L33.2 38.2 H26.5 V46 Z M26.5 32.8 H34 C37.6 32.8 39.8 30.8 39.8 28.1 C39.8 25.4 37.6 23.5 34 23.5 H26.5 Z"
+		d="M1000.46 450C1174.77 450 1278.43 553.669 1278.43 691.282C1278.43 828.896 1174.77 932.563 1000.46 932.563H912.382L1350 1350H1040.82L707.794 1033.48C683.944 1011.47 672.936 985.781 672.935 963.765C672.935 932.572 694.959 905.049 737.161 893.122L908.712 847.244C973.85 829.812 1018.81 779.353 1018.81 713.298C1018.8 632.567 952.745 585.78 871.095 585.78H450V450H1000.46Z"
 		fill="#fff"
 	/>
 </svg>
