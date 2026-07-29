@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Verify the template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      # Runs first: if a secret leaked, fail before anything else touches it.
+      - name: Check the template is clean
+        run: bun run check:clean
+
+      - name: Typecheck
+        run: bun run check
+
+      - name: Build
+        run: bun run build

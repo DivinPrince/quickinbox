@@ -1,0 +1,71 @@
+name: Release
+
+# Cut a release:
+#   git tag v1.1.0 && git push origin v1.1.0
+#
+# The zip is for anyone who wants a pinned copy rather than a `git pull`.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build a release from (e.g. v1.1.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Package and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      # Nothing ships until the template is provably free of personal config.
+      - name: Check the template is clean
+        run: bun run check:clean
+
+      - name: Typecheck
+        run: bun run check
+
+      - name: Build
+        run: bun run build
+
+      - name: Resolve version
+        id: version
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      # git archive honours the export-ignore rules in .gitattributes, so the zip
+      # carries the product without the maintainer tooling.
+      - name: Package
+        run: |
+          git archive --format=zip \
+            --prefix="quickmail-${{ steps.version.outputs.version }}/" \
+            -o "quickmail-${{ steps.version.outputs.version }}.zip" \
+            "${{ steps.version.outputs.tag }}"
+          unzip -l "quickmail-${{ steps.version.outputs.version }}.zip" | tail -5
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            "quickmail-${{ steps.version.outputs.version }}.zip" \
+            --title "QuickMail ${{ steps.version.outputs.tag }}" \
+            --generate-notes
