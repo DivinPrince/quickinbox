@@ -129,18 +129,21 @@ const browser = await chromium.launch({
   args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
 });
 
+const VIEW_W = 1920;
+const VIEW_H = 1080;
+
 const context = await browser.newContext({
-  viewport: { width: 1440, height: 900 },
-  deviceScaleFactor: 1,
-  colorScheme: "dark",
-  recordVideo: { dir: RAW, size: { width: 1440, height: 900 } },
+  viewport: { width: VIEW_W, height: VIEW_H },
+  deviceScaleFactor: 2,
+  colorScheme: "light",
+  recordVideo: { dir: RAW, size: { width: VIEW_W, height: VIEW_H } },
 });
 const page = await context.newPage();
 
-// Prefer dark from the first paint (setup through inbox).
+// Prefer light from the first paint (setup through inbox).
 await page.addInitScript(() => {
   try {
-    localStorage.setItem("mail:theme", "dark");
+    localStorage.setItem("mail:theme", "light");
   } catch {
     /* ignore */
   }
@@ -373,13 +376,13 @@ try {
     await page.waitForURL(/\/settings/, { timeout: 10_000 });
     await showCaption(page, byId["07-theme"].caption);
     await sleep(350);
-    // Already dark from start — show light, then return to dark.
-    await click(page, page.getByRole("radio", { name: /Light/i }));
-    await sleep(550);
-    await snap(page, "theme-light");
+    // Already light from start — show dark, then return to light.
     await click(page, page.getByRole("radio", { name: /Dark/i }));
-    await sleep(450);
+    await sleep(550);
     await snap(page, "theme-dark");
+    await click(page, page.getByRole("radio", { name: /Light/i }));
+    await sleep(450);
+    await snap(page, "theme-light");
     await sleep(350);
   });
 
