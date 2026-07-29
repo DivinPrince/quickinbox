@@ -1,12 +1,9 @@
-# Cinematic demo (silent)
+# Silent demo (no auto-zoom)
 
-Records a quick product walkthrough with a visible cursor, a spring follow-cam
-that tracks the mouse (not discrete zoom in/out), light parallax tilt, and small
-burned-in captions. No narration.
+Records a product walkthrough with a visible custom cursor and small burned-in
+captions. No narration, no camera zoom.
 
-Uses the `demo-video` skill patterns from DivinPrince/dpskills, adapted for a
-silent cinematic cut. The camera keeps a resting scale and eases a layout-space
-focus point so the subject stays near the frame center as the cursor moves.
+Uses the `demo-video` skill patterns from DivinPrince/dpskills.
 
 ## Prerequisites
 
@@ -25,7 +22,6 @@ In another shell:
 ```bash
 mkdir -p /tmp/demo-video && cd /tmp/demo-video
 npm init -y && npm i playwright-core
-npx playwright-core install ffmpeg   # optional helper; system Chrome + ffmpeg also work
 
 export DEMO_OUT=/tmp/demo-artifacts
 export DEMO_APP_URL=http://127.0.0.1:5173
@@ -34,10 +30,12 @@ export DEMO_LOCAL_PART=hello
 export DEMO_NAME="Demo User"
 export DEMO_PASSWORD=demopass123
 
-# Fresh local DB recommended before recording
 cd /path/to/quickmail
+# Fresh local DB recommended before recording
 node scripts/demo/record-cinematic.mjs
 bash scripts/demo/mux-silent.sh
 ```
+
+Cursor asset: `scripts/demo/assets/cursor.svg`
 
 Output: `$DEMO_OUT/quickmail-cinematic-demo.mp4`
