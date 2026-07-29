@@ -154,12 +154,15 @@ await page.addInitScript((cursorSrc) => {
 try {
   await scene("01-setup", async () => {
     await page.goto(`${APP_URL}/setup`, { waitUntil: "networkidle" });
-    await sleep(500);
+    // Let the Mail ↔ Resend partner marks settle on screen.
+    await sleep(900);
+    await moveTo(page, page.locator(".partner, .partner-marks").first()).catch(() => {});
+    await sleep(450);
     const domainBtn = page.locator("button.domain-card").filter({ hasText: DOMAIN }).first();
     await domainBtn.waitFor({ state: "visible", timeout: 20_000 });
     await click(page, domainBtn);
-    await sleep(350);
-    await click(page, page.getByRole("button", { name: /Continue/i }));
+    await sleep(300);
+    await click(page, page.getByRole("button", { name: /^Continue$/i }));
     await page.getByLabel("Your name").waitFor({ state: "visible" });
   });
 
@@ -243,30 +246,38 @@ try {
     }
   });
 
-  await scene("07-sent", async () => {
-    await click(page, page.locator('a.nav-link[href="/sent"]'));
-    await page.waitForURL(/\/sent/, { timeout: 10_000 });
-    await sleep(500);
-    await moveTo(page, page.locator("main").first());
-    await click(page, page.locator('a.nav-link[href="/drafts"]'));
-    await page.waitForURL(/\/drafts/, { timeout: 10_000 });
-    await sleep(600);
-  });
-
-  await scene("08-settings", async () => {
+  await scene("07-theme", async () => {
     await click(page, page.locator('a.nav-link[href="/settings"]'));
     await page.waitForURL(/\/settings/, { timeout: 10_000 });
-    await sleep(500);
-    await moveTo(page, page.locator("main").first());
-    await sleep(700);
-    const admin = page.locator('a.nav-link[href="/admin"]');
-    if (await admin.count()) {
-      await click(page, admin);
-      await page.waitForURL(/\/admin/, { timeout: 10_000 });
-      await sleep(700);
-      await moveTo(page, page.locator("main").first());
-    }
     await sleep(400);
+    const dark = page.getByRole("radio", { name: /Dark/i });
+    const light = page.getByRole("radio", { name: /Light/i });
+    const system = page.getByRole("radio", { name: /System/i });
+    await click(page, dark);
+    await sleep(700);
+    await click(page, light);
+    await sleep(550);
+    await click(page, system);
+    await sleep(500);
+  });
+
+  await scene("08-users", async () => {
+    await click(page, page.locator('a.nav-link[href="/admin"]'));
+    await page.waitForURL(/\/admin/, { timeout: 10_000 });
+    await sleep(400);
+    const nameField = page.getByPlaceholder("Display name");
+    await moveTo(page, nameField);
+    await typeInto(page, nameField, "Maya Chen", 24);
+    await typeInto(page, page.getByLabel("Address"), "maya", 26);
+    await typeInto(page, page.getByPlaceholder("Temporary password"), "temppass123", 16);
+    const create = page.getByRole("button", { name: /^Create$/i });
+    await click(page, create);
+    await page.waitForURL(/\/admin/, { timeout: 15_000 }).catch(() => {});
+    await sleep(600);
+    // Point at the new users list so it reads on camera.
+    const users = page.getByRole("heading", { name: /users/i });
+    if (await users.count()) await moveTo(page, users);
+    await sleep(500);
   });
 
   console.log(`Recording finished ${page.url()} total=${(now() / 1000).toFixed(1)}s mailbox=${MAILBOX}`);

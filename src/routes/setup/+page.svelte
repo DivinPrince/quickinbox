@@ -76,12 +76,14 @@
 </svelte:head>
 
 <WizardShell
-	title={step === 1 ? 'Choose your domain' : 'Create your account'}
+	title={step === 1 ? 'Choose domain' : 'Create account'}
 	subtitle={step === 1
-		? 'These are the domains your Resend account can send and receive on. Pick the one you want to use — you can add more later.'
-		: `You'll send and receive on ${chosen?.name}.`}
+		? 'Pick one from your Resend account.'
+		: `Mail for ${chosen?.name}.`}
 	steps={['Domain', 'Account']}
 	current={step}
+	partner={step === 1}
+	partnerCaption="Mail + Resend"
 >
 	{#if step === 1}
 		{#if !data.resendConfigured}
@@ -117,7 +119,7 @@
 			{#if error}<p class="error">{error}</p>{/if}
 
 			<button type="button" class="btn-primary w-full py-2.5 mt-4" onclick={goToDetails}>
-				Continue{chosen ? ` with ${chosen.name}` : ''}
+				Continue
 			</button>
 		{/if}
 	{:else}

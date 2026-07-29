@@ -86,10 +86,10 @@
 </svelte:head>
 
 <WizardShell
-	title={needsDomain ? 'Connect a domain' : 'Claim your address'}
-	subtitle={needsDomain
-		? 'Pick the domains from your Resend account that you want in this dashboard.'
-		: "Choose the address you'll send and receive mail from."}
+	title={needsDomain ? 'Choose domain' : 'Claim address'}
+	subtitle={needsDomain ? 'Pick one from your Resend account.' : 'Your send & receive address.'}
+	partner={needsDomain}
+	partnerCaption="Mail + Resend"
 >
 	{#if needsDomain}
 		{#if !data.isAdmin}

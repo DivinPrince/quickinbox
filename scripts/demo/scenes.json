@@ -1,42 +1,42 @@
 [
   {
     "id": "01-setup",
-    "caption": "Choose your domain",
-    "holdSec": 4.2
+    "caption": "Choose domain",
+    "holdSec": 4.0
   },
   {
     "id": "02-account",
     "caption": "Create your mailbox",
-    "holdSec": 7.5
+    "holdSec": 7.0
   },
   {
     "id": "03-inbox",
     "caption": "A lived-in inbox",
-    "holdSec": 4.8
+    "holdSec": 4.2
   },
   {
     "id": "04-thread",
     "caption": "Open a conversation",
-    "holdSec": 5.2
+    "holdSec": 4.8
   },
   {
     "id": "05-compose",
     "caption": "Write and send",
-    "holdSec": 8.0
+    "holdSec": 7.5
   },
   {
     "id": "06-starred",
     "caption": "Star what matters",
-    "holdSec": 3.8
+    "holdSec": 3.4
   },
   {
-    "id": "07-sent",
-    "caption": "Sent and drafts",
-    "holdSec": 4.0
+    "id": "07-theme",
+    "caption": "Switch the theme",
+    "holdSec": 5.0
   },
   {
-    "id": "08-settings",
-    "caption": "Addresses and settings",
-    "holdSec": 4.2
+    "id": "08-users",
+    "caption": "Add a new user",
+    "holdSec": 7.5
   }
 ]

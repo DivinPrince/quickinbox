@@ -1,11 +1,15 @@
 <script lang="ts">
 	import Logo from './Logo.svelte';
+	import PartnerLink from './PartnerLink.svelte';
 
 	let {
 		title,
 		subtitle,
 		steps = [],
 		current = 1,
+		/** Show Mail ↔ Resend marks above the title (domain connect screens). */
+		partner = false,
+		partnerCaption = 'Connected via Resend',
 		children
 	}: {
 		title: string;
@@ -13,13 +17,19 @@
 		/** Step labels; omit for a single-screen wizard. */
 		steps?: string[];
 		current?: number;
+		partner?: boolean;
+		partnerCaption?: string;
 		children: import('svelte').Snippet;
 	} = $props();
 </script>
 
 <div class="wizard">
 	<header class="wizard-head">
-		<div class="brand-icon"><Logo size={48} /></div>
+		{#if partner}
+			<PartnerLink size={44} caption={partnerCaption} />
+		{:else}
+			<div class="brand-icon"><Logo size={48} /></div>
+		{/if}
 		<h1>{title}</h1>
 		{#if subtitle}
 			<p class="subtitle">{subtitle}</p>
