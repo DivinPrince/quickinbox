@@ -1,0 +1,4 @@
+# Kept out of the release zip — maintainer tooling, not part of the product.
+.github            export-ignore
+.gitattributes     export-ignore
+scripts/check-template-clean.mjs export-ignore

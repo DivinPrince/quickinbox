@@ -1,0 +1,237 @@
+<script lang="ts">
+	import Icon from '$lib/components/Icon.svelte';
+	import WizardShell from '$lib/components/WizardShell.svelte';
+	import DomainPicker from '$lib/components/DomainPicker.svelte';
+	import AddressField from '$lib/components/AddressField.svelte';
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
+
+	let selected = $state<string[]>([]);
+	let connecting = $state(false);
+	let creating = $state(false);
+	let error = $state('');
+
+	let localPart = $state('');
+	let addressDomainId = $state('');
+
+	// Seed the picker with the first connected domain once data is available.
+	$effect(() => {
+		if (!addressDomainId && data.domains[0]) {
+			addressDomainId = data.domains[0].id;
+		}
+	});
+
+	// Step 1 only appears for an admin who hasn't connected anything yet.
+	const needsDomain = $derived(data.domains.length === 0);
+	const connectable = $derived(data.available.filter((domain) => !domain.connected));
+	const cleanLocal = $derived(localPart.trim().toLowerCase().replace(/@.*$/, ''));
+	const activeDomain = $derived(data.domains.find((domain) => domain.id === addressDomainId));
+
+	async function connectDomains() {
+		if (selected.length === 0) {
+			error = 'Pick at least one domain to continue';
+			return;
+		}
+
+		connecting = true;
+		error = '';
+
+		try {
+			const res = await fetch('/api/domains', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ domainIds: selected })
+			});
+			const body = await res.json();
+			if (!res.ok) {
+				error = body.error ?? 'Could not connect that domain';
+				return;
+			}
+			window.location.reload();
+		} catch {
+			error = 'Network error';
+		} finally {
+			connecting = false;
+		}
+	}
+
+	async function claimAddress(event: SubmitEvent) {
+		event.preventDefault();
+		creating = true;
+		error = '';
+
+		try {
+			const res = await fetch('/api/addresses', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ domainId: addressDomainId, localPart: cleanLocal })
+			});
+			const body = await res.json();
+			if (!res.ok) {
+				error = body.error ?? 'Could not create that address';
+				return;
+			}
+			window.location.href = '/inbox';
+		} catch {
+			error = 'Network error';
+		} finally {
+			creating = false;
+		}
+	}
+</script>
+
+<svelte:head>
+	<title>Get started — Mail</title>
+</svelte:head>
+
+<WizardShell
+	title={needsDomain ? 'Connect a domain' : 'Claim your address'}
+	subtitle={needsDomain
+		? 'Pick the domains from your Resend account that you want in this dashboard.'
+		: "Choose the address you'll send and receive mail from."}
+>
+	{#if needsDomain}
+		{#if !data.isAdmin}
+			<div class="surface-lg notice">
+				<Icon name="time-line" size={18} />
+				<div>
+					<p class="notice-title">Waiting on your admin</p>
+					<p class="notice-body">No domain has been connected yet. Ask an admin to finish setup.</p>
+				</div>
+			</div>
+		{:else if !data.resendConfigured || data.loadError}
+			<div class="surface-lg notice notice-warn">
+				<Icon name={data.resendConfigured ? 'error-warning-line' : 'key-2-line'} size={18} />
+				<div>
+					<p class="notice-title">
+						{data.resendConfigured ? "Couldn't load your domains" : 'Resend API key missing'}
+					</p>
+					<p class="notice-body">{data.loadError}</p>
+				</div>
+			</div>
+		{:else if connectable.length === 0}
+			<div class="surface-lg notice">
+				<Icon name="global-line" size={18} />
+				<div>
+					<p class="notice-title">No domains in this Resend account</p>
+					<p class="notice-body">
+						Add and verify a domain at resend.com/domains, then reload this page.
+					</p>
+				</div>
+			</div>
+		{:else}
+			<DomainPicker domains={connectable} bind:selected />
+
+			{#if error}<p class="error">{error}</p>{/if}
+
+			<button
+				type="button"
+				class="btn-primary w-full py-2.5 mt-4"
+				disabled={connecting}
+				onclick={connectDomains}
+			>
+				{connecting
+					? 'Connecting…'
+					: `Continue with ${selected.length || 'no'} domain${selected.length === 1 ? '' : 's'}`}
+			</button>
+		{/if}
+	{:else}
+		<form class="surface-lg address-card" onsubmit={claimAddress}>
+			<AddressField bind:localPart bind:domainId={addressDomainId} domains={data.domains} />
+
+			{#if cleanLocal && activeDomain}
+				<p class="preview">
+					You'll send and receive as <strong>{cleanLocal}@{activeDomain.name}</strong>
+				</p>
+			{/if}
+
+			{#if activeDomain && !activeDomain.receiving_enabled}
+				<p class="hint">
+					<Icon name="information-line" size={14} />
+					Receiving isn't enabled on {activeDomain.name} — you can send, but inbound mail won't
+					arrive.
+				</p>
+			{/if}
+
+			{#if error}<p class="error">{error}</p>{/if}
+
+			<button
+				type="submit"
+				class="btn-primary w-full py-2.5 mt-4"
+				disabled={creating || !cleanLocal}
+			>
+				{creating ? 'Creating…' : 'Go to inbox'}
+			</button>
+		</form>
+
+		{#if data.isAdmin && data.available.some((domain) => !domain.connected)}
+			<p class="footnote">
+				Want more than one domain here? Connect them any time from <a href="/admin">Admin</a>.
+			</p>
+		{/if}
+	{/if}
+</WizardShell>
+
+<style>
+	.address-card {
+		padding: 1.5rem;
+	}
+
+	.preview {
+		margin-top: 0.75rem;
+		font-size: 0.8125rem;
+		color: var(--color-text-secondary);
+	}
+
+	.notice {
+		display: flex;
+		gap: 0.75rem;
+		padding: 1.25rem;
+		color: var(--color-text-secondary);
+	}
+
+	.notice-warn {
+		box-shadow: 0 0 0 1px var(--tone-notice-line), var(--shadow-sm);
+	}
+
+	.notice-title {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--color-text);
+	}
+
+	.notice-body {
+		margin-top: 0.25rem;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+	}
+
+	.hint {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.375rem;
+		margin-top: 0.875rem;
+		font-size: 0.75rem;
+		line-height: 1.5;
+		color: var(--color-muted);
+	}
+
+	.error {
+		margin-top: 0.75rem;
+		font-size: 0.8125rem;
+		color: var(--color-danger);
+	}
+
+	.footnote {
+		margin-top: 1rem;
+		text-align: center;
+		font-size: 0.75rem;
+		color: var(--color-muted);
+	}
+
+	.footnote a {
+		color: var(--color-text-secondary);
+		text-decoration: underline;
+	}
+</style>
