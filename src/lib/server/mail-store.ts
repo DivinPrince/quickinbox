@@ -761,9 +761,10 @@ export async function listThreadMessages(
 		.bind(...results.map((message) => message.id))
 		.all<EmailAttachmentMeta>();
 
+	// The query already filters drafts out, so `status` is a delivery state or null
+	// and needs no further narrowing here.
 	return results.map((message) => ({
 		...message,
-		status: message.status === 'draft' ? null : (message.status as DeliveryStatus | null),
 		is_read: message.is_read === 1,
 		is_starred: message.is_starred === 1,
 		attachments: files.filter((file) => file.email_id === message.id)
