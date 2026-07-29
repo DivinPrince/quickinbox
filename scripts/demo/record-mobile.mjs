@@ -128,12 +128,31 @@ async function openNav(page) {
   await sleep(200);
 }
 
+async function closeNav(page) {
+  if (!(await page.locator(".sidebar.mobile-open").count())) return;
+  const scrim = page.getByRole("button", { name: /Close navigation/i });
+  if (await scrim.count()) {
+    await scrim.click({ force: true });
+  } else {
+    await page.keyboard.press("Escape").catch(() => {});
+  }
+  await page
+    .locator(".sidebar.mobile-open")
+    .waitFor({ state: "hidden", timeout: 5_000 })
+    .catch(() => {});
+  await sleep(150);
+}
+
 async function navTo(page, href) {
   await openNav(page);
-  const link = page.locator(`a.nav-link[href="${href}"], a.new-message[href="${href}"], a[href="${href}"]`).first();
+  const link = page
+    .locator(`a.nav-link[href="${href}"], a.new-message[href="${href}"], a[href="${href}"]`)
+    .first();
   await click(page, link);
   await page.waitForURL(new RegExp(href.replace("/", "\\/")), { timeout: 12_000 });
-  await sleep(250);
+  // New message link does not auto-close the drawer — dismiss it.
+  await closeNav(page);
+  await sleep(200);
 }
 
 const browser = await chromium.launch({
@@ -296,13 +315,12 @@ try {
 
   await scene("05-compose", async () => {
     await showCaption(page, byId["05-compose"].caption);
-    await openNav(page);
-    await click(page, page.locator('a.new-message, a[href="/compose"]').first());
-    await page.waitForURL(/\/compose/, { timeout: 15_000 });
+    await navTo(page, "/compose");
     await showCaption(page, byId["05-compose"].caption);
     await sleep(220);
 
     const toField = page.locator('input[placeholder*="recipient"]').first();
+    await toField.waitFor({ state: "visible", timeout: 10_000 });
     await typeInto(page, toField, "elon@x.com", 18);
     await typeInto(
       page,
