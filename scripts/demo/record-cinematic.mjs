@@ -132,9 +132,19 @@ const browser = await chromium.launch({
 const context = await browser.newContext({
   viewport: { width: 1440, height: 900 },
   deviceScaleFactor: 1,
+  colorScheme: "dark",
   recordVideo: { dir: RAW, size: { width: 1440, height: 900 } },
 });
 const page = await context.newPage();
+
+// Prefer dark from the first paint (setup through inbox).
+await page.addInitScript(() => {
+  try {
+    localStorage.setItem("mail:theme", "dark");
+  } catch {
+    /* ignore */
+  }
+});
 
 await page.addInitScript((cursorSrc) => {
   const install = () => {
@@ -363,14 +373,14 @@ try {
     await page.waitForURL(/\/settings/, { timeout: 10_000 });
     await showCaption(page, byId["07-theme"].caption);
     await sleep(350);
-    await click(page, page.getByRole("radio", { name: /Dark/i }));
-    await sleep(550);
-    await snap(page, "theme-dark");
+    // Already dark from start — show light, then return to dark.
     await click(page, page.getByRole("radio", { name: /Light/i }));
-    await sleep(450);
+    await sleep(550);
     await snap(page, "theme-light");
-    await click(page, page.getByRole("radio", { name: /System/i }));
-    await sleep(400);
+    await click(page, page.getByRole("radio", { name: /Dark/i }));
+    await sleep(450);
+    await snap(page, "theme-dark");
+    await sleep(350);
   });
 
   await scene("08-users", async () => {
