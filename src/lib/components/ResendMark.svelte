@@ -17,7 +17,6 @@
 	xmlns="http://www.w3.org/2000/svg"
 	role="img"
 	aria-label="Resend"
-	aria-hidden="true"
 >
 	<rect width="1800" height="1800" rx="412" fill="#0a0a0a" />
 	<path
