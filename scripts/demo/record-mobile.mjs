@@ -109,11 +109,13 @@ async function moveTo(page, locator, steps = 14) {
 
 async function click(page, locator) {
   await moveTo(page, locator);
-  await locator.click();
+  await locator.click({ force: true });
 }
 
 async function typeInto(page, locator, text, delay = 18) {
-  await click(page, locator);
+  await locator.scrollIntoViewIfNeeded().catch(() => {});
+  await moveTo(page, locator);
+  await locator.click({ force: true });
   await locator.fill("");
   await locator.pressSequentially(text, { delay });
 }
@@ -145,12 +147,17 @@ async function closeNav(page) {
 
 async function navTo(page, href) {
   await openNav(page);
-  const link = page
-    .locator(`a.nav-link[href="${href}"], a.new-message[href="${href}"], a[href="${href}"]`)
-    .first();
+  const link = page.locator(`aside.sidebar a[href="${href}"]`).first();
+  await link.waitFor({ state: "visible", timeout: 8_000 });
   await click(page, link);
-  await page.waitForURL(new RegExp(href.replace("/", "\\/")), { timeout: 12_000 });
-  // New message link does not auto-close the drawer — dismiss it.
+  await page.waitForURL((url) => url.pathname === href || url.pathname.startsWith(`${href}/`), {
+    timeout: 12_000,
+  });
+  await closeNav(page);
+  // Hard navigation keeps the drawer from covering the page on mobile.
+  if (!page.url().includes(href)) {
+    await page.goto(`${APP_URL}${href}`, { waitUntil: "networkidle" });
+  }
   await closeNav(page);
   await sleep(200);
 }
@@ -315,12 +322,13 @@ try {
 
   await scene("05-compose", async () => {
     await showCaption(page, byId["05-compose"].caption);
-    await navTo(page, "/compose");
+    await page.goto(`${APP_URL}/compose`, { waitUntil: "networkidle" });
+    await closeNav(page);
     await showCaption(page, byId["05-compose"].caption);
-    await sleep(220);
+    await sleep(280);
 
-    const toField = page.locator('input[placeholder*="recipient"]').first();
-    await toField.waitFor({ state: "visible", timeout: 10_000 });
+    const toField = page.locator("#to").first();
+    await toField.waitFor({ state: "visible", timeout: 15_000 });
     await typeInto(page, toField, "elon@x.com", 18);
     await typeInto(
       page,
