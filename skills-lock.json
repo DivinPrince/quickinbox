@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "demo-video": {
+      "source": "DivinPrince/dpskills",
+      "sourceType": "github",
+      "skillPath": "skills/demo-video/SKILL.md",
+      "computedHash": "a74c565f80fb79fc7410356a5ea2ea9bfaa7eb330f5fc3a6636513f11f610efc"
+    }
+  }
+}

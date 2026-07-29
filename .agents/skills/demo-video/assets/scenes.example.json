@@ -1,0 +1,17 @@
+[
+  {
+    "id": "01-intro",
+    "caption": "Welcome to the product",
+    "text": "Welcome. In this short tutorial, I'll walk you through the feature end to end — what it does, how to set it up, and how to use it day to day."
+  },
+  {
+    "id": "02-overview",
+    "caption": "What you're looking at",
+    "text": "This is the main workspace. Everything you create shows up here, with its current status right alongside it."
+  },
+  {
+    "id": "03-create",
+    "caption": "Create your first project",
+    "text": "Click New project, give it a name, and choose a region close to your users."
+  }
+]

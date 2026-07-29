@@ -11,3 +11,7 @@ RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Shown once when you create the webhook at https://resend.com/webhooks
 # (see step 4 of the README). Starts with whsec_.
 RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Optional: set RESEND_API_KEY=demo_local and DEMO_MAIL_DOMAIN=your.domain
+# for an offline setup/onboarding demo without calling Resend.
+# DEMO_MAIL_DOMAIN=demo.local

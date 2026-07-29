@@ -1,3 +1,4 @@
+import { createDemoResendClient, isDemoResendKey } from './demo-resend';
 import { createResendClient, type ResendClient } from './resend';
 
 type PlatformLike = App.Platform | undefined | null;
@@ -16,6 +17,9 @@ export function getResendClient(platform: PlatformLike): ResendClient {
 		throw new ConfigError(
 			'RESEND_API_KEY is not set. Add it with `wrangler secret put RESEND_API_KEY` (or to .dev.vars locally).'
 		);
+	}
+	if (isDemoResendKey(apiKey)) {
+		return createDemoResendClient(platform?.env.DEMO_MAIL_DOMAIN);
 	}
 	return createResendClient(apiKey);
 }

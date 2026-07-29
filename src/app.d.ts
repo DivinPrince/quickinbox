@@ -12,6 +12,8 @@ declare global {
 				RESEND_API_KEY: string;
 				/** Signing secret from the Resend webhook (whsec_…). */
 				RESEND_WEBHOOK_SECRET: string;
+				/** Optional local demo domain when RESEND_API_KEY=demo_local. */
+				DEMO_MAIL_DOMAIN?: string;
 			};
 		}
 		interface Locals {
