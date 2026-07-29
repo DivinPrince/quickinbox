@@ -2,7 +2,7 @@
 
 Records a product walkthrough with a larger custom cursor and top-right
 slide-in caption chips (not bottom subtitles). No narration, no camera zoom.
-Starts in **light mode** at 1920×1080 (2× screenshots). Mux uses CRF 14 / slow.
+Starts in **dark mode** at 1920×1080 (2× screenshots). Mux uses CRF 14 / slow.
 Also writes PNG screenshots per beat under `$DEMO_OUT/shots`.
 
 Uses the `demo-video` skill patterns from DivinPrince/dpskills.
