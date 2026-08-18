@@ -1,12 +1,14 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { MailAddress, OutboundAttachmentInput, User } from '$lib/types';
+import { appendEmailSignature } from '$lib/email-signature';
 import { base64ByteLength, insertAttachments } from './attachments';
 import { MAX_TOTAL_ATTACHMENT_BYTES } from './constants';
 import { getAddressForUser, getDefaultAddress } from './domains';
+import { getEmailSignature } from './email-signature';
 import { stripHtml } from './html';
 import { insertEmail } from './mail-store';
 import { initialOutboundStatus, type EmailProvider } from './email-provider';
-import { parseRecipients, sendOutboundEmail } from './send-mail';
+import { escapeHtml, parseRecipients, sendOutboundEmail } from './send-mail';
 
 export type ComposeInput = {
 	fromAddressId?: string | null;
@@ -52,12 +54,19 @@ export async function sendAndStore(
 	// resolveFromAddress scopes the lookup to this user, so ownership is implied.
 	const from = await resolveFromAddress(env.DB, user, input.fromAddressId);
 
-	const html = input.html?.trim() || null;
-	const text = input.text?.trim() || (html ? stripHtml(html) : '');
+	const bodyHtml = input.html?.trim() || null;
+	const bodyText = input.text?.trim() || (bodyHtml ? stripHtml(bodyHtml) : '');
 
-	if (!text && !html) {
+	// The automatic signature does not count as message content.
+	if (!bodyText && !bodyHtml) {
 		throw new Error('Message body is required');
 	}
+
+	const { text, html } = appendEmailSignature({
+		text: bodyText,
+		html: bodyHtml,
+		signature: await getEmailSignature(env.DB, user.id)
+	});
 
 	const attachments = input.attachments ?? [];
 	const totalBytes = attachments.reduce(
@@ -91,7 +100,7 @@ export async function sendAndStore(
 		bcc: parseRecipients(input.bcc).join(', ') || null,
 		subject: input.subject.trim(),
 		bodyText: text,
-		bodyHtml: html ?? text.replaceAll('\n', '<br>\n'),
+		bodyHtml: html ?? escapeHtml(text).replaceAll('\n', '<br>\n'),
 		inReplyTo: input.inReplyTo ?? null,
 		references: input.references ?? null,
 		replyToEmailId: input.replyToEmailId ?? null,

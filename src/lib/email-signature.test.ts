@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import { describe, test } from 'node:test';
+import {
+	appendEmailSignature,
+	normalizeEmailSignature
+} from './email-signature';
+
+	describe('email signatures', () => {
+	test('normalizes line endings and trailing whitespace', () => {
+		assert.equal(
+			normalizeEmailSignature('  Best,  \r\nEmmanuel  \r\n'),
+			'Best,\nEmmanuel'
+		);
+	});
+
+	test('appends a sign-off to plain text and HTML', () => {
+		assert.deepEqual(
+			appendEmailSignature({
+				text: 'Hello there',
+				html: '<p>Hello there</p>',
+				signature: 'Best,\nEmmanuel'
+			}),
+			{
+				text: 'Hello there\n\nBest,\nEmmanuel',
+				html:
+					'<p>Hello there</p>\n<div><br></div>\n<div data-email-signature="true">Best,<br>\nEmmanuel</div>'
+			}
+		);
+	});
+
+	test('escapes signature text before adding it to HTML', () => {
+		const result = appendEmailSignature({
+			text: 'Hello',
+			html: '<p>Hello</p>',
+			signature: '<Emmanuel & Co>'
+		});
+
+		assert.match(result.html ?? '', /&lt;Emmanuel &amp; Co&gt;/);
+		assert.doesNotMatch(result.html ?? '', /<Emmanuel & Co>/);
+	});
+
+	test('leaves the message unchanged when the signature is empty', () => {
+		assert.deepEqual(
+			appendEmailSignature({ text: 'Hello', html: '<p>Hello</p>', signature: '   ' }),
+			{ text: 'Hello', html: '<p>Hello</p>' }
+		);
+	});
+});
