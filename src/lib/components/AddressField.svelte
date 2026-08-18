@@ -63,6 +63,7 @@
 		flex: 1;
 		min-width: 0;
 		font-size: 0.9375rem;
+		color: var(--color-text);
 		background: transparent;
 		outline: none;
 	}
