@@ -3,6 +3,12 @@
 	import WizardShell from '$lib/components/WizardShell.svelte';
 	import DomainPicker from '$lib/components/DomainPicker.svelte';
 	import AddressField from '$lib/components/AddressField.svelte';
+	import {
+		missingProviderTitle,
+		noDomainsBody,
+		noDomainsTitle,
+		onboardingSubtitle
+	} from '$lib/provider-copy';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -88,7 +94,7 @@
 <WizardShell
 	title={needsDomain ? 'Connect a domain' : 'Claim your address'}
 	subtitle={needsDomain
-		? 'Pick the domains from your Resend account that you want in this dashboard.'
+		? onboardingSubtitle(data.providerKind)
 		: "Choose the address you'll send and receive mail from."}
 >
 	{#if needsDomain}
@@ -100,12 +106,12 @@
 					<p class="notice-body">No domain has been connected yet. Ask an admin to finish setup.</p>
 				</div>
 			</div>
-		{:else if !data.resendConfigured || data.loadError}
+		{:else if !data.providerConfigured || data.loadError}
 			<div class="surface-lg notice notice-warn">
-				<Icon name={data.resendConfigured ? 'error-warning-line' : 'key-2-line'} size={18} />
+				<Icon name={data.providerConfigured ? 'error-warning-line' : 'key-2-line'} size={18} />
 				<div>
 					<p class="notice-title">
-						{data.resendConfigured ? "Couldn't load your domains" : 'Resend API key missing'}
+						{data.providerConfigured ? "Couldn't load your domains" : missingProviderTitle(data.providerKind)}
 					</p>
 					<p class="notice-body">{data.loadError}</p>
 				</div>
@@ -114,9 +120,9 @@
 			<div class="surface-lg notice">
 				<Icon name="global-line" size={18} />
 				<div>
-					<p class="notice-title">No domains in this Resend account</p>
+					<p class="notice-title">{noDomainsTitle(data.providerKind)}</p>
 					<p class="notice-body">
-						Add and verify a domain at resend.com/domains, then reload this page.
+						{noDomainsBody(data.providerKind)}
 					</p>
 				</div>
 			</div>

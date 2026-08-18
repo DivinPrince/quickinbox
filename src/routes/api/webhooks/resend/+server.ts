@@ -4,8 +4,7 @@ import { claimWebhookEvent, handleResendWebhook, type ResendWebhookEvent } from 
 import { verifyWebhookSignature } from '$lib/server/webhook';
 
 /**
- * Resend webhook receiver — this is how mail arrives now that the Cloudflare
- * Email Routing worker handler is gone.
+ * Resend webhook receiver — used when EMAIL_PROVIDER=resend.
  *
  * Point a webhook at https://<your-app>/api/webhooks/resend in the Resend
  * dashboard and subscribe to `email.received` plus the delivery events.

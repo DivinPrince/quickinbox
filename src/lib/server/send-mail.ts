@@ -1,5 +1,5 @@
 import type { MailAddress, OutboundAttachmentInput } from '$lib/types';
-import type { ResendClient } from './resend';
+import type { EmailProvider } from './email-provider';
 
 export type OutboundMailInput = {
 	from: MailAddress;
@@ -12,6 +12,7 @@ export type OutboundMailInput = {
 	html?: string;
 	inReplyTo?: string | null;
 	references?: string | null;
+	headers?: Record<string, string>;
 	attachments?: OutboundAttachmentInput[];
 	idempotencyKey?: string;
 };
@@ -59,7 +60,7 @@ export function validateSubject(subject: string): string | null {
 	return null;
 }
 
-/** Split a comma-separated recipient field into addresses Resend will accept. */
+/** Split a comma-separated recipient field into addresses the provider will accept. */
 export function parseRecipients(value: string | string[] | undefined | null): string[] {
 	if (!value) return [];
 	const parts = Array.isArray(value) ? value : value.split(',');
@@ -82,7 +83,7 @@ ${bodyHtml}
 }
 
 export async function sendOutboundEmail(
-	client: ResendClient,
+	provider: EmailProvider,
 	input: OutboundMailInput
 ): Promise<OutboundMailResult> {
 	const subjectError = validateSubject(input.subject);
@@ -100,7 +101,7 @@ export async function sendOutboundEmail(
 	const safeText = input.text.trim();
 	const bodyHtml = input.html?.trim() || escapeHtml(safeText).replaceAll('\n', '<br>\n');
 
-	const headers: Record<string, string> = {};
+	const headers: Record<string, string> = { ...input.headers };
 	const inReplyTo = formatMessageId(input.inReplyTo);
 	// References is a chain, In-Reply-To a single id. Both matter: mail clients
 	// on the other side thread on them, and so do we when the reply comes back.
@@ -110,29 +111,19 @@ export async function sendOutboundEmail(
 		if (references) headers['References'] = references;
 	}
 
-	const result = await client.send(
-		{
-			from: `${input.senderName} <${input.from.address}>`,
-			to,
-			...(cc.length ? { cc } : {}),
-			...(bcc.length ? { bcc } : {}),
-			reply_to: input.from.address,
-			subject: input.subject.trim(),
-			text: safeText,
-			html: buildHtmlEmail(bodyHtml),
-			...(Object.keys(headers).length ? { headers } : {}),
-			...(input.attachments?.length
-				? {
-						attachments: input.attachments.map((file) => ({
-							filename: file.filename,
-							content: file.content,
-							content_type: file.type
-						}))
-					}
-				: {})
-		},
-		input.idempotencyKey ?? crypto.randomUUID()
-	);
-
-	return { providerId: result.id };
+	return provider.send({
+		from: input.from,
+		senderName: input.senderName,
+		to,
+		...(cc.length ? { cc } : {}),
+		...(bcc.length ? { bcc } : {}),
+		subject: input.subject.trim(),
+		text: safeText,
+		html: buildHtmlEmail(bodyHtml),
+		inReplyTo,
+		references,
+		...(Object.keys(headers).length ? { headers } : {}),
+		attachments: input.attachments,
+		idempotencyKey: input.idempotencyKey ?? crypto.randomUUID()
+	});
 }

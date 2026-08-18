@@ -5,7 +5,7 @@ import { MAX_TOTAL_ATTACHMENT_BYTES } from './constants';
 import { getAddressForUser, getDefaultAddress } from './domains';
 import { stripHtml } from './html';
 import { insertEmail } from './mail-store';
-import type { ResendClient } from './resend';
+import { initialOutboundStatus, type EmailProvider } from './email-provider';
 import { parseRecipients, sendOutboundEmail } from './send-mail';
 
 export type ComposeInput = {
@@ -42,10 +42,10 @@ export async function resolveFromAddress(
 	return address;
 }
 
-/** Send through Resend, then record it in the Sent folder with its provider id. */
+/** Send through the configured provider, then record it in the Sent folder. */
 export async function sendAndStore(
 	env: { DB: D1Database; ATTACHMENTS: R2Bucket },
-	client: ResendClient,
+	provider: EmailProvider,
 	user: User,
 	input: ComposeInput
 ): Promise<{ emailId: string; providerId: string; from: MailAddress }> {
@@ -68,7 +68,7 @@ export async function sendAndStore(
 		throw new Error('Attachments exceed the total size limit');
 	}
 
-	const { providerId } = await sendOutboundEmail(client, {
+	const { providerId } = await sendOutboundEmail(provider, {
 		from,
 		senderName: user.name,
 		to: input.to,
@@ -97,7 +97,7 @@ export async function sendAndStore(
 		replyToEmailId: input.replyToEmailId ?? null,
 		domainId: from.domain_id,
 		providerId,
-		status: 'queued',
+		status: initialOutboundStatus(provider.kind),
 		isRead: true
 	});
 

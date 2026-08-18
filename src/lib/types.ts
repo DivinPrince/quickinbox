@@ -30,7 +30,10 @@ export type Domain = {
 	synced_at: string | null;
 };
 
-/** A domain as reported by the Resend API, flagged with local connection state. */
+/** Which mail backend this deploy is configured to use. */
+export type EmailProviderKind = 'resend' | 'cloudflare';
+
+/** A domain as reported by the active provider, flagged with local connection state. */
 export type AvailableDomain = {
 	id: string;
 	name: string;

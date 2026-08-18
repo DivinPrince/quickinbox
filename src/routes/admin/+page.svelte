@@ -122,8 +122,10 @@
 	<section class="surface-lg admin-card">
 		<h2><Icon name="global-line" size={18} /> Domains</h2>
 		<p class="card-hint">
-			Connected domains send and receive through Resend. Catch-all decides who gets mail addressed
-			to an unknown mailbox on that domain.
+			Connected domains send and receive through {data.providerKind === 'cloudflare'
+				? 'Cloudflare Email'
+				: 'Resend'}. Catch-all decides who gets mail addressed to an unknown mailbox on that
+			domain.
 		</p>
 
 		<ul class="domain-list">
@@ -184,8 +186,11 @@
 					{#if !domain.receiving_enabled}
 						<p class="hint">
 							<Icon name="information-line" size={13} />
-							Inbound is off for this domain in Resend — add the MX record and enable receiving to
-							get mail.
+							Inbound is off for this domain — enable receiving
+							{data.providerKind === 'cloudflare'
+								? "and point Email Routing's catch-all at this Worker"
+								: 'and add the MX record at the provider'}
+							to get mail.
 						</p>
 					{/if}
 					{#if domain.catchall_user_id}
@@ -200,7 +205,9 @@
 
 		{#if connectable.length > 0}
 			<div class="connect-block">
-				<p class="connect-title">Available in Resend</p>
+				<p class="connect-title">
+					Available in {data.providerKind === 'cloudflare' ? 'Cloudflare Email' : 'Resend'}
+				</p>
 				<ul class="connect-list">
 					{#each connectable as domain (domain.id)}
 						<li class="connect-row">

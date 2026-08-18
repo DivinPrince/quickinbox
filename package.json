@@ -6,9 +6,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
-		"preview": "vite build && wrangler dev",
-		"deploy": "vite build && wrangler deploy",
+		"build": "vite build && bun scripts/wrap-cloudflare-worker.mjs",
+		"preview": "bun run build && wrangler dev",
+		"deploy": "bun run build && wrangler deploy",
 		"db:migrate:local": "wrangler d1 migrations apply quickmail --local",
 		"db:migrate:remote": "wrangler d1 migrations apply quickmail --remote",
 		"prepare": "svelte-kit sync || echo ''",
@@ -33,6 +33,7 @@
 		"wrangler": "^4.96.0"
 	},
 	"dependencies": {
+		"postal-mime": "^3.0.0",
 		"remixicon": "^4.9.1"
 	}
 }

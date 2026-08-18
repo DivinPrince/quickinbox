@@ -1,10 +1,17 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { ConfigError, getResendClient } from '$lib/server/context';
+import {
+	ConfigError,
+	getEmailProvider,
+	safeEmailProviderKind,
+	hasProviderConfigured,
+	listAvailableDomains,
+	ProviderError,
+	providerLoadError
+} from '$lib/server/context';
 import { listDomains, syncDomains, upsertDomain } from '$lib/server/domains';
-import { isDomainReceivable, isDomainSendable, ResendError } from '$lib/server/resend';
 
 /**
- * GET  — every domain the configured Resend key can reach, flagged with
+ * GET  — every domain the configured provider can reach, flagged with
  *        whether it is already connected to this dashboard.
  * POST — connect one (or several) of them.
  */
@@ -15,47 +22,57 @@ export const GET: RequestHandler = async ({ locals, platform, url }) => {
 	}
 
 	const connected = await listDomains(db);
+	const providerKind = safeEmailProviderKind(platform);
 
 	// Non-admins only need what is already wired up.
 	if (!locals.user.is_admin) {
-		return json({ connected, available: [], resendConfigured: true });
+		return json({
+			connected,
+			available: [],
+			providerConfigured: true,
+			providerKind
+		});
 	}
 
 	try {
-		const client = getResendClient(platform);
+		const provider = getEmailProvider(platform);
 
 		if (url.searchParams.get('sync') === '1') {
-			return json({ connected: await syncDomains(db, client), available: [] });
+			return json({
+				connected: await syncDomains(db, provider),
+				available: [],
+				providerKind
+			});
 		}
-
-		const remote = await client.listDomains();
-		const connectedIds = new Set(connected.map((domain) => domain.id));
 
 		return json({
 			connected,
-			resendConfigured: true,
-			available: remote.map((domain) => ({
-				id: domain.id,
-				name: domain.name,
-				status: domain.status,
-				region: domain.region,
-				can_send: isDomainSendable(domain),
-				can_receive: isDomainReceivable(domain),
-				connected: connectedIds.has(domain.id)
-			}))
+			providerConfigured: true,
+			providerKind,
+			available: await listAvailableDomains(
+				platform,
+				connected.map((domain) => domain.id)
+			)
 		});
 	} catch (error) {
 		if (error instanceof ConfigError) {
-			return json({ connected, available: [], resendConfigured: false, error: error.message });
+			return json({
+				connected,
+				available: [],
+				providerConfigured: false,
+				providerKind,
+				error: error.message
+			});
 		}
 		return json(
 			{
 				connected,
 				available: [],
-				resendConfigured: true,
-				error: error instanceof ResendError ? error.message : 'Failed to reach Resend'
+				providerConfigured: hasProviderConfigured(platform),
+				providerKind,
+				error: providerLoadError(providerKind, error)
 			},
-			{ status: error instanceof ResendError ? error.status : 502 }
+			{ status: error instanceof ProviderError ? (error.status >= 500 ? 502 : 400) : 502 }
 		);
 	}
 };
@@ -74,19 +91,17 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 	}
 
 	try {
-		const client = getResendClient(platform);
+		const provider = getEmailProvider(platform);
 		const connected = [];
 
 		for (const id of ids) {
-			// Read it back from Resend so status/capabilities are authoritative.
-			const domain = await client.getDomain(id);
-			connected.push(await upsertDomain(db, domain));
+			connected.push(await upsertDomain(db, await provider.getDomain(id)));
 		}
 
 		return json({ connected, domains: await listDomains(db) }, { status: 201 });
 	} catch (error) {
 		const message =
-			error instanceof ConfigError || error instanceof ResendError
+			error instanceof ConfigError || error instanceof ProviderError
 				? error.message
 				: 'Failed to connect domain';
 		return json({ error: message }, { status: 400 });

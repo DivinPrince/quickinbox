@@ -64,8 +64,8 @@
 {#if selected.some((id) => domains.find((d) => d.id === id && !d.can_receive))}
 	<p class="hint">
 		<Icon name="information-line" size={14} />
-		Receiving is off for a selected domain. Enable Inbound on it in Resend to get mail — sending
-		still works.
+		Receiving is off for a selected domain. Enable inbound on it at the mail provider to get
+		mail — sending still works.
 	</p>
 {/if}
 

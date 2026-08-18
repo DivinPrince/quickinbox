@@ -91,7 +91,7 @@
 							{#if activeDomainId === domain.id}
 								<Icon name="check-line" size={14} />
 							{:else if !domain.receiving_enabled}
-								<span class="item-flag" title="Receiving not enabled in Resend">send only</span>
+								<span class="item-flag" title="Receiving not enabled for this domain">send only</span>
 							{/if}
 						</button>
 					</li>

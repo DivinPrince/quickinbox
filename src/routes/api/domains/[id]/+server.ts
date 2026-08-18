@@ -1,9 +1,8 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { getResendClient } from '$lib/server/context';
+import { getEmailProvider, ProviderError } from '$lib/server/context';
 import { disconnectDomain, getDomain, setCatchallUser, upsertDomain } from '$lib/server/domains';
-import { ResendError } from '$lib/server/resend';
 
-/** PATCH — set the catch-all owner or re-sync DNS status from Resend. */
+/** PATCH — set the catch-all owner or re-sync status from the active provider. */
 export const PATCH: RequestHandler = async ({ params, request, locals, platform }) => {
 	const db = platform?.env.DB;
 	if (!db || !locals.user?.is_admin) {
@@ -22,12 +21,12 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 
 	if (body.refresh) {
 		try {
-			const client = getResendClient(platform);
-			const remote = await client.getDomain(domain.id);
+			const provider = getEmailProvider(platform);
+			const remote = await provider.getDomain(domain.id);
 			return json({ domain: await upsertDomain(db, remote) });
 		} catch (error) {
 			return json(
-				{ error: error instanceof ResendError ? error.message : 'Failed to refresh domain' },
+				{ error: error instanceof ProviderError ? error.message : 'Failed to refresh domain' },
 				{ status: 502 }
 			);
 		}
@@ -40,7 +39,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 	return json({ domain: await getDomain(db, domain.id) });
 };
 
-/** DELETE — stop using the domain here. The domain stays in Resend. */
+/** DELETE — stop using the domain here. The domain stays with the provider. */
 export const DELETE: RequestHandler = async ({ params, locals, platform }) => {
 	const db = platform?.env.DB;
 	if (!db || !locals.user?.is_admin) {

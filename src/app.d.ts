@@ -1,4 +1,5 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
+import type { CloudflareSendEmailBinding } from '$lib/server/providers/cloudflare-provider';
 import type { Domain, MailAddress, User } from '$lib/types';
 
 declare global {
@@ -8,6 +9,11 @@ declare global {
 				DB: D1Database;
 				ATTACHMENTS: R2Bucket;
 				ASSETS: Fetcher;
+				EMAIL: CloudflareSendEmailBinding;
+				/** `resend` (default) or `cloudflare`. */
+				EMAIL_PROVIDER?: string;
+				/** Comma-separated domains when EMAIL_PROVIDER=cloudflare. */
+				CLOUDFLARE_MAIL_DOMAINS?: string;
 				/** Resend API key — `wrangler secret put RESEND_API_KEY`. */
 				RESEND_API_KEY: string;
 				/** Signing secret from the Resend webhook (whsec_…). */

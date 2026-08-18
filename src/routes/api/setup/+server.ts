@@ -7,24 +7,32 @@ import {
 	SESSION_COOKIE
 } from '$lib/server/auth';
 import { SESSION_DAYS } from '$lib/server/constants';
-import { ConfigError, getResendClient, hasResendKey } from '$lib/server/context';
+import {
+	ConfigError,
+	getEmailProvider,
+	safeEmailProviderKind,
+	hasProviderConfigured,
+	ProviderError
+} from '$lib/server/context';
 import { createAddress, setCatchallUser, upsertDomain } from '$lib/server/domains';
-import { ResendError } from '$lib/server/resend';
 
 export const GET: RequestHandler = async ({ platform }) => {
 	const db = platform?.env.DB;
-	if (!db) return json({ ready: false, needsSetup: true, resendConfigured: false });
+	if (!db) {
+		return json({ ready: false, needsSetup: true, providerConfigured: false, providerKind: 'resend' });
+	}
 
 	const users = await countUsers(db);
 	return json({
 		ready: true,
 		needsSetup: users === 0,
-		resendConfigured: hasResendKey(platform)
+		providerConfigured: hasProviderConfigured(platform),
+		providerKind: safeEmailProviderKind(platform)
 	});
 };
 
 /**
- * First-run bootstrap, done in one shot: connect the chosen Resend domain,
+ * First-run bootstrap, done in one shot: connect the chosen provider domain,
  * create the admin, claim their address, make them the catch-all, sign them in.
  */
 export const POST: RequestHandler = async ({ request, cookies, platform }) => {
@@ -57,9 +65,8 @@ export const POST: RequestHandler = async ({ request, cookies, platform }) => {
 	}
 
 	try {
-		// Read the domain back from Resend so status/capabilities are authoritative.
-		const client = getResendClient(platform);
-		const domain = await upsertDomain(db, await client.getDomain(body.domainId));
+		const provider = getEmailProvider(platform);
+		const domain = await upsertDomain(db, await provider.getDomain(body.domainId));
 
 		const localPart = body.localPart.trim().toLowerCase().replace(/@.*$/, '');
 		const address = `${localPart}@${domain.name}`;
@@ -73,8 +80,8 @@ export const POST: RequestHandler = async ({ request, cookies, platform }) => {
 
 		await createAddress(db, { userId: user.id, domainId: domain.id, localPart });
 
-		// Resend accepts mail for every mailbox on the domain; without a catch-all
-		// anything sent to an unknown address would just pile up unrouted.
+		// The provider accepts mail for every mailbox on the domain; without a
+		// catch-all anything sent to an unknown address would just pile up unrouted.
 		await setCatchallUser(db, domain.id, user.id);
 
 		const session = await login(db, address, body.password);
@@ -89,7 +96,7 @@ export const POST: RequestHandler = async ({ request, cookies, platform }) => {
 		return json({ ok: true, email: address, signedIn: Boolean(session) });
 	} catch (error) {
 		const message =
-			error instanceof ConfigError || error instanceof ResendError
+			error instanceof ConfigError || error instanceof ProviderError
 				? error.message
 				: error instanceof Error
 					? error.message

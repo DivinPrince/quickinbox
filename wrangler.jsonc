@@ -26,10 +26,24 @@
 		"binding": "ASSETS"
 	},
 
-	// Sending and receiving both go through Resend. Two secrets are required:
+	// Mail provider is selected by EMAIL_PROVIDER (resend | cloudflare).
+	// Resend secrets (when EMAIL_PROVIDER=resend or unset):
 	//   wrangler secret put RESEND_API_KEY
 	//   wrangler secret put RESEND_WEBHOOK_SECRET
-	// Locally, put the same values in .dev.vars (copy .dev.vars.example).
+	// Cloudflare Email uses the send_email binding below plus CLOUDFLARE_MAIL_DOMAINS.
+	// Locally, put values in .dev.vars (copy .dev.vars.example).
+
+	"vars": {
+		"EMAIL_PROVIDER": "resend"
+		// "CLOUDFLARE_MAIL_DOMAINS": "example.com"
+	},
+
+	"send_email": [
+		{
+			"name": "EMAIL",
+			"remote": true
+		}
+	],
 
 	"d1_databases": [
 		{

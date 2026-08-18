@@ -1,7 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { Domain, MailAddress } from '$lib/types';
-import type { ResendClient, ResendDomain } from './resend';
-import { isDomainReceivable, isDomainSendable } from './resend';
+import type { EmailProvider, ProviderDomain } from './email-provider';
 
 type DomainRow = {
 	id: string;
@@ -83,10 +82,10 @@ export async function getDomainByName(db: D1Database, name: string): Promise<Dom
 }
 
 /**
- * Connect (or refresh) a Resend domain. Keyed on the Resend domain id so
+ * Connect (or refresh) a provider domain. Keyed on the provider domain id so
  * re-running is safe and picks up newly verified DNS.
  */
-export async function upsertDomain(db: D1Database, domain: ResendDomain): Promise<Domain> {
+export async function upsertDomain(db: D1Database, domain: ProviderDomain): Promise<Domain> {
 	await db
 		.prepare(
 			`INSERT INTO domains (id, name, status, region, sending_enabled, receiving_enabled, synced_at)
@@ -104,8 +103,8 @@ export async function upsertDomain(db: D1Database, domain: ResendDomain): Promis
 			domain.name.toLowerCase(),
 			domain.status,
 			domain.region ?? null,
-			isDomainSendable(domain) ? 1 : 0,
-			isDomainReceivable(domain) ? 1 : 0
+			domain.sendingEnabled ? 1 : 0,
+			domain.receivingEnabled ? 1 : 0
 		)
 		.run();
 
@@ -129,12 +128,12 @@ export async function setCatchallUser(
 		.run();
 }
 
-/** Re-read every connected domain from Resend so status/capabilities stay fresh. */
-export async function syncDomains(db: D1Database, client: ResendClient): Promise<Domain[]> {
+/** Re-read every connected domain from the active provider so status stays fresh. */
+export async function syncDomains(db: D1Database, provider: EmailProvider): Promise<Domain[]> {
 	const connected = await listDomains(db);
 	if (connected.length === 0) return [];
 
-	const remote = await client.listDomains();
+	const remote = await provider.listDomains();
 	const byId = new Map(remote.map((domain) => [domain.id, domain]));
 
 	for (const domain of connected) {
@@ -142,7 +141,7 @@ export async function syncDomains(db: D1Database, client: ResendClient): Promise
 		if (match) {
 			await upsertDomain(db, match);
 		} else {
-			// Removed in Resend — mark it so the UI can explain why sending fails.
+			// Removed from the provider — mark it so the UI can explain why sending fails.
 			await db
 				.prepare(
 					`UPDATE domains SET status = 'missing', sending_enabled = 0, receiving_enabled = 0,
@@ -281,8 +280,8 @@ export type InboundRoute = {
 /**
  * Resolve who an inbound message belongs to.
  *
- * Resend accepts mail for every address on a connected domain, so we try an
- * exact address match first and fall back to the domain's catch-all owner.
+ * The provider accepts mail for every address on a connected domain, so we try
+ * an exact address match first and fall back to the domain's catch-all owner.
  */
 export async function resolveInboundRoute(
 	db: D1Database,
