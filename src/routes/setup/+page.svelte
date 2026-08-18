@@ -9,6 +9,7 @@
 		missingProviderTitle,
 		noDomainsBody,
 		noDomainsTitle,
+		providerName,
 		receivingHint
 	} from '$lib/provider-copy';
 	import type { PageData } from './$types';
@@ -90,6 +91,9 @@
 		: `You'll send and receive on ${chosen?.name}.`}
 	steps={['Domain', 'Account']}
 	current={step}
+	partner={step === 1}
+	partnerKind={data.providerKind}
+	partnerCaption={`Mail + ${providerName(data.providerKind)}`}
 >
 	{#if step === 1}
 		{#if !data.providerConfigured}

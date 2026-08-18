@@ -1,11 +1,17 @@
 <script lang="ts">
+	import type { EmailProviderKind } from '$lib/types';
 	import Logo from './Logo.svelte';
+	import PartnerLink from './PartnerLink.svelte';
 
 	let {
 		title,
 		subtitle,
 		steps = [],
 		current = 1,
+		/** Show Mail ↔ provider marks above the title (domain connect screens). */
+		partner = false,
+		partnerCaption = 'Connected via Cloudflare Email',
+		partnerKind = 'cloudflare',
 		children
 	}: {
 		title: string;
@@ -13,13 +19,20 @@
 		/** Step labels; omit for a single-screen wizard. */
 		steps?: string[];
 		current?: number;
+		partner?: boolean;
+		partnerCaption?: string;
+		partnerKind?: EmailProviderKind;
 		children: import('svelte').Snippet;
 	} = $props();
 </script>
 
 <div class="wizard">
 	<header class="wizard-head">
-		<div class="brand-icon"><Logo size={48} /></div>
+		{#if partner}
+			<PartnerLink size={44} caption={partnerCaption} kind={partnerKind} />
+		{:else}
+			<div class="brand-icon"><Logo size={48} /></div>
+		{/if}
 		<h1>{title}</h1>
 		{#if subtitle}
 			<p class="subtitle">{subtitle}</p>
