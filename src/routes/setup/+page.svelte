@@ -3,6 +3,14 @@
 	import WizardShell from '$lib/components/WizardShell.svelte';
 	import DomainPicker from '$lib/components/DomainPicker.svelte';
 	import AddressField from '$lib/components/AddressField.svelte';
+	import {
+		domainPickerSubtitle,
+		missingProviderHint,
+		missingProviderTitle,
+		noDomainsBody,
+		noDomainsTitle,
+		receivingHint
+	} from '$lib/provider-copy';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -78,19 +86,19 @@
 <WizardShell
 	title={step === 1 ? 'Choose your domain' : 'Create your account'}
 	subtitle={step === 1
-		? 'These are the domains your Resend account can send and receive on. Pick the one you want to use — you can add more later.'
+		? domainPickerSubtitle(data.providerKind)
 		: `You'll send and receive on ${chosen?.name}.`}
 	steps={['Domain', 'Account']}
 	current={step}
 >
 	{#if step === 1}
-		{#if !data.resendConfigured}
+		{#if !data.providerConfigured}
 			<div class="surface-lg notice notice-warn">
 				<Icon name="key-2-line" size={18} />
 				<div>
-					<p class="notice-title">Resend API key missing</p>
+					<p class="notice-title">{missingProviderTitle(data.providerKind)}</p>
 					<p class="notice-body">{data.loadError}</p>
-					<pre class="snippet">wrangler secret put RESEND_API_KEY</pre>
+					<pre class="snippet">{missingProviderHint(data.providerKind)}</pre>
 				</div>
 			</div>
 		{:else if data.loadError}
@@ -105,9 +113,9 @@
 			<div class="surface-lg notice">
 				<Icon name="global-line" size={18} />
 				<div>
-					<p class="notice-title">No domains in this Resend account</p>
+					<p class="notice-title">{noDomainsTitle(data.providerKind)}</p>
 					<p class="notice-body">
-						Add and verify a domain at resend.com/domains, then reload this page.
+						{noDomainsBody(data.providerKind)}
 					</p>
 				</div>
 			</div>
@@ -172,8 +180,7 @@
 			{#if chosen && !chosen.can_receive}
 				<p class="hint">
 					<Icon name="information-line" size={14} />
-					Receiving isn't enabled on {chosen.name} yet — you can send, but inbound mail won't arrive
-					until you add the MX record in Resend.
+					{receivingHint(data.providerKind, chosen.name)}
 				</p>
 			{/if}
 

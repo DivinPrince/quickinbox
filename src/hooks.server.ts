@@ -87,7 +87,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		throw redirect(303, '/login');
 	}
 
-	// Nothing works until a Resend domain is connected and the user owns an
+	// Nothing works until a provider domain is connected and the user owns an
 	// address on it, so send them through onboarding first.
 	const needsOnboarding =
 		event.locals.domains.length === 0 || event.locals.addresses.length === 0;

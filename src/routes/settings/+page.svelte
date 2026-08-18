@@ -179,7 +179,7 @@
 		{#if selectedDomain && !selectedDomain.receiving_enabled}
 			<p class="hint">
 				<Icon name="information-line" size={14} />
-				Receiving isn't enabled on {selectedDomain.name} in Resend — this address can send but won't
+				Receiving isn't enabled on {selectedDomain.name} — this address can send but won't
 				receive.
 			</p>
 		{/if}

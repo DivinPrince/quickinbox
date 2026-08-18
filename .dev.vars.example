@@ -1,13 +1,19 @@
 # Copy this file to .dev.vars and fill in real values.
 # .dev.vars is gitignored — never commit it.
 #
-# In production these live as Worker secrets instead:
-#   wrangler secret put RESEND_API_KEY
-#   wrangler secret put RESEND_WEBHOOK_SECRET
+# In production these live as Worker secrets / vars instead.
 
+# resend (default) or cloudflare
+EMAIL_PROVIDER=resend
+
+# --- Resend (EMAIL_PROVIDER=resend) ---
 # From https://resend.com/api-keys — needs full access (send + domains + receiving).
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # Shown once when you create the webhook at https://resend.com/webhooks
-# (see step 4 of the README). Starts with whsec_.
+# (see the README). Starts with whsec_.
 RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# --- Cloudflare Email (EMAIL_PROVIDER=cloudflare) ---
+# Comma-separated domains already onboarded in Email Service / Email Routing.
+# CLOUDFLARE_MAIL_DOMAINS=example.com,mail.example.com

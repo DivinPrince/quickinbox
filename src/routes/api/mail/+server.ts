@@ -1,8 +1,11 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { ConfigError, getResendClient } from '$lib/server/context';
+import {
+	describeProviderError,
+	getEmailProvider,
+	statusForProviderError
+} from '$lib/server/context';
 import { deleteDraft, listEmails } from '$lib/server/mail-store';
 import { sendAndStore } from '$lib/server/outbox';
-import { ResendError } from '$lib/server/resend';
 import type { OutboundAttachmentInput } from '$lib/types';
 
 type SendMailBody = {
@@ -47,10 +50,10 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 	}
 
 	try {
-		const client = getResendClient(platform);
+		const provider = getEmailProvider(platform);
 		const { emailId } = await sendAndStore(
 			{ DB: db, ATTACHMENTS: bucket },
-			client,
+			provider,
 			locals.user,
 			{
 				fromAddressId: body.fromAddressId,
@@ -70,18 +73,6 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 
 		return json({ ok: true, id: emailId });
 	} catch (error) {
-		return json({ error: describeError(error) }, { status: statusFor(error) });
+		return json({ error: describeProviderError(error) }, { status: statusForProviderError(error) });
 	}
 };
-
-function describeError(error: unknown): string {
-	if (error instanceof ConfigError) return error.message;
-	if (error instanceof ResendError) return `Resend rejected the message: ${error.message}`;
-	return error instanceof Error ? error.message : 'Failed to send email';
-}
-
-function statusFor(error: unknown): number {
-	if (error instanceof ConfigError) return 503;
-	if (error instanceof ResendError) return error.status >= 500 ? 502 : 400;
-	return 400;
-}
