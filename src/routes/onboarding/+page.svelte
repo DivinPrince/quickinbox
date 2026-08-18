@@ -7,7 +7,8 @@
 		missingProviderTitle,
 		noDomainsBody,
 		noDomainsTitle,
-		onboardingSubtitle
+		onboardingSubtitle,
+		providerName
 	} from '$lib/provider-copy';
 	import type { PageData } from './$types';
 
@@ -96,6 +97,9 @@
 	subtitle={needsDomain
 		? onboardingSubtitle(data.providerKind)
 		: "Choose the address you'll send and receive mail from."}
+	partner={needsDomain}
+	partnerKind={data.providerKind}
+	partnerCaption={`Mail + ${providerName(data.providerKind)}`}
 >
 	{#if needsDomain}
 		{#if !data.isAdmin}
