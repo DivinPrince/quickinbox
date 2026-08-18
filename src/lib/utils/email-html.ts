@@ -68,7 +68,8 @@ html, body { height: auto !important; }
    not enough: a frame whose colour scheme differs from its embedder's is denied
    transparency and painted in its own scheme instead, so the scheme has to be
    declared in here too — see the dark rule below. */
-html { color-scheme: light; overflow-x: auto; overflow-y: hidden; background: transparent; }
+html { overflow-x: auto; overflow-y: hidden; background: transparent; }
+html:not([data-theme='dark']) { color-scheme: light; }
 body {
 	margin: 0;
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -113,7 +114,7 @@ blockquote { border-color: rgba(0, 0, 0, 0.12) !important; }
  * outrank stylesheets, hence !important.
  */
 :root[data-theme='dark'] { color-scheme: dark; }
-:root[data-theme='dark'] body { color: #a8a8b3; background-color: transparent !important; }
+:root[data-theme='dark'] body { color: #a8a8b3 !important; background-color: transparent !important; }
 :root[data-theme='dark'] body *:not(a):not(.quote-toggle) {
 	color: inherit !important;
 	background-color: transparent !important;

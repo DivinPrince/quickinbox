@@ -109,6 +109,10 @@
 		padding: 0.375rem 0.5rem;
 	}
 
+	.editor {
+		color: var(--color-text);
+	}
+
 	.editor:empty::before {
 		content: attr(data-placeholder);
 		color: var(--color-muted);
