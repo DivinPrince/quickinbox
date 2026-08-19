@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import AddressField from '$lib/components/AddressField.svelte';
 	import {
@@ -7,6 +8,7 @@
 		THEME_OPTIONS,
 		type ThemePreference
 	} from '$lib/theme';
+	import { MAX_EMAIL_SIGNATURE_LENGTH } from '$lib/email-signature';
 	import type { MailAddress } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -21,6 +23,38 @@
 	function chooseTheme(next: ThemePreference) {
 		theme = next;
 		setThemePreference(next);
+	}
+
+	let signature = $state(untrack(() => data.signature));
+	let signatureBusy = $state(false);
+	let signatureError = $state('');
+	let signatureSaved = $state(false);
+
+	async function saveSignature(event: SubmitEvent) {
+		event.preventDefault();
+		signatureBusy = true;
+		signatureError = '';
+		signatureSaved = false;
+
+		try {
+			const res = await fetch('/api/settings/signature', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ signature })
+			});
+			const body = await res.json();
+			if (!res.ok) {
+				signatureError = body.error ?? 'Could not save signature';
+				return;
+			}
+
+			signature = body.signature;
+			signatureSaved = true;
+		} catch {
+			signatureError = 'Network error';
+		} finally {
+			signatureBusy = false;
+		}
 	}
 
 	// Server data until an edit happens, then whatever the API returned.
@@ -122,6 +156,35 @@
 				</button>
 			{/each}
 		</div>
+	</section>
+
+	<section class="surface-lg card">
+		<h2><Icon name="pencil-line" size={18} /> Email signature</h2>
+		<p class="card-hint">
+			Add a short sign-off to new messages and replies, for example “Best, Emmanuel.”
+		</p>
+
+		<form class="signature-form" onsubmit={saveSignature}>
+			<label for="email-signature" class="field-title">Signature text</label>
+			<textarea
+				id="email-signature"
+				bind:value={signature}
+				maxlength={MAX_EMAIL_SIGNATURE_LENGTH}
+				rows="5"
+				placeholder={'Best,\nEmmanuel'}
+				class="signature-input"
+			></textarea>
+
+			<div class="signature-actions">
+				<span class="character-count">{signature.length}/{MAX_EMAIL_SIGNATURE_LENGTH}</span>
+				<button type="submit" class="btn-primary" disabled={signatureBusy}>
+					{signatureBusy ? 'Saving…' : 'Save signature'}
+				</button>
+			</div>
+
+			{#if signatureError}<p class="error">{signatureError}</p>{/if}
+			{#if signatureSaved}<p class="saved">Signature saved.</p>{/if}
+		</form>
 	</section>
 
 	<section class="surface-lg card">
@@ -233,6 +296,53 @@
 		font-size: 0.8125rem;
 		line-height: 1.5;
 		color: var(--color-muted);
+	}
+
+	.signature-form {
+		margin-top: 1rem;
+	}
+
+	.field-title {
+		display: block;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--color-text-secondary);
+	}
+
+	.signature-input {
+		width: 100%;
+		margin-top: 0.5rem;
+		padding: 0.75rem 0.875rem;
+		resize: vertical;
+		border-radius: 0.75rem;
+		font-size: 0.875rem;
+		line-height: 1.55;
+		background: var(--color-surface-muted);
+		box-shadow: inset 0 0 0 1px var(--color-line);
+		outline: none;
+	}
+
+	.signature-input:focus {
+		box-shadow: inset 0 0 0 1px var(--color-focus-line), 0 0 0 3px var(--color-focus-halo);
+	}
+
+	.signature-actions {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin-top: 0.75rem;
+	}
+
+	.character-count {
+		font-size: 0.75rem;
+		color: var(--color-muted);
+	}
+
+	.saved {
+		margin-top: 0.75rem;
+		font-size: 0.8125rem;
+		color: var(--tone-good-fg);
 	}
 
 	.theme-options {
