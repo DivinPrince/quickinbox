@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import Avatar from './Avatar.svelte';
 	import AttachmentList from './AttachmentList.svelte';
 	import DeliveryStatus from './DeliveryStatus.svelte';
 	import EmailBody from './EmailBody.svelte';
@@ -19,7 +20,6 @@
 
 	const outbound = $derived(message.direction === 'outbound');
 	const sender = $derived(outbound ? 'me' : message.from_addr);
-	const initial = $derived((message.from_addr[0] ?? '?').toUpperCase());
 
 	/** Text-only messages get the same treatment as HTML ones. */
 	const text = $derived(splitQuotedText(message.body_text ?? ''));
@@ -33,7 +33,7 @@
 <article class="message" class:collapsed={!expanded}>
 	{#if expanded}
 		<header class="head">
-			<div class="avatar" class:self={outbound}>{outbound ? 'me' : initial}</div>
+			<Avatar email={message.from_addr} size={36} self={outbound} />
 
 			<button type="button" class="who" onclick={onToggle}>
 				<p class="name">
@@ -82,7 +82,7 @@
 		{/if}
 	{:else}
 		<button type="button" class="summary" onclick={onToggle}>
-			<span class="avatar small" class:self={outbound}>{outbound ? 'me' : initial}</span>
+			<Avatar email={message.from_addr} size={28} self={outbound} />
 			<span class="name">{sender}</span>
 			<span class="snippet">{snippet}</span>
 			{#if message.attachments.length > 0}
@@ -112,31 +112,6 @@
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
-	}
-
-	.avatar {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-		width: 2.25rem;
-		height: 2.25rem;
-		border-radius: 9999px;
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: var(--color-text);
-		background: var(--color-surface-muted);
-	}
-
-	.avatar.self {
-		color: var(--color-text-secondary);
-		background: var(--color-surface-hover);
-	}
-
-	.avatar.small {
-		width: 1.75rem;
-		height: 1.75rem;
-		font-size: 0.625rem;
 	}
 
 	.who {

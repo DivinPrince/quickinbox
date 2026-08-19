@@ -2,6 +2,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page as currentPage } from '$app/stores';
 	import Icon from './Icon.svelte';
+	import Avatar from './Avatar.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import DeliveryStatus from './DeliveryStatus.svelte';
 	import { formatRelativeDate } from '$lib/utils/date';
@@ -63,9 +64,10 @@
 		return first?.address ? first.address.split('@')[0].replace(/[._-]+/g, ' ') : '';
 	}
 
-	function initial(thread: ThreadSummary): string {
+	/** Show the other party's face, falling back to whoever is on the thread. */
+	function faceOf(thread: ThreadSummary): string {
 		const external = thread.participants.find((participant) => !participant.self);
-		return ((external ?? thread.participants[0])?.address[0] ?? '?').toUpperCase();
+		return (external ?? thread.participants[0])?.address ?? '';
 	}
 
 	/** Rows carry the newest message; opening it opens the whole conversation. */
@@ -455,7 +457,7 @@
 						</button>
 
 						<a class="row-link" href={href(thread)}>
-							<span class="avatar">{initial(thread)}</span>
+							<span class="avatar-slot"><Avatar email={faceOf(thread)} size={32} /></span>
 
 							<span class="sender" title={people(thread)}>
 								<span class="sender-names">{people(thread)}</span>
@@ -847,22 +849,9 @@
 		padding: 0.625rem 0;
 	}
 
-	.avatar {
+	.avatar-slot {
 		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 2rem;
-		height: 2rem;
-		border-radius: 9999px;
-		font-size: 0.6875rem;
-		font-weight: 600;
-		color: var(--color-text-secondary);
-		background: var(--color-surface-muted);
-	}
-
-	.row.unread .avatar {
-		color: var(--color-text);
-		background: var(--color-surface-hover);
+		flex-shrink: 0;
 	}
 
 	.sender {
@@ -1001,7 +990,7 @@
 			gap: 0.25rem 0.5rem;
 		}
 
-		.avatar,
+		.avatar-slot,
 		.indicators {
 			display: none;
 		}

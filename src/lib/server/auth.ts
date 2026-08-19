@@ -9,6 +9,8 @@ type UserRow = {
 	name: string;
 	is_admin: number;
 	created_at: string;
+	avatar_key: string | null;
+	external_avatars: number;
 };
 
 function mapUser(row: UserRow): User {
@@ -17,7 +19,9 @@ function mapUser(row: UserRow): User {
 		email: row.email,
 		name: row.name,
 		is_admin: row.is_admin === 1,
-		created_at: row.created_at
+		created_at: row.created_at,
+		avatar_key: row.avatar_key ?? null,
+		external_avatars: row.external_avatars !== 0
 	};
 }
 
@@ -28,7 +32,7 @@ export async function countUsers(db: D1Database): Promise<number> {
 
 export async function getUserByEmail(db: D1Database, email: string): Promise<(User & { password_hash: string }) | null> {
 	const row = await db
-		.prepare('SELECT id, email, name, password_hash, is_admin, created_at FROM users WHERE email = ?')
+		.prepare('SELECT id, email, name, password_hash, is_admin, created_at, avatar_key, external_avatars FROM users WHERE email = ?')
 		.bind(email.toLowerCase())
 		.first<UserRow & { password_hash: string }>();
 
@@ -37,7 +41,7 @@ export async function getUserByEmail(db: D1Database, email: string): Promise<(Us
 
 export async function getUserById(db: D1Database, id: string): Promise<User | null> {
 	const row = await db
-		.prepare('SELECT id, email, name, is_admin, created_at FROM users WHERE id = ?')
+		.prepare('SELECT id, email, name, is_admin, created_at, avatar_key, external_avatars FROM users WHERE id = ?')
 		.bind(id)
 		.first<UserRow>();
 
@@ -46,7 +50,7 @@ export async function getUserById(db: D1Database, id: string): Promise<User | nu
 
 export async function listUsers(db: D1Database): Promise<User[]> {
 	const { results } = await db
-		.prepare('SELECT id, email, name, is_admin, created_at FROM users ORDER BY created_at ASC')
+		.prepare('SELECT id, email, name, is_admin, created_at, avatar_key, external_avatars FROM users ORDER BY created_at ASC')
 		.all<UserRow>();
 
 	return results.map(mapUser);
@@ -132,7 +136,7 @@ export async function getUserFromSession(db: D1Database, token: string | undefin
 	const token_hash = await hashToken(token);
 	const row = await db
 		.prepare(
-			`SELECT u.id, u.email, u.name, u.is_admin, u.created_at
+			`SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.avatar_key, u.external_avatars
 			 FROM sessions s
 			 JOIN users u ON u.id = s.user_id
 			 WHERE s.token_hash = ? AND s.expires_at > datetime('now')`

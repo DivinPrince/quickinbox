@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import Icon from './Icon.svelte';
+	import Avatar from './Avatar.svelte';
 	import type { MailAddress } from '$lib/types';
 
 	let {
@@ -35,15 +36,6 @@
 	// Recipients see the sending identity, not the login email.
 	const primaryAddress = $derived(
 		addresses.find((address) => address.is_default)?.address ?? addresses[0]?.address ?? userEmail
-	);
-
-	const initials = $derived(
-		userName
-			.split(/\s+/)
-			.filter(Boolean)
-			.slice(0, 2)
-			.map((part) => part[0]!.toUpperCase())
-			.join('') || '?'
 	);
 
 	function submitSearch(event: SubmitEvent) {
@@ -101,7 +93,7 @@
 					<span class="account-name">{userName}</span>
 					<span class="account-address">{primaryAddress}</span>
 				</span>
-				<span class="avatar">{initials}</span>
+				<Avatar email={primaryAddress} name={userName} size={32} />
 			</button>
 
 			{#if menuOpen}
@@ -248,19 +240,6 @@
 		white-space: nowrap;
 		font-size: 0.6875rem;
 		color: var(--color-muted);
-	}
-
-	.avatar {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 2rem;
-		height: 2rem;
-		border-radius: 9999px;
-		font-size: 0.6875rem;
-		font-weight: 600;
-		color: var(--color-text);
-		background: var(--color-surface-hover);
 	}
 
 	.menu-backdrop {

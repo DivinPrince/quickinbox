@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from '$lib/components/Icon.svelte';
 	import AddressField from '$lib/components/AddressField.svelte';
+	import Avatar from '$lib/components/Avatar.svelte';
 	import {
 		readThemePreference,
 		setThemePreference,
@@ -75,6 +76,71 @@
 		if (res.ok) edited = body.addresses;
 	}
 
+	// --- profile picture ----------------------------------------------------
+
+	let avatarBusy = $state(false);
+	let avatarError = $state('');
+	let avatarSet = $state<boolean | null>(null);
+	let externalSet = $state<boolean | null>(null);
+	const hasAvatar = $derived(avatarSet ?? data.user?.hasAvatar ?? false);
+	const externalAvatars = $derived(externalSet ?? data.user?.externalAvatars ?? true);
+	// Same URL before and after a change, so the cached response needs defeating.
+	let avatarVersion = $state(0);
+	let fileInput = $state<HTMLInputElement | null>(null);
+
+	async function uploadAvatar(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		avatarBusy = true;
+		avatarError = '';
+		try {
+			const form = new FormData();
+			form.append('avatar', file);
+			const res = await fetch('/api/avatar', { method: 'POST', body: form });
+			const body = await res.json();
+			if (!res.ok) {
+				avatarError = body.error ?? 'Could not upload that image';
+				return;
+			}
+			avatarSet = true;
+			avatarVersion += 1;
+		} catch {
+			avatarError = 'Network error';
+		} finally {
+			avatarBusy = false;
+			input.value = '';
+		}
+	}
+
+	async function removeAvatar() {
+		avatarBusy = true;
+		avatarError = '';
+		try {
+			const res = await fetch('/api/avatar', { method: 'DELETE' });
+			if (!res.ok) {
+				avatarError = 'Could not remove your picture';
+				return;
+			}
+			avatarSet = false;
+			avatarVersion += 1;
+		} catch {
+			avatarError = 'Network error';
+		} finally {
+			avatarBusy = false;
+		}
+	}
+
+	async function toggleExternal(next: boolean) {
+		externalSet = next;
+		await fetch('/api/avatar', {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ externalAvatars: next })
+		}).catch(() => {});
+	}
+
 	async function remove(id: string) {
 		const res = await fetch(`/api/addresses/${id}`, { method: 'DELETE' });
 		const body = await res.json();
@@ -122,6 +188,64 @@
 				</button>
 			{/each}
 		</div>
+	</section>
+
+	<section class="surface-lg card">
+		<h2><Icon name="user-line" size={18} /> Profile picture</h2>
+		<p class="card-hint">
+			Shown on your messages. People you write to only see it if their mail app
+			looks it up.
+		</p>
+
+		<div class="avatar-row">
+			<Avatar
+				email={data.user?.email ?? ''}
+				name={data.user?.name}
+				size={64}
+				version={avatarVersion}
+			/>
+
+			<div class="avatar-actions">
+				<input
+					bind:this={fileInput}
+					type="file"
+					accept="image/png,image/jpeg,image/gif,image/webp"
+					class="sr-only"
+					onchange={uploadAvatar}
+				/>
+				<button
+					type="button"
+					class="btn-primary"
+					disabled={avatarBusy}
+					onclick={() => fileInput?.click()}
+				>
+					{avatarBusy ? 'Working…' : hasAvatar ? 'Change picture' : 'Upload picture'}
+				</button>
+				{#if hasAvatar}
+					<button type="button" class="btn-ghost" disabled={avatarBusy} onclick={removeAvatar}>
+						Remove
+					</button>
+				{/if}
+				<p class="avatar-note">PNG, JPEG, GIF or WebP, up to 1MB.</p>
+			</div>
+		</div>
+
+		{#if avatarError}<p class="error">{avatarError}</p>{/if}
+
+		<label class="external-toggle">
+			<input
+				type="checkbox"
+				checked={externalAvatars}
+				onchange={(event) => toggleExternal(event.currentTarget.checked)}
+			/>
+			<span>
+				<span class="toggle-label">Show pictures for other people</span>
+				<span class="toggle-hint">
+					Looks correspondents up on Gravatar, and falls back to the logo a domain
+					publishes for its mail. Requests are made by the server, never your browser.
+				</span>
+			</span>
+		</label>
 	</section>
 
 	<section class="surface-lg card">
@@ -231,6 +355,50 @@
 	.card-hint {
 		margin-top: 0.375rem;
 		font-size: 0.8125rem;
+		line-height: 1.5;
+		color: var(--color-muted);
+	}
+
+	.avatar-row {
+		display: flex;
+		align-items: center;
+		gap: 1.25rem;
+		margin-top: 1.25rem;
+	}
+
+	.avatar-actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.avatar-note {
+		flex-basis: 100%;
+		font-size: 0.75rem;
+		color: var(--color-muted);
+	}
+
+	.external-toggle {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.625rem;
+		margin-top: 1.5rem;
+		padding-top: 1.25rem;
+		cursor: pointer;
+		border-top: 1px solid var(--color-line);
+	}
+
+	.toggle-label {
+		display: block;
+		font-size: 0.8125rem;
+		font-weight: 500;
+	}
+
+	.toggle-hint {
+		display: block;
+		margin-top: 0.25rem;
+		font-size: 0.75rem;
 		line-height: 1.5;
 		color: var(--color-muted);
 	}
