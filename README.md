@@ -17,7 +17,7 @@ Deploys to Cloudflare Workers.
 - **Safe HTML** — received HTML renders in a sandboxed iframe.
 - **Multiple domains and users** — each user has addresses and a default sending identity. Admins get a catch-all and an unrouted-mail view.
 - **Delivery status** — Resend reports delivered / bounced / complained over webhooks. Cloudflare marks a send `sent` once the binding accepts it.
-- **Programmatic API** — each user can issue long-lived API keys and `POST /api/mail` to send from a script, no browser or session cookie needed.
+- **Programmatic API** — each user can issue scoped, long-lived API keys and `POST /api/mail` to send from a script, no browser or session cookie needed.
 - **Light and dark themes.**
 
 ---
@@ -43,9 +43,14 @@ curl https://your-worker/api/mail \
 ```
 
 `POST /api/mail` returns `{"ok": true, "id": "<emailId>"}`. List what you sent
-with `GET /api/mail?direction=outbound`. Keys only ever authenticate `/api/*` —
-the web UI still needs a normal session — and revoking a key in Settings takes
-effect immediately.
+with `GET /api/mail?direction=outbound`.
+
+A key is not a session. It reaches only `/api/mail`, and only with the matching
+scope — `mail:send` to send, `mail:read` to list or read. Mailbox mutations
+(trashing, starring), key management, addresses, domains and admin all stay
+session-only, so a leaked key cannot mint a replacement that survives revoking
+the original. A key used outside that gets `403`. Revoking takes effect
+immediately.
 
 > Only the SHA-256 hash of a key is stored; the raw value is shown once at
 > creation. If you lose it, revoke and mint a new one.

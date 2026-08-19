@@ -364,11 +364,11 @@
 			</div>
 
 			<div class="scope-row">
-				<label class="scope-check">
+				<label class="scope-check" title="Send mail — POST /api/mail">
 					<input type="checkbox" bind:checked={sendScope} />
 					<span>send</span>
 				</label>
-				<label class="scope-check">
+				<label class="scope-check" title="List and read mail — GET /api/mail">
 					<input type="checkbox" bind:checked={readScope} />
 					<span>read</span>
 				</label>
@@ -410,9 +410,10 @@
 
 		<p class="hint">
 			<Icon name="shield-keyhole-line" size={14} />
-			Send this with <code>Authorization: Bearer <em>your-key</em></code> on any
-			<code>/api/*</code> request. Revoking deletes the key immediately; scripts using it will
-			get <code>401 Unauthorized</code>.
+			Send this as <code>Authorization: Bearer <em>your-key</em></code>. Keys reach only
+			<code>/api/mail</code> — sending needs <code>send</code>, reading needs
+			<code>read</code>. Everything else, including this page, stays session-only. Revoking
+			takes effect immediately.
 		</p>
 	</section>
 </div>

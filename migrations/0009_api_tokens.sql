@@ -7,14 +7,15 @@
 -- gone forever if the operator loses it -- create a new one instead.
 -- `token_preview` keeps a masked fragment (first 8 + last 4 chars) purely so the
 -- list UI can tell two tokens apart. It is not secret enough to authenticate.
--- `scopes` currently gates nothing beyond the request happening as the owning
--- user, but is kept so future stricter per-scope authorization can be added.
+-- `scopes` is enforced: `mail:send` gates the send path, `mail:read` gates reads.
+-- A key is not a session -- it only reaches the handful of routes in
+-- BEARER_ROUTES (hooks.server.ts), never key management, admin or domains.
 
 CREATE TABLE api_tokens (
 	id            TEXT PRIMARY KEY,
 	user_id       TEXT NOT NULL,
 	name          TEXT NOT NULL,
-	token_hash    TEXT NOT NULL,
+	token_hash    TEXT NOT NULL UNIQUE,
 	token_preview TEXT NOT NULL,
 	scopes        TEXT NOT NULL DEFAULT 'mail:send',
 	created_at    TEXT NOT NULL,
@@ -23,4 +24,3 @@ CREATE TABLE api_tokens (
 );
 
 CREATE INDEX idx_api_tokens_user ON api_tokens(user_id);
-CREATE INDEX idx_api_tokens_hash ON api_tokens(token_hash);

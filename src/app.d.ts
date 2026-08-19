@@ -1,5 +1,6 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { CloudflareSendEmailBinding } from '$lib/server/providers/cloudflare-provider';
+import type { ApiScope } from '$lib/server/api-tokens';
 import type { Domain, MailAddress, User } from '$lib/types';
 
 declare global {
@@ -28,6 +29,12 @@ declare global {
 			addresses: MailAddress[];
 			/** Active domain filter, or null for the combined inbox. */
 			activeDomainId: string | null;
+			/**
+			 * Set only when the request authenticated with an API key, so handlers
+			 * can authorize without a second lookup. Null means a browser session,
+			 * which is not scope-limited.
+			 */
+			apiToken: { id: string; scopes: ApiScope[] } | null;
 		}
 	}
 }

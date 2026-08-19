@@ -2,9 +2,17 @@ import type { D1Database } from '@cloudflare/workers-types';
 import { hashToken } from './crypto';
 import type { ApiTokenSummary, User } from '$lib/types';
 
-/** Scopes a token can carry. For now every scope acts as the owning user. */
+/** Scopes a token can carry. Both are enforced -- see `tokenAllows`. */
 export const API_SCOPES = ['mail:send', 'mail:read'] as const;
 export type ApiScope = (typeof API_SCOPES)[number];
+
+const TOKEN_PREFIX = 'qm_live_';
+
+/**
+ * How stale `last_used_at` is allowed to get. Without this every scripted send
+ * costs a second D1 write purely for a timestamp nobody reads that precisely.
+ */
+const LAST_USED_THROTTLE_MS = 15 * 60 * 1000;
 
 type TokenRow = {
 	id: string;
@@ -39,12 +47,22 @@ function toBase64Url(bytes: Uint8Array): string {
 /** `qm_live_<32 random bytes, base64url>` — recognizable and collision-resistant. */
 function generateToken(): string {
 	const bytes = crypto.getRandomValues(new Uint8Array(32));
-	return `qm_live_${toBase64Url(bytes)}`;
+	return `${TOKEN_PREFIX}${toBase64Url(bytes)}`;
 }
 
-/** A masked fragment (first 8 + last 4 chars) to tell tokens apart in the UI. */
+/**
+ * A masked fragment used to tell keys apart in the list. Taken from the random
+ * part only -- every token starts with the same prefix, so including it made
+ * every preview look identical.
+ */
 function previewFor(token: string): string {
-	return token.length > 14 ? `${token.slice(0, 8)}…${token.slice(-4)}` : token.slice(0, 8);
+	const random = token.startsWith(TOKEN_PREFIX) ? token.slice(TOKEN_PREFIX.length) : token;
+	if (random.length <= 8) return random;
+	return `${random.slice(0, 4)}…${random.slice(-4)}`;
+}
+
+function parseScopes(raw: string): ApiScope[] {
+	return (raw.split(',') as ApiScope[]).filter((scope) => API_SCOPES.includes(scope));
 }
 
 function mapRow(row: TokenRow): ApiTokenSummary {
@@ -52,9 +70,7 @@ function mapRow(row: TokenRow): ApiTokenSummary {
 		id: row.id,
 		name: row.name,
 		preview: row.token_preview,
-		scopes: (row.scopes.split(',') as ApiScope[]).filter((scope) =>
-			API_SCOPES.includes(scope)
-		),
+		scopes: parseScopes(row.scopes),
 		created_at: row.created_at,
 		last_used_at: row.last_used_at
 	};
@@ -123,7 +139,23 @@ type TokenUserRow = {
 	is_admin: number;
 	created_at: string;
 	token_id: string;
+	token_scopes: string;
+	token_last_used_at: string | null;
 };
+
+/** What a verified bearer token resolves to: who, plus what it may do. */
+export type ApiTokenIdentity = {
+	user: User;
+	tokenId: string;
+	scopes: ApiScope[];
+};
+
+/** Does this request's credential carry the scope a route requires? */
+export function tokenAllows(scopes: ApiScope[] | null, required: ApiScope): boolean {
+	// A browser session has no token and is not scope-limited.
+	if (scopes === null) return true;
+	return scopes.includes(required);
+}
 
 /**
  * Resolve a bearer token to its owning user. A session-independent login that
@@ -133,13 +165,15 @@ type TokenUserRow = {
 export async function getUserByApiToken(
 	db: D1Database,
 	token: string
-): Promise<(User & { tokenId: string }) | null> {
-	if (!token.startsWith('qm_live_')) return null;
+): Promise<ApiTokenIdentity | null> {
+	if (!token.startsWith(TOKEN_PREFIX)) return null;
 	const hash = await hashToken(token);
 
 	const row = await db
 		.prepare(
-			`SELECT u.id, u.email, u.name, u.is_admin, u.created_at, t.id AS token_id
+			`SELECT u.id, u.email, u.name, u.is_admin, u.created_at,
+			        t.id AS token_id, t.scopes AS token_scopes,
+			        t.last_used_at AS token_last_used_at
 			 FROM api_tokens t
 			 JOIN users u ON u.id = t.user_id
 			 WHERE t.token_hash = ?`
@@ -149,19 +183,26 @@ export async function getUserByApiToken(
 
 	if (!row) return null;
 
-	// Refresh the last-use marker opportunistically; a missed update is harmless.
-	await db
-		.prepare('UPDATE api_tokens SET last_used_at = ? WHERE id = ?')
-		.bind(new Date().toISOString(), row.token_id)
-		.run();
+	// Only refresh the marker once it has actually gone stale. A scripted sender
+	// hits this on every request, and the timestamp is not read at that precision.
+	const lastUsed = row.token_last_used_at ? Date.parse(row.token_last_used_at) : 0;
+	if (!Number.isFinite(lastUsed) || Date.now() - lastUsed > LAST_USED_THROTTLE_MS) {
+		await db
+			.prepare('UPDATE api_tokens SET last_used_at = ? WHERE id = ?')
+			.bind(new Date().toISOString(), row.token_id)
+			.run();
+	}
 
 	return {
-		id: row.id,
-		email: row.email,
-		name: row.name,
-		is_admin: row.is_admin === 1,
-		created_at: row.created_at,
-		tokenId: row.token_id
+		user: {
+			id: row.id,
+			email: row.email,
+			name: row.name,
+			is_admin: row.is_admin === 1,
+			created_at: row.created_at
+		},
+		tokenId: row.token_id,
+		scopes: parseScopes(row.token_scopes)
 	};
 }
 
