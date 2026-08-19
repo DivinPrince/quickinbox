@@ -43,7 +43,17 @@ body and attachments from Resend. Cloudflare delivers the full MIME on
 
 # Setup
 
-Budget about 30 minutes. Most of it is DNS.
+The wizard installs tools, logs you into Cloudflare, creates D1/R2, writes
+env and wrangler config, and onboards your domain:
+
+```bash
+bun run setup
+# if bun isn't installed yet:
+bash scripts/setup.sh
+```
+
+It asks for the mail domain, Resend vs Cloudflare Email, and any API keys —
+then does the rest. Budget about 30 minutes; most of that is DNS.
 
 **You need**
 
@@ -51,7 +61,11 @@ Budget about 30 minutes. Most of it is DNS.
 2. A [Cloudflare](https://dash.cloudflare.com) account.
 3. Either a [Resend](https://resend.com) account, **or** the domain on Cloudflare DNS plus a Workers paid plan (Cloudflare Email Sending).
 
-## 1. Install
+## Manual setup
+
+Do this only if you cannot run the wizard.
+
+### 1. Install
 
 ```bash
 bun install          # or: npm install
@@ -62,7 +76,7 @@ Use **Wrangler 4.123 or newer** for Cloudflare Email Sending. `4.96` calls an
 old `/email/sending/enable` path and gets a 404. Check with
 `bunx wrangler --version`. Upgrade with `bun add -d wrangler@latest`.
 
-## 2. Create D1 and R2
+### 2. Create D1 and R2
 
 ```bash
 bunx wrangler d1 create quickmail
@@ -304,6 +318,7 @@ src/
     server/          providers, inbound, D1, auth
     utils/           HTML, quoting, dates, attachments
 scripts/
+  setup.sh / setup.mjs   first-run wizard (tools, login, domain, env)
   wrap-cloudflare-worker.mjs   attach email() after the SvelteKit build
 migrations/          D1 schema, applied in order
 ```

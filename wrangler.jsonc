@@ -26,6 +26,7 @@
 		"binding": "ASSETS"
 	},
 
+	// Prefer `bun run setup` (or `bash scripts/setup.sh`) over editing this by hand.
 	// Mail provider is selected by EMAIL_PROVIDER (resend | cloudflare).
 	// Resend secrets (when EMAIL_PROVIDER=resend or unset):
 	//   wrangler secret put RESEND_API_KEY
@@ -49,7 +50,7 @@
 		{
 			"binding": "DB",
 			"database_name": "quickmail",
-			// Run `wrangler d1 create quickmail` and paste the id it prints here.
+			// `bun run setup` fills this in, or: wrangler d1 create quickmail
 			"database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
 			"migrations_dir": "migrations"
 		}
@@ -58,7 +59,7 @@
 	"r2_buckets": [
 		{
 			"binding": "ATTACHMENTS",
-			// Run `wrangler r2 bucket create quickmail-attachments`.
+			// `bun run setup` creates this, or: wrangler r2 bucket create quickmail-attachments
 			"bucket_name": "quickmail-attachments"
 		}
 	],

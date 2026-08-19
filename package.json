@@ -8,6 +8,7 @@
 		"dev": "vite dev",
 		"build": "vite build && bun scripts/wrap-cloudflare-worker.mjs",
 		"preview": "bun run build && wrangler dev",
+		"setup": "node scripts/setup.mjs",
 		"deploy": "bun run build && wrangler deploy",
 		"db:migrate:local": "wrangler d1 migrations apply quickmail --local",
 		"db:migrate:remote": "wrangler d1 migrations apply quickmail --remote",
@@ -30,7 +31,7 @@
 		"tailwindcss": "^4.2.2",
 		"typescript": "^6.0.2",
 		"vite": "^8.0.7",
-		"wrangler": "^4.96.0"
+		"wrangler": "^4.124.0"
 	},
 	"dependencies": {
 		"postal-mime": "^3.0.0",
