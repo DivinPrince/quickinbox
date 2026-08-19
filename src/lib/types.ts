@@ -6,6 +6,20 @@ export type User = {
 	created_at: string;
 };
 
+/**
+ * A stored API token used for scripted access to the mail API. Everything but
+ * the raw value — which is shown exactly once at creation and only ever kept as
+ * a SHA-256 hash. `preview` is a masked fragment for the UI.
+ */
+export type ApiTokenSummary = {
+	id: string;
+	name: string;
+	preview: string;
+	scopes: ('mail:send' | 'mail:read')[];
+	created_at: string;
+	last_used_at: string | null;
+};
+
 export type DeliveryStatus =
 	| 'queued'
 	| 'sent'

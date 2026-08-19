@@ -17,7 +17,38 @@ Deploys to Cloudflare Workers.
 - **Safe HTML** — received HTML renders in a sandboxed iframe.
 - **Multiple domains and users** — each user has addresses and a default sending identity. Admins get a catch-all and an unrouted-mail view.
 - **Delivery status** — Resend reports delivered / bounced / complained over webhooks. Cloudflare marks a send `sent` once the binding accepts it.
+- **Programmatic API** — each user can issue long-lived API keys and `POST /api/mail` to send from a script, no browser or session cookie needed.
 - **Light and dark themes.**
+
+---
+
+## Send from a script (API keys)
+
+Signing in with a browser only gets you a cookie that lives seven days — fine for
+a human, awkward for automation. Any user can instead mint a long-lived API key
+under **Settings → API keys** and use it as a bearer token on the mail API. It
+acts as exactly that user on any `/api/*` endpoint.
+
+```sh
+curl https://your-worker/api/mail \
+  -H "Authorization: Bearer qm_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fromAddressId": "<optional — defaults to your send identity>",
+    "to": "you@example.com",
+    "cc": "cc@example.com",
+    "subject": "hello from a script",
+    "text": "hi"
+  }'
+```
+
+`POST /api/mail` returns `{"ok": true, "id": "<emailId>"}`. List what you sent
+with `GET /api/mail?direction=outbound`. Keys only ever authenticate `/api/*` —
+the web UI still needs a normal session — and revoking a key in Settings takes
+effect immediately.
+
+> Only the SHA-256 hash of a key is stored; the raw value is shown once at
+> creation. If you lose it, revoke and mint a new one.
 
 ---
 

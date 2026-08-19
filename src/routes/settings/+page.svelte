@@ -9,7 +9,7 @@
 		type ThemePreference
 	} from '$lib/theme';
 	import { MAX_EMAIL_SIGNATURE_LENGTH } from '$lib/email-signature';
-	import type { MailAddress } from '$lib/types';
+	import type { ApiTokenSummary, MailAddress } from '$lib/types';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -117,6 +117,88 @@
 			return;
 		}
 		edited = body.addresses;
+	}
+
+	// --- API keys -----------------------------------------------------------
+
+	let keyName = $state('');
+	let sendScope = $state(true);
+	let readScope = $state(false);
+	// Server-seeded list of stored keys (no raw values — those are shown once).
+	let tokens = $state<ApiTokenSummary[]>([]);
+	let hydrated = $state(false);
+	$effect(() => {
+		if (!hydrated) {
+			tokens = data.apiTokens;
+			hydrated = true;
+		}
+	});
+	let keyBusy = $state(false);
+	let keyError = $state('');
+
+	// The freshly created raw token, only ever shown once, in a confirmation box.
+	let revealed = $state<{ summary: ApiTokenSummary; token: string } | null>(null);
+	let copied = $state(false);
+
+	async function createKey(event?: SubmitEvent) {
+		if (event) event.preventDefault();
+		keyBusy = true;
+		keyError = '';
+		try {
+			const scopes = [];
+			if (sendScope) scopes.push('mail:send');
+			if (readScope) scopes.push('mail:read');
+
+			const res = await fetch('/api/apikeys', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name: keyName, scopes })
+			});
+			const body = await res.json();
+			if (!res.ok) {
+				keyError = body.error ?? 'Could not create the API key';
+				return;
+			}
+			tokens = [body.tokenMeta, ...tokens.filter((token) => token.id !== body.tokenMeta.id)];
+			revealed = { summary: body.tokenMeta, token: body.token };
+			copied = false;
+			keyName = '';
+		} catch {
+			keyError = 'Network error';
+		} finally {
+			keyBusy = false;
+		}
+	}
+
+	async function copyKey() {
+		if (!revealed) return;
+		try {
+			await navigator.clipboard.writeText(revealed.token);
+			copied = true;
+			setTimeout(() => (copied = false), 1600);
+		} catch {
+			/* clipboard unavailable — the box is still selectable */
+		}
+	}
+
+	function closeRevealed() {
+		revealed = null;
+		copied = false;
+	}
+
+	async function revokeKey(id: string) {
+		if (!confirm('Revoke this API key? Anything using it will stop working.')) return;
+		const res = await fetch(`/api/apikeys/${id}`, { method: 'DELETE' });
+		const body = await res.json();
+		if (!res.ok) {
+			keyError = body.error ?? 'Could not revoke that key';
+			return;
+		}
+		tokens = body.tokens;
+	}
+
+	function formatDate(value: string): string {
+		return new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 	}
 </script>
 
@@ -265,7 +347,116 @@
 			{/each}
 		</ul>
 	</section>
+
+	<section class="surface-lg card">
+		<h2><Icon name="key-2-line" size={18} /> API keys</h2>
+		<p class="card-hint">
+			Long-lived bearer tokens for scripted access to the mail API — send with
+			<code>POST /api/mail</code>, list with <code>GET /api/mail?direction=outbound</code> — for
+			the address below. A key is shown once when created; keep it somewhere safe.
+		</p>
+
+		<form class="key-form" onsubmit={createKey}>
+			<div class="key-field">
+				<label class="sr-only" for="apikey-name">Key name</label>
+				<input
+					id="apikey-name"
+					class="text-input"
+					placeholder="Name (e.g. my-cron-job)"
+					value={keyName}
+					oninput={(event) => (keyName = event.currentTarget.value)}
+				/>
+			</div>
+
+			<div class="scope-row">
+				<label class="scope-check">
+					<input type="checkbox" bind:checked={sendScope} />
+					<span>send</span>
+				</label>
+				<label class="scope-check">
+					<input type="checkbox" bind:checked={readScope} />
+					<span>read</span>
+				</label>
+			</div>
+
+			<button type="submit" class="btn-primary" disabled={keyBusy || (!sendScope && !readScope)}>
+				{keyBusy ? 'Creating…' : 'Generate key'}
+			</button>
+		</form>
+
+		{#if keyError}<p class="error">{keyError}</p>{/if}
+
+		{#if tokens.length}
+			<ul class="key-list">
+				{#each tokens as token (token.id)}
+					<li class="key-row">
+						<div class="min-w-0 flex-1">
+							<p class="key-name">{token.name}</p>
+							<p class="key-meta">
+								<code>{token.preview}</code>
+								<span class="caps">
+									{#each token.scopes as scope (scope)}<span class="chip">{scope}</span>{/each}
+								</span>
+							</p>
+						</div>
+						<span class="key-created">{formatDate(token.created_at)}</span>
+						<button
+							type="button"
+							class="icon-btn"
+							aria-label="Revoke {token.name}"
+							onclick={() => revokeKey(token.id)}
+						>
+							<Icon name="delete-bin-line" size={15} />
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+
+		<p class="hint">
+			<Icon name="shield-keyhole-line" size={14} />
+			Send this with <code>Authorization: Bearer <em>your-key</em></code> on any
+			<code>/api/*</code> request. Revoking deletes the key immediately; scripts using it will
+			get <code>401 Unauthorized</code>.
+		</p>
+	</section>
 </div>
+
+{#if revealed}
+	<div
+		class="modal-backdrop"
+		role="presentation"
+		tabindex="-1"
+		onclick={(event) => {
+			if (event.target === event.currentTarget) closeRevealed();
+		}}
+		onkeydown={(event) => {
+			if (event.key === 'Escape') closeRevealed();
+		}}
+	>
+		<div
+			class="reveal-card"
+			role="dialog"
+			aria-modal="true"
+			aria-label="New API key"
+			tabindex="-1"
+		>
+			<h3><Icon name="key-2-line" size={16} /> New API key — copy it now</h3>
+			<p class="card-hint">
+				<strong>{revealed.summary.name}</strong> was created. It can't be shown again — if you
+				lose it, revoke and make a new one.
+			</p>
+			<pre class="token-box">{revealed.token}</pre>
+			<div class="reveal-actions">
+				<button type="button" class="btn-primary" onclick={copyKey}>
+					<Icon name={copied ? 'check-line' : 'copy-line'} size={15} />
+					{copied ? 'Copied' : 'Copy key'}
+				</button>
+				<button type="button" class="btn-ghost" onclick={closeRevealed}>Done</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.settings-page {
@@ -566,5 +757,150 @@
 		margin-top: 0.75rem;
 		font-size: 0.8125rem;
 		color: var(--color-danger);
+	}
+
+	.key-form {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		flex-wrap: wrap;
+		margin-top: 1rem;
+	}
+
+	.key-field {
+		flex: 1;
+		min-width: 12rem;
+	}
+
+	.text-input {
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.625rem;
+		font-size: 0.875rem;
+		color: var(--color-text);
+		background: var(--color-surface);
+		box-shadow: inset 0 0 0 1px var(--color-line);
+		transition: box-shadow 0.15s;
+	}
+
+	.text-input::placeholder {
+		color: var(--color-muted);
+	}
+
+	.text-input:focus {
+		outline: none;
+		box-shadow: inset 0 0 0 2px var(--color-accent);
+	}
+
+	.scope-row {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.scope-check {
+		display: flex;
+		align-items: center;
+		gap: 0.3125rem;
+		padding: 0.3125rem 0.5625rem;
+		border-radius: 0.5rem;
+		font-size: 0.8125rem;
+		color: var(--color-text-secondary);
+		box-shadow: inset 0 0 0 1px var(--color-line);
+		cursor: pointer;
+	}
+
+	.key-list {
+		margin-top: 1.25rem;
+	}
+
+	.key-row {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		padding: 0.75rem 0;
+	}
+
+	.key-row + .key-row {
+		box-shadow: inset 0 1px 0 var(--color-line);
+	}
+
+	.key-name {
+		font-size: 0.875rem;
+		font-weight: 500;
+	}
+
+	.key-meta {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 0.1875rem;
+		font-size: 0.75rem;
+		color: var(--color-muted);
+	}
+
+	.key-meta code {
+		font-size: 0.75rem;
+	}
+
+	.key-created {
+		flex-shrink: 0;
+		font-size: 0.75rem;
+		color: var(--color-muted);
+	}
+
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 40;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		background: rgba(0, 0, 0, 0.45);
+	}
+
+	.reveal-card {
+		width: 100%;
+		max-width: 30rem;
+		padding: 1.5rem;
+		border-radius: 1rem;
+		background: var(--color-card);
+		box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.25);
+	}
+
+	.reveal-card h3 {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 1rem;
+		font-weight: 600;
+	}
+
+	.token-box {
+		overflow-x: auto;
+		margin-top: 1rem;
+		padding: 0.75rem;
+		border-radius: 0.625rem;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+		word-break: break-all;
+		white-space: pre-wrap;
+		color: var(--color-text);
+		background: var(--color-surface-muted);
+		box-shadow: inset 0 0 0 1px var(--color-line);
+	}
+
+	.reveal-actions {
+		display: flex;
+		gap: 0.5rem;
+		margin-top: 1.25rem;
+	}
+
+	.reveal-actions .btn-primary,
+	.reveal-actions .btn-ghost {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
 	}
 </style>

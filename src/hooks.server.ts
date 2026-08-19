@@ -1,5 +1,6 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { countUsers, getUserFromSession, readSessionToken } from '$lib/server/auth';
+import { getUserByApiToken, readBearerToken } from '$lib/server/api-tokens';
 import { DOMAIN_COOKIE } from '$lib/server/constants';
 import { listAddressesForUser, listDomains } from '$lib/server/domains';
 
@@ -16,12 +17,19 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.addresses = [];
 	event.locals.activeDomainId = null;
 
+	const { pathname } = event.url;
+
 	if (db) {
+		// Browser sessions first; then, for API calls, a long-lived bearer token
+		// (generated under Settings → API keys) so scripts can authenticate
+		// without a session cookie. A bearer token is only honoured on /api/*.
 		const token = readSessionToken(event.cookies);
 		event.locals.user = await getUserFromSession(db, token);
+		if (!event.locals.user && pathname.startsWith('/api/')) {
+			const bearer = readBearerToken(event.request);
+			if (bearer) event.locals.user = await getUserByApiToken(db, bearer);
+		}
 	}
-
-	const { pathname } = event.url;
 
 	// Webhooks authenticate with a signature, not a session.
 	if (pathname.startsWith('/api/webhooks/')) {
