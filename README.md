@@ -52,8 +52,11 @@ bun run setup
 bash scripts/setup.sh
 ```
 
-It asks for the mail domain, Resend vs Cloudflare Email, and any API keys —
-then does the rest. Budget about 30 minutes; most of that is DNS.
+It asks for the mail domain, Resend vs Cloudflare Email, Worker / D1 / R2
+names, and any API keys — then does the rest. If `quickmail` or
+`quickmail-attachments` already exist on the account, it suggests new names
+so you do not overwrite another project. Budget about 30 minutes; most of
+that is DNS.
 
 **You need**
 

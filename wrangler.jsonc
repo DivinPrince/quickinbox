@@ -50,7 +50,7 @@
 		{
 			"binding": "DB",
 			"database_name": "quickmail",
-			// `bun run setup` fills this in, or: wrangler d1 create quickmail
+			// `bun run setup` fills this in, or: wrangler d1 create <name>
 			"database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
 			"migrations_dir": "migrations"
 		}
@@ -59,7 +59,7 @@
 	"r2_buckets": [
 		{
 			"binding": "ATTACHMENTS",
-			// `bun run setup` creates this, or: wrangler r2 bucket create quickmail-attachments
+			// `bun run setup` creates this, or: wrangler r2 bucket create <name>
 			"bucket_name": "quickmail-attachments"
 		}
 	],

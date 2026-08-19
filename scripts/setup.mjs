@@ -24,7 +24,6 @@ const devVarsFile = join(root, '.dev.vars');
 const devVarsExample = join(root, '.dev.vars.example');
 const envFile = join(root, '.env');
 
-const D1_PLACEHOLDER = 'REPLACE_WITH_YOUR_D1_DATABASE_ID';
 const MIN_WRANGLER = [4, 123, 0];
 const ADDRESSES_WRANGLER = [4, 113, 0];
 const MIN_NODE_MAJOR = 20;
@@ -70,6 +69,8 @@ wrangler config, and onboards your mail domain.
 Options:
   --domain <name>      Mail domain (e.g. example.com)
   --provider <name>    resend | cloudflare
+  --d1-name <name>     D1 database name (default: quickmail, or unique if taken)
+  --r2-name <name>     R2 bucket name (default: quickmail-attachments, or unique if taken)
   --yes                Accept defaults (still requires --domain)
   --skip-deploy        Do not deploy at the end
   --help               Show this help
@@ -77,7 +78,15 @@ Options:
 }
 
 function parseArgs(argv) {
-	const out = { help: false, yes: false, skipDeploy: false, domain: null, provider: null };
+	const out = {
+		help: false,
+		yes: false,
+		skipDeploy: false,
+		domain: null,
+		provider: null,
+		d1Name: null,
+		r2Name: null
+	};
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i];
 		switch (arg) {
@@ -98,9 +107,17 @@ function parseArgs(argv) {
 			case '--provider':
 				out.provider = argv[++i] ?? '';
 				break;
+			case '--d1-name':
+				out.d1Name = argv[++i] ?? '';
+				break;
+			case '--r2-name':
+				out.r2Name = argv[++i] ?? '';
+				break;
 			default:
 				if (arg.startsWith('--domain=')) out.domain = arg.slice('--domain='.length);
 				else if (arg.startsWith('--provider=')) out.provider = arg.slice('--provider='.length);
+				else if (arg.startsWith('--d1-name=')) out.d1Name = arg.slice('--d1-name='.length);
+				else if (arg.startsWith('--r2-name=')) out.r2Name = arg.slice('--r2-name='.length);
 				else {
 					console.error(`Unknown option: ${arg}`);
 					printHelp();
@@ -416,6 +433,45 @@ function isWorkerName(value) {
 	return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(value);
 }
 
+function isR2BucketName(value) {
+	return (
+		value.length >= 3 &&
+		value.length <= 63 &&
+		/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(value)
+	);
+}
+
+function slugDomain(domain) {
+	return domain.replace(/\./g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
+function uniqueName(base, taken, maxLen = 63) {
+	const takenSet = taken instanceof Set ? taken : new Set(taken);
+	const clip = (value) => {
+		let name = value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
+		name = name.replace(/^-+/, '').replace(/-+$/, '');
+		if (name.length > maxLen) name = name.slice(0, maxLen).replace(/-+$/, '');
+		if (name.length < 3) name = `${name}db`.slice(0, maxLen);
+		return name;
+	};
+
+	let candidate = clip(base);
+	if (!takenSet.has(candidate)) return candidate;
+	for (let n = 2; n < 100; n++) {
+		const suffix = `-${n}`;
+		candidate = clip(`${base.slice(0, Math.max(3, maxLen - suffix.length))}${suffix}`);
+		if (!takenSet.has(candidate)) return candidate;
+	}
+	return clip(`${base}-${Date.now().toString(36).slice(-4)}`);
+}
+
+function previewNames(names, limit = 8) {
+	const list = [...names];
+	if (list.length === 0) return '';
+	const shown = list.slice(0, limit).join(', ');
+	return list.length > limit ? `${shown}, …` : shown;
+}
+
 function nodeMajor() {
 	const path = which('node');
 	if (!path) return null;
@@ -639,6 +695,55 @@ async function askHostname(domain) {
 	return host;
 }
 
+async function askCloudResource({
+	label,
+	current,
+	taken,
+	altBase,
+	flagValue,
+	validate,
+	invalidHint
+}) {
+	const takenSet = new Set(taken);
+	let suggested = current;
+	if (takenSet.has(current)) {
+		warn(`${label} "${current}" already exists on this account — probably another project.`);
+		suggested = uniqueName(altBase, takenSet);
+		log(`  ${c.dim(`Suggested new name: ${suggested}`)}`);
+	}
+
+	if (flagValue) {
+		const name = flagValue.trim().toLowerCase();
+		if (!validate(name)) throw new Error(`Invalid ${label} name "${flagValue}". ${invalidHint}`);
+		if (takenSet.has(name) && !args.yes) {
+			if (!(await confirm(`Reuse existing ${label} "${name}"?`, false))) {
+				throw new Error(`Pick a different --${label === 'D1' ? 'd1' : 'r2'}-name. "${name}" already exists.`);
+			}
+		} else if (takenSet.has(name)) {
+			warn(`Reusing existing ${label} "${name}".`);
+		}
+		return name;
+	}
+
+	if (args.yes) return suggested;
+
+	while (true) {
+		const name = (await prompt(`${label} name`, suggested)).toLowerCase();
+		if (!validate(name)) {
+			warn(invalidHint);
+			continue;
+		}
+		if (takenSet.has(name)) {
+			if (await confirm(`Reuse existing ${label} "${name}"? This will share it with whatever already uses it.`, false)) {
+				return name;
+			}
+			warn('Enter a different name to create a new one.');
+			continue;
+		}
+		return name;
+	}
+}
+
 function listD1() {
 	const result = wrangler(['d1', 'list', '--json'], { allowFail: true });
 	const parsed = parseJsonOutput(`${result.stdout}\n${result.stderr}`);
@@ -680,12 +785,7 @@ function createD1(name) {
 	throw new Error(text.trim() || `Failed to create D1 database "${name}".`);
 }
 
-async function ensureD1(databaseName, currentId) {
-	if (currentId && currentId !== D1_PLACEHOLDER) {
-		ok(`D1 ${databaseName} (${currentId})`);
-		return currentId;
-	}
-
+async function ensureD1(databaseName) {
 	const existing = listD1().find((row) => row.name === databaseName);
 	if (existing) {
 		ok(`reusing D1 ${databaseName} (${existing.id})`);
@@ -698,24 +798,28 @@ async function ensureD1(databaseName, currentId) {
 	return id;
 }
 
-function r2BucketExists(bucketName) {
+function listR2Names() {
 	const result = wrangler(['r2', 'bucket', 'list', '--json'], { allowFail: true });
 	const parsed = parseJsonOutput(`${result.stdout}\n${result.stderr}`);
 	const rows = Array.isArray(parsed) ? parsed : parsed?.buckets ?? parsed?.result ?? [];
-	const names = rows
+	const fromJson = rows
 		.map((row) => (typeof row === 'string' ? row : row.name ?? row.Name))
 		.filter(Boolean);
-	if (names.includes(bucketName)) return true;
+	if (fromJson.length > 0) return fromJson;
 
 	const table = wrangler(['r2', 'bucket', 'list'], { allowFail: true });
-	return new RegExp(`\\b${bucketName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(
-		`${table.stdout}\n${table.stderr}`
-	);
+	const text = `${table.stdout}\n${table.stderr}`;
+	const names = [];
+	for (const line of text.split('\n')) {
+		const match = line.match(/\b([a-z0-9][a-z0-9-]{1,61}[a-z0-9])\b/i);
+		if (match && !/^(name|creation|location|id)$/i.test(match[1])) names.push(match[1]);
+	}
+	return names;
 }
 
 function ensureR2(bucketName) {
-	if (r2BucketExists(bucketName)) {
-		ok(`R2 bucket ${bucketName}`);
+	if (listR2Names().includes(bucketName)) {
+		ok(`reusing R2 bucket ${bucketName}`);
 		return;
 	}
 
@@ -730,6 +834,16 @@ function ensureR2(bucketName) {
 		return;
 	}
 	throw new Error(text.trim() || `Failed to create R2 bucket "${bucketName}".`);
+}
+
+function setPackageMigrateScripts(databaseName) {
+	const pkgPath = join(root, 'package.json');
+	if (!existsSync(pkgPath)) return;
+	const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+	if (!pkg.scripts) return;
+	pkg.scripts['db:migrate:local'] = `wrangler d1 migrations apply ${databaseName} --local`;
+	pkg.scripts['db:migrate:remote'] = `wrangler d1 migrations apply ${databaseName} --remote`;
+	writeFileSync(pkgPath, `${JSON.stringify(pkg, null, '\t')}\n`);
 }
 
 function putSecret(name, value) {
@@ -1032,14 +1146,40 @@ async function main() {
 	if (hostname) ok(`UI hostname ${hostname}`);
 
 	section(4, total, 'D1 and R2');
-	const databaseName = jsoncString(source, 'database_name') || 'quickmail';
-	const bucketName = jsoncString(source, 'bucket_name') || 'quickmail-attachments';
-	const databaseId = await ensureD1(databaseName, jsoncString(source, 'database_id'));
+	const existingD1 = listD1();
+	const existingR2 = listR2Names();
+	const d1Taken = existingD1.map((row) => row.name);
+	if (d1Taken.length) log(`  Existing D1: ${previewNames(d1Taken)}`);
+	if (existingR2.length) log(`  Existing R2: ${previewNames(existingR2)}`);
+
+	const domainSlug = slugDomain(domain);
+	const databaseName = await askCloudResource({
+		label: 'D1',
+		current: jsoncString(source, 'database_name') || 'quickmail',
+		taken: d1Taken,
+		altBase: `${workerName}-${domainSlug}`,
+		flagValue: args.d1Name,
+		validate: isWorkerName,
+		invalidHint: 'Use lowercase letters, numbers, and hyphens.'
+	});
+	const bucketName = await askCloudResource({
+		label: 'R2',
+		current: jsoncString(source, 'bucket_name') || 'quickmail-attachments',
+		taken: existingR2,
+		altBase: `${workerName}-${domainSlug}-attachments`,
+		flagValue: args.r2Name,
+		validate: isR2BucketName,
+		invalidHint: '3–63 characters, lowercase letters, numbers, and hyphens.'
+	});
+	ok(`D1 name ${databaseName}`);
+	ok(`R2 name ${bucketName}`);
+	const databaseId = await ensureD1(databaseName);
 	ensureR2(bucketName);
 
 	section(5, total, 'Config');
 	source = readWrangler();
 	source = setFirstString(source, 'name', workerName);
+	source = setFirstString(source, 'database_name', databaseName);
 	source = setFirstString(source, 'database_id', databaseId);
 	source = setFirstString(source, 'bucket_name', bucketName);
 	source = setVars(source, {
@@ -1054,6 +1194,8 @@ async function main() {
 	}
 	writeWrangler(source);
 	ok('updated wrangler.jsonc');
+	setPackageMigrateScripts(databaseName);
+	if (databaseName !== 'quickmail') ok(`updated package.json migrate scripts for ${databaseName}`);
 
 	const devVars = {
 		EMAIL_PROVIDER: provider
