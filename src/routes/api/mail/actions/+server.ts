@@ -1,4 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
+import { authorizeMailAction, isMailAction, type MailAction } from '$lib/server/api-access';
 import {
 	deleteEmailsPermanently,
 	emptyTrash,
@@ -8,26 +9,11 @@ import {
 	getMailboxCounts
 } from '$lib/server/mail-store';
 
-/** Bulk actions from the list toolbar. */
-const ACTIONS = [
-	'read',
-	'unread',
-	'star',
-	'unstar',
-	'trash',
-	'restore',
-	'delete',
-	'read-all',
-	'empty-trash'
-] as const;
-
 /** Actions that operate on the whole mailbox rather than a selection. */
-const WHOLE_MAILBOX: Action[] = ['read-all', 'empty-trash'];
-
-type Action = (typeof ACTIONS)[number];
+const WHOLE_MAILBOX: MailAction[] = ['read-all', 'empty-trash'];
 
 type ActionBody = {
-	action?: Action;
+	action?: MailAction;
 	ids?: string[];
 };
 
@@ -40,8 +26,19 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 	const body = (await request.json()) as ActionBody;
 	const action = body.action;
 
-	if (!action || !ACTIONS.includes(action)) {
+	if (!isMailAction(action)) {
 		return json({ error: 'Unknown action' }, { status: 400 });
+	}
+
+	if (locals.authMethod === 'api_token') {
+		const access = authorizeMailAction({
+			action,
+			authMethod: 'api_token',
+			scopes: locals.apiScopes
+		});
+		if (!access.ok) {
+			return json({ error: access.error }, { status: access.status });
+		}
 	}
 
 	const selected = (body.ids ?? []).filter((id) => typeof id === 'string' && id.length > 0);
@@ -88,6 +85,10 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		case 'empty-trash':
 			affected = await emptyTrash(db, platform?.env.ATTACHMENTS, locals.user.id);
 			break;
+		default: {
+			const _never: never = action;
+			return _never;
+		}
 	}
 
 	const counts = await getMailboxCounts(db, locals.user.id, locals.activeDomainId);

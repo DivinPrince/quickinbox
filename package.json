@@ -4,6 +4,9 @@
 	"version": "1.0.0",
 	"license": "MIT",
 	"type": "module",
+	"bin": {
+		"quickmail": "./bin/quickmail.mjs"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && bun scripts/wrap-cloudflare-worker.mjs",
@@ -16,7 +19,9 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:clean": "bun scripts/check-template-clean.mjs",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"quickmail": "bun cli/main.ts",
+		"test": "bun test src/lib/email-signature.test.ts src/lib/server/api-access.test.ts src/lib/server/api-tokens.test.ts cli/client.test.ts"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20260601.1",
@@ -34,7 +39,9 @@
 		"wrangler": "^4.124.0"
 	},
 	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.29.0",
 		"postal-mime": "^3.0.0",
-		"remixicon": "^4.9.1"
+		"remixicon": "^4.9.1",
+		"zod": "^3.25.0"
 	}
 }

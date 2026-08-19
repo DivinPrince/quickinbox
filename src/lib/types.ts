@@ -6,6 +6,17 @@ export type User = {
 	created_at: string;
 };
 
+export type ApiScope = 'mail:send' | 'mail:read' | 'admin';
+
+export type ApiTokenSummary = {
+	id: string;
+	name: string;
+	preview: string;
+	scopes: ApiScope[];
+	created_at: string;
+	last_used_at: string | null;
+};
+
 export type DeliveryStatus =
 	| 'queued'
 	| 'sent'

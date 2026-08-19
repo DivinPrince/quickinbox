@@ -121,12 +121,7 @@
 
 	<section class="surface-lg admin-card">
 		<h2><Icon name="global-line" size={18} /> Domains</h2>
-		<p class="card-hint">
-			Connected domains send and receive through {data.providerKind === 'cloudflare'
-				? 'Cloudflare Email'
-				: 'Resend'}. Catch-all decides who gets mail addressed to an unknown mailbox on that
-			domain.
-		</p>
+		<p class="card-hint">Catch-all gets unmatched mail.</p>
 
 		<ul class="domain-list">
 			{#each data.domains as domain (domain.id)}
@@ -186,17 +181,17 @@
 					{#if !domain.receiving_enabled}
 						<p class="hint">
 							<Icon name="information-line" size={13} />
-							Inbound is off for this domain — enable receiving
+							Inbound is off
 							{data.providerKind === 'cloudflare'
-								? "and point Email Routing's catch-all at this Worker"
-								: 'and add the MX record at the provider'}
-							to get mail.
+								? '— point Email Routing’s catch-all at this Worker'
+								: '— add the MX record'}
+							to receive.
 						</p>
 					{/if}
 					{#if domain.catchall_user_id}
 						<p class="hint">
 							<Icon name="user-received-line" size={13} />
-							Unmatched mail goes to {userLabel(domain.catchall_user_id)}.
+							Goes to {userLabel(domain.catchall_user_id)}.
 						</p>
 					{/if}
 				</li>
@@ -235,9 +230,7 @@
 	<div class="admin-grid">
 		<section class="surface-lg admin-card">
 			<h2><Icon name="user-add-line" size={18} /> New user</h2>
-			<p class="card-hint">
-				Their address is also their login — they can sign in and use it straight away.
-			</p>
+			<p class="card-hint">Address is their login.</p>
 			<form class="mt-4 space-y-3" onsubmit={createUser}>
 				<input type="text" bind:value={name} required placeholder="Display name" class="admin-input" />
 				<AddressField
@@ -291,9 +284,7 @@
 	{#if data.unrouted.length > 0}
 		<section class="surface-lg admin-card">
 			<h2><Icon name="question-mark" size={18} /> Unrouted mail</h2>
-			<p class="card-hint">
-				Received on a connected domain but no address matched and no catch-all was set.
-			</p>
+			<p class="card-hint">No matching address or catch-all.</p>
 			<ul class="user-list">
 				{#each data.unrouted as item (item.id)}
 					<li class="user-row">
