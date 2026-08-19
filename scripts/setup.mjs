@@ -69,8 +69,8 @@ wrangler config, and onboards your mail domain.
 Options:
   --domain <name>      Mail domain (e.g. example.com)
   --provider <name>    resend | cloudflare
-  --d1-name <name>     D1 database name (default: quickmail, or unique if taken)
-  --r2-name <name>     R2 bucket name (default: quickmail-attachments, or unique if taken)
+  --d1-name <name>     D1 database name (e.g. quickmail)
+  --r2-name <name>     R2 bucket name (e.g. quickmail-attachments)
   --yes                Accept defaults (still requires --domain)
   --skip-deploy        Do not deploy at the end
   --help               Show this help
@@ -441,37 +441,6 @@ function isR2BucketName(value) {
 	);
 }
 
-function slugDomain(domain) {
-	return domain.replace(/\./g, '-').replace(/[^a-z0-9-]/g, '');
-}
-
-function uniqueName(base, taken, maxLen = 63) {
-	const takenSet = taken instanceof Set ? taken : new Set(taken);
-	const clip = (value) => {
-		let name = value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
-		name = name.replace(/^-+/, '').replace(/-+$/, '');
-		if (name.length > maxLen) name = name.slice(0, maxLen).replace(/-+$/, '');
-		if (name.length < 3) name = `${name}db`.slice(0, maxLen);
-		return name;
-	};
-
-	let candidate = clip(base);
-	if (!takenSet.has(candidate)) return candidate;
-	for (let n = 2; n < 100; n++) {
-		const suffix = `-${n}`;
-		candidate = clip(`${base.slice(0, Math.max(3, maxLen - suffix.length))}${suffix}`);
-		if (!takenSet.has(candidate)) return candidate;
-	}
-	return clip(`${base}-${Date.now().toString(36).slice(-4)}`);
-}
-
-function previewNames(names, limit = 8) {
-	const list = [...names];
-	if (list.length === 0) return '';
-	const shown = list.slice(0, limit).join(', ');
-	return list.length > limit ? `${shown}, …` : shown;
-}
-
 function nodeMajor() {
 	const path = which('node');
 	if (!path) return null;
@@ -695,52 +664,18 @@ async function askHostname(domain) {
 	return host;
 }
 
-async function askCloudResource({
-	label,
-	current,
-	taken,
-	altBase,
-	flagValue,
-	validate,
-	invalidHint
-}) {
-	const takenSet = new Set(taken);
-	let suggested = current;
-	if (takenSet.has(current)) {
-		warn(`${label} "${current}" already exists on this account — probably another project.`);
-		suggested = uniqueName(altBase, takenSet);
-		log(`  ${c.dim(`Suggested new name: ${suggested}`)}`);
-	}
-
+async function askResourceName(question, fallback, flagValue, validate, invalidHint) {
 	if (flagValue) {
 		const name = flagValue.trim().toLowerCase();
-		if (!validate(name)) throw new Error(`Invalid ${label} name "${flagValue}". ${invalidHint}`);
-		if (takenSet.has(name) && !args.yes) {
-			if (!(await confirm(`Reuse existing ${label} "${name}"?`, false))) {
-				throw new Error(`Pick a different --${label === 'D1' ? 'd1' : 'r2'}-name. "${name}" already exists.`);
-			}
-		} else if (takenSet.has(name)) {
-			warn(`Reusing existing ${label} "${name}".`);
-		}
+		if (!validate(name)) throw new Error(`Invalid ${question}: "${flagValue}". ${invalidHint}`);
 		return name;
 	}
-
-	if (args.yes) return suggested;
-
+	if (args.yes) return fallback;
 	while (true) {
-		const name = (await prompt(`${label} name`, suggested)).toLowerCase();
-		if (!validate(name)) {
-			warn(invalidHint);
-			continue;
-		}
-		if (takenSet.has(name)) {
-			if (await confirm(`Reuse existing ${label} "${name}"? This will share it with whatever already uses it.`, false)) {
-				return name;
-			}
-			warn('Enter a different name to create a new one.');
-			continue;
-		}
-		return name;
+		const raw = await prompt(question);
+		const name = (raw || fallback).toLowerCase();
+		if (validate(name)) return name;
+		warn(invalidHint);
 	}
 }
 
@@ -1146,33 +1081,22 @@ async function main() {
 	if (hostname) ok(`UI hostname ${hostname}`);
 
 	section(4, total, 'D1 and R2');
-	const existingD1 = listD1();
-	const existingR2 = listR2Names();
-	const d1Taken = existingD1.map((row) => row.name);
-	if (d1Taken.length) log(`  Existing D1: ${previewNames(d1Taken)}`);
-	if (existingR2.length) log(`  Existing R2: ${previewNames(existingR2)}`);
-
-	const domainSlug = slugDomain(domain);
-	const databaseName = await askCloudResource({
-		label: 'D1',
-		current: jsoncString(source, 'database_name') || 'quickmail',
-		taken: d1Taken,
-		altBase: `${workerName}-${domainSlug}`,
-		flagValue: args.d1Name,
-		validate: isWorkerName,
-		invalidHint: 'Use lowercase letters, numbers, and hyphens.'
-	});
-	const bucketName = await askCloudResource({
-		label: 'R2',
-		current: jsoncString(source, 'bucket_name') || 'quickmail-attachments',
-		taken: existingR2,
-		altBase: `${workerName}-${domainSlug}-attachments`,
-		flagValue: args.r2Name,
-		validate: isR2BucketName,
-		invalidHint: '3–63 characters, lowercase letters, numbers, and hyphens.'
-	});
-	ok(`D1 name ${databaseName}`);
-	ok(`R2 name ${bucketName}`);
+	const databaseName = await askResourceName(
+		'D1 database name (e.g. quickmail)',
+		jsoncString(source, 'database_name') || 'quickmail',
+		args.d1Name,
+		isWorkerName,
+		'Use lowercase letters, numbers, and hyphens.'
+	);
+	const bucketName = await askResourceName(
+		'R2 bucket name (e.g. quickmail-attachments)',
+		jsoncString(source, 'bucket_name') || 'quickmail-attachments',
+		args.r2Name,
+		isR2BucketName,
+		'3–63 characters, lowercase letters, numbers, and hyphens.'
+	);
+	ok(`D1 ${databaseName}`);
+	ok(`R2 ${bucketName}`);
 	const databaseId = await ensureD1(databaseName);
 	ensureR2(bucketName);
 
