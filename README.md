@@ -18,6 +18,8 @@ Deploys to Cloudflare Workers.
 - **Multiple domains and users** — each user has addresses and a default sending identity. Admins get a catch-all and an unrouted-mail view.
 - **Delivery status** — Resend reports delivered / bounced / complained over webhooks. Cloudflare marks a send `sent` once the binding accepts it.
 - **Light and dark themes.**
+- **Programmatic API** — each user can issue long-lived API keys and `POST /api/mail` to send from a script, no browser or session cookie needed.
+- **CLI and MCP** — the same keys drive `quickmail` in the terminal and an MCP server for agents.
 
 ---
 
@@ -308,6 +310,89 @@ That in-app catch-all is separate from Cloudflare Email Routing's catch-all.
 Routing's catch-all gets the message **into** the Worker. QuickMail's catch-all
 decides **which user** sees it.
 
+## Send from a script (API keys)
+
+Signing in with a browser only gets you a cookie that lives seven days — fine for
+a human, awkward for automation. Any user can instead mint a long-lived API key
+under **Settings → API keys** and use it as a bearer token on the mail API.
+
+```sh
+curl https://your-worker/api/mail \
+  -H "Authorization: Bearer qm_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fromAddressId": "<optional — defaults to your send identity>",
+    "to": "you@example.com",
+    "cc": "cc@example.com",
+    "subject": "hello from a script",
+    "text": "hi"
+  }'
+```
+
+`POST /api/mail` returns `{"ok": true, "id": "<emailId>"}`. List conversations
+with `GET /api/mail?view=inbox` (or `?direction=outbound` for sent). Keys only
+ever authenticate an allowlisted set
+of `/api/*` routes — the web UI and **Settings → API keys** still need a normal
+session — and revoking a key in Settings takes effect immediately.
+
+Scopes are enforced: `mail:read` cannot send, `mail:send` cannot hit admin
+routes, and a key cannot mint another key. Apply `migrations/0009_api_tokens.sql`
+after pulling.
+
+> Only the SHA-256 hash of a key is stored; the raw value is shown once at
+> creation. If you lose it, revoke and mint a new one.
+
+## CLI and MCP
+
+Install the CLI from GitHub (no npm). The command is also on **Settings → API keys**:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickmail/main/scripts/install.sh | sh
+quickmail login --url https://<your-quickmail-instance> --token <key from Settings>
+quickmail inbox
+quickmail search "invoice"
+quickmail read <thread-id>
+quickmail send --to someone@example.com --subject "Hi" --body "Hello"
+quickmail users list          # admin scope
+quickmail unrouted            # admin scope
+```
+
+Install from `main` by default (`QUICKMAIL_REF` selects another ref). Your
+instance URL is only for `quickmail login --url` — optional:
+`curl -fsSL https://<your-instance>/install.sh | sh` sets `QUICKMAIL_URL` then
+runs the GitHub installer.
+
+Create the key under **Settings → API keys**. The installer never asks for a token.
+`QUICKMAIL_URL` and `QUICKMAIL_TOKEN` override the saved config.
+
+From this repo, or via npm: `bunx quickmail …` / `bun run quickmail -- inbox`.
+
+The same credentials drive an MCP server for Claude, Cursor, and other agents
+(`bunx` keeps the MCP SDK available; the curl install skips `mcp.ts`):
+
+```bash
+bunx quickmail mcp
+```
+
+Tools: `list_threads`, `get_thread`, `search_mail`, `send_message`, `reply`, `list_attachments`.
+
+Claude Desktop / Cursor example:
+
+```json
+{
+  "mcpServers": {
+    "quickmail": {
+      "command": "bunx",
+      "args": ["quickmail", "mcp"],
+      "env": {
+        "QUICKMAIL_URL": "https://mail.example.com",
+        "QUICKMAIL_TOKEN": "qm_live_…"
+      }
+    }
+  }
+}
+```
+
 ## Layout
 
 ```
@@ -320,7 +405,10 @@ src/
     utils/           HTML, quoting, dates, attachments
 scripts/
   setup.sh / setup.mjs   first-run wizard (tools, login, domain, env)
+  install.sh             GitHub CLI installer (instance /install.sh is a thin wrapper)
   wrap-cloudflare-worker.mjs   attach email() after the SvelteKit build
+cli/                 quickmail CLI + MCP server (talks to a deployed instance)
+bin/quickmail.mjs
 migrations/          D1 schema, applied in order
 ```
 

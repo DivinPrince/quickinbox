@@ -2,6 +2,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page as currentPage } from '$app/stores';
 	import Icon from './Icon.svelte';
+	import Check from './Check.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import DeliveryStatus from './DeliveryStatus.svelte';
 	import { formatRelativeDate } from '$lib/utils/date';
@@ -151,13 +152,11 @@
 	<header class="toolbar">
 		<div class="toolbar-left">
 			<div class="select-all">
-				<input
-					type="checkbox"
-					class="checkbox"
-					aria-label="Select all messages"
+				<Check
+					label="Select all messages"
 					checked={allSelected}
 					indeterminate={someSelected && !allSelected}
-					onchange={(event) => selectAll(event.currentTarget.checked)}
+					onchange={selectAll}
 				/>
 				<button
 					type="button"
@@ -351,7 +350,7 @@
 							onclick={() => apply({ unread: filters.unreadOnly ? null : '1' })}
 						>
 							<Icon
-								name={filters.unreadOnly ? 'checkbox-line' : 'checkbox-blank-line'}
+								name={filters.unreadOnly ? 'checkbox-fill' : 'checkbox-blank-line'}
 								size={15}
 							/>
 							Unread only
@@ -362,7 +361,7 @@
 							onclick={() => apply({ starred: filters.starredOnly ? null : '1' })}
 						>
 							<Icon
-								name={filters.starredOnly ? 'checkbox-line' : 'checkbox-blank-line'}
+								name={filters.starredOnly ? 'checkbox-fill' : 'checkbox-blank-line'}
 								size={15}
 							/>
 							Starred only
@@ -373,7 +372,7 @@
 							onclick={() => apply({ attachments: filters.attachmentsOnly ? null : '1' })}
 						>
 							<Icon
-								name={filters.attachmentsOnly ? 'checkbox-line' : 'checkbox-blank-line'}
+								name={filters.attachmentsOnly ? 'checkbox-fill' : 'checkbox-blank-line'}
 								size={15}
 							/>
 							Has attachments
@@ -436,10 +435,8 @@
 						class:unread={!thread.is_read}
 						class:checked={selected.includes(thread.latest_id)}
 					>
-						<input
-							type="checkbox"
-							class="checkbox"
-							aria-label="Select conversation with {people(thread)}"
+						<Check
+							label={`Select conversation with ${people(thread)}`}
 							checked={selected.includes(thread.latest_id)}
 							onchange={() => toggle(thread.latest_id)}
 						/>
@@ -602,15 +599,6 @@
 
 	.caret:hover {
 		color: var(--color-text);
-	}
-
-	.checkbox {
-		width: 1rem;
-		height: 1rem;
-		flex-shrink: 0;
-		border-radius: 0.25rem;
-		accent-color: var(--color-accent);
-		cursor: pointer;
 	}
 
 	.tool-btn {

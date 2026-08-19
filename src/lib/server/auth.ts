@@ -126,6 +126,52 @@ export async function logout(db: D1Database, token: string): Promise<void> {
 	await db.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(token_hash).run();
 }
 
+export async function setUserPassword(
+	db: D1Database,
+	userId: string,
+	password: string
+): Promise<void> {
+	if (password.length < 8) {
+		throw new Error('Password must be at least 8 characters');
+	}
+
+	const password_hash = await hashPassword(password);
+	const result = await db
+		.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+		.bind(password_hash, userId)
+		.run();
+
+	if ((result.meta.changes ?? 0) === 0) {
+		throw new Error('User not found');
+	}
+
+	// Password rotation must cut off every login path, including long-lived keys.
+	await db.batch([
+		db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
+		db.prepare('DELETE FROM api_tokens WHERE user_id = ?').bind(userId)
+	]);
+}
+
+export async function deleteUser(db: D1Database, actor: User, targetId: string): Promise<void> {
+	if (actor.id === targetId) {
+		throw new Error('You cannot delete your own account');
+	}
+
+	const target = await getUserById(db, targetId);
+	if (!target) {
+		throw new Error('User not found');
+	}
+
+	if (target.is_admin) {
+		const admins = (await listUsers(db)).filter((user) => user.is_admin);
+		if (admins.length <= 1) {
+			throw new Error('Keep at least one admin');
+		}
+	}
+
+	await db.prepare('DELETE FROM users WHERE id = ?').bind(targetId).run();
+}
+
 export async function getUserFromSession(db: D1Database, token: string | undefined): Promise<User | null> {
 	if (!token) return null;
 

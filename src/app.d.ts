@@ -1,4 +1,5 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
+import type { ApiScope, AuthMethod } from '$lib/server/api-access';
 import type { CloudflareSendEmailBinding } from '$lib/server/providers/cloudflare-provider';
 import type { Domain, MailAddress, User } from '$lib/types';
 
@@ -22,6 +23,11 @@ declare global {
 		}
 		interface Locals {
 			user: User | null;
+			/** How this request authenticated — sessions are unrestricted. */
+			authMethod: AuthMethod | null;
+			/** Scopes on the bearer token; empty for a browser session. */
+			apiScopes: ApiScope[];
+			apiTokenId: string | null;
 			/** Connected domains, loaded once per request for the switcher. */
 			domains: Domain[];
 			/** The signed-in user's sending identities. */
