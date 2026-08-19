@@ -6,17 +6,13 @@
 	"compatibility_flags": ["nodejs_compat"],
 	"workers_dev": true,
 
-	// Your Cloudflare account is picked up from `wrangler login`. If you belong
-	// to more than one account, set CLOUDFLARE_ACCOUNT_ID in your environment
-	// or uncomment this and paste the ID from the Cloudflare dashboard sidebar.
-	// "account_id": "",
+	// Your account ID filled in
+	"account_id": "5b49642f856e69ac463af10e6da43323",
 
-	// Deploys to <name>.<your-subdomain>.workers.dev out of the box. To serve it
-	// from your own domain instead, uncomment this and make sure the zone is on
-	// the same Cloudflare account.
+	// (Optional) Uncomment and fill if you are using a custom domain instead of workers.dev
 	// "routes": [
 	// 	{
-	// 		"pattern": "mail.example.com",
+	// 		"pattern": "mail.yourdomain.com",
 	// 		"custom_domain": true
 	// 	}
 	// ],
@@ -26,16 +22,10 @@
 		"binding": "ASSETS"
 	},
 
-	// Mail provider is selected by EMAIL_PROVIDER (resend | cloudflare).
-	// Resend secrets (when EMAIL_PROVIDER=resend or unset):
-	//   wrangler secret put RESEND_API_KEY
-	//   wrangler secret put RESEND_WEBHOOK_SECRET
-	// Cloudflare Email uses the send_email binding below plus CLOUDFLARE_MAIL_DOMAINS.
-	// Locally, put values in .dev.vars (copy .dev.vars.example).
-
+	// Change provider to cloudflare and specify your domain
 	"vars": {
-		"EMAIL_PROVIDER": "resend"
-		// "CLOUDFLARE_MAIL_DOMAINS": "example.com"
+		"EMAIL_PROVIDER": "cloudflare",
+		"CLOUDFLARE_MAIL_DOMAINS": "genofx.com"
 	},
 
 	"send_email": [
@@ -49,8 +39,8 @@
 		{
 			"binding": "DB",
 			"database_name": "quickmail",
-			// Run `wrangler d1 create quickmail` and paste the id it prints here.
-			"database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+			// Put your actual D1 database ID here after running `wrangler d1 create quickmail`
+			"database_id": "ce6bd9f0-dae7-44c2-a19e-6cc7cfe61d3c",
 			"migrations_dir": "migrations"
 		}
 	],
@@ -58,7 +48,6 @@
 	"r2_buckets": [
 		{
 			"binding": "ATTACHMENTS",
-			// Run `wrangler r2 bucket create quickmail-attachments`.
 			"bucket_name": "quickmail-attachments"
 		}
 	],
