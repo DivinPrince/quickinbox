@@ -6,8 +6,6 @@ export type User = {
 	created_at: string;
 	/** R2 key for an uploaded picture, or null for initials. */
 	avatar_key: string | null;
-	/** Whether to resolve correspondents against Gravatar and BIMI. */
-	external_avatars: boolean;
 };
 
 export type DeliveryStatus =

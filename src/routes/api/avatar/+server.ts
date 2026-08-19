@@ -3,7 +3,6 @@ import {
 	MAX_AVATAR_BYTES,
 	deleteUserAvatar,
 	detectImageType,
-	setExternalAvatars,
 	storeUserAvatar
 } from '$lib/server/avatars';
 
@@ -48,20 +47,4 @@ export const DELETE: RequestHandler = async ({ locals, platform }) => {
 
 	await deleteUserAvatar(db, bucket, locals.user.id);
 	return json({ ok: true });
-};
-
-/** Toggle whether we look correspondents up against Gravatar and BIMI. */
-export const PATCH: RequestHandler = async ({ request, locals, platform }) => {
-	const db = platform?.env.DB;
-	if (!db || !locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const body = (await request.json().catch(() => null)) as { externalAvatars?: unknown } | null;
-	if (typeof body?.externalAvatars !== 'boolean') {
-		return json({ error: 'externalAvatars must be a boolean' }, { status: 400 });
-	}
-
-	await setExternalAvatars(db, locals.user.id, body.externalAvatars);
-	return json({ ok: true, externalAvatars: body.externalAvatars });
 };

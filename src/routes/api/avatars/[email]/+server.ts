@@ -16,10 +16,7 @@ export const GET: RequestHandler = async ({ params, locals, platform, setHeaders
 
 	let avatar = await getUserAvatarByEmail(db, bucket, email);
 
-	// Only reach off-box when the signed-in user has left that switched on.
-	if (!avatar && locals.user.external_avatars) {
-		avatar = await resolveContactAvatar(db, bucket, email);
-	}
+	if (!avatar) avatar = await resolveContactAvatar(db, bucket, email);
 
 	if (!avatar) throw error(404, 'No avatar');
 

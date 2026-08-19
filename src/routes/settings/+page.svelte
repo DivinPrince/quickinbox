@@ -81,9 +81,7 @@
 	let avatarBusy = $state(false);
 	let avatarError = $state('');
 	let avatarSet = $state<boolean | null>(null);
-	let externalSet = $state<boolean | null>(null);
 	const hasAvatar = $derived(avatarSet ?? data.user?.hasAvatar ?? false);
-	const externalAvatars = $derived(externalSet ?? data.user?.externalAvatars ?? true);
 	// Same URL before and after a change, so the cached response needs defeating.
 	let avatarVersion = $state(0);
 	let fileInput = $state<HTMLInputElement | null>(null);
@@ -130,15 +128,6 @@
 		} finally {
 			avatarBusy = false;
 		}
-	}
-
-	async function toggleExternal(next: boolean) {
-		externalSet = next;
-		await fetch('/api/avatar', {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ externalAvatars: next })
-		}).catch(() => {});
 	}
 
 	async function remove(id: string) {
@@ -192,10 +181,7 @@
 
 	<section class="surface-lg card">
 		<h2><Icon name="user-line" size={18} /> Profile picture</h2>
-		<p class="card-hint">
-			Shown on your messages. People you write to only see it if their mail app
-			looks it up.
-		</p>
+		<p class="card-hint">Shown next to your messages inside Mail.</p>
 
 		<div class="avatar-row">
 			<Avatar
@@ -232,20 +218,6 @@
 
 		{#if avatarError}<p class="error">{avatarError}</p>{/if}
 
-		<label class="external-toggle">
-			<input
-				type="checkbox"
-				checked={externalAvatars}
-				onchange={(event) => toggleExternal(event.currentTarget.checked)}
-			/>
-			<span>
-				<span class="toggle-label">Show pictures for other people</span>
-				<span class="toggle-hint">
-					Looks correspondents up on Gravatar, and falls back to the logo a domain
-					publishes for its mail. Requests are made by the server, never your browser.
-				</span>
-			</span>
-		</label>
 	</section>
 
 	<section class="surface-lg card">
@@ -376,30 +348,6 @@
 	.avatar-note {
 		flex-basis: 100%;
 		font-size: 0.75rem;
-		color: var(--color-muted);
-	}
-
-	.external-toggle {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.625rem;
-		margin-top: 1.5rem;
-		padding-top: 1.25rem;
-		cursor: pointer;
-		border-top: 1px solid var(--color-line);
-	}
-
-	.toggle-label {
-		display: block;
-		font-size: 0.8125rem;
-		font-weight: 500;
-	}
-
-	.toggle-hint {
-		display: block;
-		margin-top: 0.25rem;
-		font-size: 0.75rem;
-		line-height: 1.5;
 		color: var(--color-muted);
 	}
 

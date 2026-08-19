@@ -8,8 +8,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			? {
 					name: locals.user.name,
 					email: locals.user.email,
-					hasAvatar: Boolean(locals.user.avatar_key),
-					externalAvatars: locals.user.external_avatars
+					hasAvatar: Boolean(locals.user.avatar_key)
 				}
 			: null
 	};

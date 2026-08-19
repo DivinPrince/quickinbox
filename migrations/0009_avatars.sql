@@ -16,11 +16,6 @@
 
 ALTER TABLE users ADD COLUMN avatar_key TEXT;
 
--- Off switch for the outbound lookups above. Server-side only -- the browser
--- never talks to Gravatar directly -- but some operators still will not want
--- their Worker resolving correspondents against a third party at all.
-ALTER TABLE users ADD COLUMN external_avatars INTEGER NOT NULL DEFAULT 1;
-
 CREATE TABLE contact_avatars (
 	email        TEXT PRIMARY KEY COLLATE NOCASE,
 	source       TEXT NOT NULL CHECK (source IN ('gravatar', 'bimi', 'none')),

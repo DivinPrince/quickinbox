@@ -114,17 +114,6 @@ export async function deleteUserAvatar(
 	if (row?.avatar_key) await bucket.delete(row.avatar_key).catch(() => {});
 }
 
-export async function setExternalAvatars(
-	db: D1Database,
-	userId: string,
-	enabled: boolean
-): Promise<void> {
-	await db
-		.prepare('UPDATE users SET external_avatars = ? WHERE id = ?')
-		.bind(enabled ? 1 : 0, userId)
-		.run();
-}
-
 // --- lookups ---------------------------------------------------------------
 
 async function sha256Hex(value: string): Promise<string> {
