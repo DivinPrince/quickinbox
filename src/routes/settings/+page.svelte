@@ -350,11 +350,6 @@
 
 	<section class="surface-lg card">
 		<h2><Icon name="key-2-line" size={18} /> API keys</h2>
-		<p class="card-hint">
-			Long-lived bearer tokens for scripted access to the mail API — send with
-			<code>POST /api/mail</code>, list with <code>GET /api/mail?direction=outbound</code> — for
-			the address below. A key is shown once when created; keep it somewhere safe.
-		</p>
 
 		<form class="key-form" onsubmit={createKey}>
 			<div class="key-field">
@@ -857,16 +852,16 @@
 		align-items: center;
 		justify-content: center;
 		padding: 1rem;
-		background: rgba(0, 0, 0, 0.45);
+		background: var(--color-scrim);
 	}
 
 	.reveal-card {
 		width: 100%;
 		max-width: 30rem;
 		padding: 1.5rem;
-		border-radius: 1rem;
-		background: var(--color-card);
-		box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.25);
+		border-radius: 1.25rem;
+		background: var(--color-surface);
+		box-shadow: var(--shadow-md);
 	}
 
 	.reveal-card h3 {
