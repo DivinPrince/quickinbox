@@ -110,6 +110,10 @@
 		keyError = '';
 	}
 
+	function handleWindowKeydown(event: KeyboardEvent) {
+		if (creating && event.key === 'Escape' && !revealed) closeCreate();
+	}
+
 	async function createKey(event?: SubmitEvent) {
 		if (event) event.preventDefault();
 		keyBusy = true;
@@ -234,6 +238,8 @@
 <svelte:head>
 	<title>Settings — Mail</title>
 </svelte:head>
+
+<svelte:window onkeydown={handleWindowKeydown} />
 
 <div class="settings-page">
 	<h1>Settings</h1>
@@ -417,11 +423,6 @@
 </div>
 
 {#if creating}
-	<svelte:window
-		onkeydown={(event) => {
-			if (event.key === 'Escape' && !revealed) closeCreate();
-		}}
-	/>
 	<div
 		class="modal-backdrop"
 		role="presentation"
