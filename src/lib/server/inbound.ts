@@ -5,6 +5,7 @@ import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL, MAX_BODY_BYTES } from 
 import { collectInboundRecipients, parseEmailAddress } from './email-address';
 import { recordUnroutedEmail, resolveInboundRoute } from './domains';
 import { emailExistsByProviderId, insertEmail, updateEmailStatusByProviderId } from './mail-store';
+import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
 import type { ResendClient } from './resend';
 
 export type ResendWebhookEvent = {
@@ -18,7 +19,7 @@ export type WebhookOutcome = {
 	note: string;
 };
 
-type InboundEnv = { DB: D1Database; ATTACHMENTS: R2Bucket };
+type InboundEnv = PushNotificationEnv & { ATTACHMENTS: R2Bucket };
 
 /** Resend delivery events → the status we display on a sent message. */
 const STATUS_BY_EVENT: Record<string, DeliveryStatus> = {
@@ -132,6 +133,12 @@ async function handleInboundEmail(
 	});
 
 	await storeInboundAttachments(env, client, providerId, emailId);
+	await scheduleNewMailNotification(env, {
+		emailId,
+		userId: route.userId,
+		from,
+		subject
+	});
 
 	return {
 		handled: true,

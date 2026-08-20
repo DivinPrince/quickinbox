@@ -35,6 +35,24 @@ describe('API key access', () => {
 			}).ok,
 			false
 		);
+		assert.equal(
+			authorizeApiRequest({
+				pathname: '/api/push/subscriptions',
+				method: 'POST',
+				authMethod: 'api_token',
+				scopes: ['mail:read', 'mail:send']
+			}).ok,
+			false
+		);
+		assert.equal(
+			authorizeApiRequest({
+				pathname: '/api/push/subscriptions',
+				method: 'GET',
+				authMethod: 'api_token',
+				scopes: ['mail:read', 'mail:send']
+			}).ok,
+			false
+		);
 	});
 
 	test('a read key can list and open threads', () => {

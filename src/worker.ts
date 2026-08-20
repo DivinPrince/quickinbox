@@ -26,7 +26,7 @@ export default {
 		return svelteApp.fetch(request, env, ctx);
 	},
 
-	async email(message: CloudflareInboundMessage, env: Env) {
+	async email(message: CloudflareInboundMessage, env: Env, ctx: ExecutionContext) {
 		if (env.EMAIL_PROVIDER?.trim().toLowerCase() !== 'cloudflare') {
 			message.setReject('Cloudflare email provider is not enabled');
 			return;
@@ -34,7 +34,11 @@ export default {
 
 		const inboundEnv: CloudflareInboundEnv = {
 			DB: env.DB,
-			ATTACHMENTS: env.ATTACHMENTS
+			ATTACHMENTS: env.ATTACHMENTS,
+			VAPID_PUBLIC_KEY: env.VAPID_PUBLIC_KEY,
+			VAPID_PRIVATE_KEY: env.VAPID_PRIVATE_KEY,
+			VAPID_SUBJECT: env.VAPID_SUBJECT,
+			waitUntil: (promise) => ctx.waitUntil(promise)
 		};
 
 		await handleCloudflareInbound(message, inboundEnv);

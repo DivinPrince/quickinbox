@@ -52,7 +52,18 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 	try {
 		const client = getResendClient(platform);
-		const outcome = await handleResendWebhook(event, { DB: db, ATTACHMENTS: bucket }, client);
+		const outcome = await handleResendWebhook(
+			event,
+			{
+				DB: db,
+				ATTACHMENTS: bucket,
+				VAPID_PUBLIC_KEY: platform?.env.VAPID_PUBLIC_KEY,
+				VAPID_PRIVATE_KEY: platform?.env.VAPID_PRIVATE_KEY,
+				VAPID_SUBJECT: platform?.env.VAPID_SUBJECT,
+				waitUntil: platform?.ctx ? (promise) => platform.ctx.waitUntil(promise) : undefined
+			},
+			client
+		);
 		return json({ ok: true, ...outcome });
 	} catch (error) {
 		// Release the claim so Resend's retry can succeed.

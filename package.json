@@ -21,7 +21,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"cf-typegen": "wrangler types",
 		"quickmail": "bun cli/main.ts",
-		"test": "bun test src/lib/email-signature.test.ts src/lib/server/api-access.test.ts src/lib/server/api-tokens.test.ts cli/client.test.ts"
+		"test": "bun test src/lib/email-signature.test.ts src/lib/push-client.test.ts src/lib/server/api-access.test.ts src/lib/server/api-tokens.test.ts src/lib/server/push-notifications.test.ts cli/client.test.ts"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20260601.1",
@@ -31,6 +31,7 @@
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@tailwindcss/vite": "^4.2.2",
 		"@types/node": "^24.10.1",
+		"@types/web-push": "^3.6.4",
 		"svelte": "^5.55.2",
 		"svelte-check": "^4.4.6",
 		"tailwindcss": "^4.2.2",
@@ -42,6 +43,7 @@
 		"@modelcontextprotocol/sdk": "^1.29.0",
 		"postal-mime": "^3.0.0",
 		"remixicon": "^4.9.1",
+		"web-push": "^3.6.7",
 		"zod": "^3.25.0"
 	}
 }
