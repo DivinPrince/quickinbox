@@ -3,8 +3,9 @@
 #
 # In production these live as Worker secrets / vars instead.
 
-# resend (default) or cloudflare
-EMAIL_PROVIDER=resend
+# resend (default) or cloudflare. Set in wrangler.jsonc vars for production;
+# uncomment here only to override locally.
+# EMAIL_PROVIDER=resend
 
 # --- Resend (EMAIL_PROVIDER=resend) ---
 # From https://resend.com/api-keys — needs full access (send + domains + receiving).

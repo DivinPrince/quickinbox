@@ -35,8 +35,10 @@
 	// Locally, put values in .dev.vars (copy .dev.vars.example).
 
 	"vars": {
-		"EMAIL_PROVIDER": "resend"
-		// "CLOUDFLARE_MAIL_DOMAINS": "example.com"
+		"EMAIL_PROVIDER": "resend",
+		// Only used when EMAIL_PROVIDER=cloudflare. Comma-separated domains
+		// onboarded in Email Service / Email Routing.
+		"CLOUDFLARE_MAIL_DOMAINS": ""
 	},
 
 	"send_email": [
