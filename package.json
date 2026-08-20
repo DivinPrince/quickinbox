@@ -54,11 +54,17 @@
 			"ATTACHMENTS": {
 				"description": "R2 bucket for inbound and outbound attachments."
 			},
+			"EMAIL_PROVIDER": {
+				"description": "Mail provider: `resend` (default, any DNS host) or `cloudflare` (requires Cloudflare DNS + Workers paid plan)."
+			},
+			"CLOUDFLARE_MAIL_DOMAINS": {
+				"description": "Only for `EMAIL_PROVIDER=cloudflare`: comma-separated domains onboarded in Email Service, e.g. `example.com`. Leave empty for Resend."
+			},
 			"RESEND_API_KEY": {
-				"description": "Full-access key from [Resend API keys](https://resend.com/api-keys) (send + domains + receiving)."
+				"description": "Only for `EMAIL_PROVIDER=resend`: full-access key from [Resend API keys](https://resend.com/api-keys). Keep the placeholder if using Cloudflare Email."
 			},
 			"RESEND_WEBHOOK_SECRET": {
-				"description": "Shown once when you create the webhook at [Resend webhooks](https://resend.com/webhooks). Starts with `whsec_`."
+				"description": "Only for `EMAIL_PROVIDER=resend`: shown once when you create the webhook at [Resend webhooks](https://resend.com/webhooks). Keep the placeholder if using Cloudflare Email."
 			}
 		}
 	}
