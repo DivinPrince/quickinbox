@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import Check from '$lib/components/Check.svelte';
 	import AddressField from '$lib/components/AddressField.svelte';
+	import DesktopNotifications from '$lib/components/DesktopNotifications.svelte';
 	import {
 		readThemePreference,
 		setThemePreference,
@@ -10,15 +11,6 @@
 		type ThemePreference
 	} from '$lib/theme';
 	import { MAX_EMAIL_SIGNATURE_LENGTH } from '$lib/email-signature';
-	import {
-		deletePushSubscription,
-		getPushSubscription,
-		isPushSubscriptionRegistered,
-		savePushSubscription,
-		subscribeToPush,
-		subscriptionUsesPublicKey,
-		supportsWebPush
-	} from '$lib/push-client';
 	import type { ApiTokenSummary, MailAddress } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -33,116 +25,6 @@
 	function chooseTheme(next: ThemePreference) {
 		theme = next;
 		setThemePreference(next);
-	}
-
-	type PushState =
-		| 'loading'
-		| 'unsupported'
-		| 'unconfigured'
-		| 'denied'
-		| 'disabled'
-		| 'enabled'
-		| 'error';
-
-	let pushState = $state<PushState>('loading');
-	let pushBusy = $state(false);
-	let pushError = $state('');
-	const pushStatusLabel = $derived(
-		({
-			loading: 'Checking',
-			unsupported: 'Unsupported',
-			unconfigured: 'Setup required',
-			denied: 'Blocked',
-			disabled: 'Off',
-			enabled: 'On',
-			error: 'Error'
-		} satisfies Record<PushState, string>)[pushState]
-	);
-
-	function pushErrorMessage(error: unknown): string {
-		return error instanceof Error ? error.message : 'Could not update desktop notifications';
-	}
-
-	async function refreshPushState() {
-		pushError = '';
-		if (!data.push.configured || !data.push.publicKey) {
-			pushState = 'unconfigured';
-			return;
-		}
-		if (!supportsWebPush()) {
-			pushState = 'unsupported';
-			return;
-		}
-		if (Notification.permission === 'denied') {
-			pushState = 'denied';
-			return;
-		}
-
-		try {
-			const subscription = await getPushSubscription();
-			if (
-				subscription &&
-				Notification.permission === 'granted' &&
-				subscriptionUsesPublicKey(subscription, data.push.publicKey) &&
-				(await isPushSubscriptionRegistered(subscription))
-			) {
-				pushState = 'enabled';
-			} else {
-				pushState = 'disabled';
-			}
-		} catch (error) {
-			pushState = 'error';
-			pushError = pushErrorMessage(error);
-		}
-	}
-
-	$effect(() => {
-		void refreshPushState();
-	});
-
-	async function enableDesktopNotifications() {
-		if (!data.push.publicKey || !supportsWebPush()) return;
-		pushBusy = true;
-		pushError = '';
-		try {
-			const permission = await Notification.requestPermission();
-			if (permission !== 'granted') {
-				pushState = permission === 'denied' ? 'denied' : 'disabled';
-				pushError =
-					permission === 'denied'
-						? 'Notifications are blocked in this browser. Allow them in site settings.'
-						: 'Notification permission was not granted.';
-				return;
-			}
-
-			const subscription = await subscribeToPush(data.push.publicKey);
-			await savePushSubscription(subscription);
-			pushState = 'enabled';
-		} catch (error) {
-			pushState = 'error';
-			pushError = pushErrorMessage(error);
-		} finally {
-			pushBusy = false;
-		}
-	}
-
-	async function disableDesktopNotifications() {
-		pushBusy = true;
-		pushError = '';
-		try {
-			const subscription = await getPushSubscription();
-			if (subscription) {
-				await deletePushSubscription(subscription);
-				const removed = await subscription.unsubscribe();
-				if (!removed) throw new Error('The browser could not remove its push subscription');
-			}
-			pushState = 'disabled';
-		} catch (error) {
-			pushState = 'error';
-			pushError = pushErrorMessage(error);
-		} finally {
-			pushBusy = false;
-		}
 	}
 
 	let signature = $state(untrack(() => data.signature));
@@ -393,61 +275,7 @@
 		</div>
 	</section>
 
-	<section class="surface-lg card">
-		<div class="card-head notification-head">
-			<div>
-				<h2><Icon name="notification-3-line" size={18} /> Desktop notifications</h2>
-				<p class="section-description">Get an alert when new mail arrives, even after closing this tab.</p>
-			</div>
-			<span class="badge" class:notification-on={pushState === 'enabled'}>{pushStatusLabel}</span>
-		</div>
-
-		{#if pushState === 'unconfigured'}
-			<p class="hint">
-				<Icon name="information-line" size={14} />
-				The server needs VAPID keys before desktop notifications can be enabled.
-			</p>
-		{:else if pushState === 'unsupported'}
-			<p class="hint">
-				<Icon name="information-line" size={14} />
-				This browser does not support Web Push notifications.
-			</p>
-		{:else if pushState === 'denied'}
-			<p class="hint">
-				<Icon name="information-line" size={14} />
-				Notifications are blocked. Allow them for this site in your browser settings.
-			</p>
-		{:else}
-			<div class="notification-controls">
-				<p class="hint notification-hint">
-					{pushState === 'enabled'
-						? 'This browser will receive notifications for your account.'
-						: 'Permission is requested only when you enable notifications.'}
-				</p>
-				{#if pushState === 'enabled'}
-					<button
-						type="button"
-						class="btn-ghost"
-						disabled={pushBusy}
-						onclick={disableDesktopNotifications}
-					>
-						{pushBusy ? 'Disabling…' : 'Disable'}
-					</button>
-				{:else}
-					<button
-						type="button"
-						class="btn-primary"
-						disabled={pushBusy || pushState === 'loading'}
-						onclick={enableDesktopNotifications}
-					>
-						{pushBusy ? 'Enabling…' : pushState === 'loading' ? 'Checking…' : 'Enable'}
-					</button>
-				{/if}
-			</div>
-		{/if}
-
-		{#if pushError}<p class="error" aria-live="polite">{pushError}</p>{/if}
-	</section>
+	<DesktopNotifications configured={data.push.configured} publicKey={data.push.publicKey} />
 
 	<section class="surface-lg card">
 		<h2><Icon name="pencil-line" size={18} /> Signature</h2>
@@ -692,34 +520,6 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.75rem;
-	}
-
-	.notification-head {
-		align-items: flex-start;
-	}
-
-	.section-description {
-		margin-top: 0.375rem;
-		font-size: 0.8125rem;
-		line-height: 1.5;
-		color: var(--color-muted);
-	}
-
-	.notification-on {
-		color: var(--tone-good-fg);
-		background: var(--tone-good-bg);
-	}
-
-	.notification-controls {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		margin-top: 1rem;
-	}
-
-	.notification-hint {
-		margin-top: 0;
 	}
 
 	.card h2 {

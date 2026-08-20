@@ -3,10 +3,12 @@ import { describe, test } from 'node:test';
 import type { D1Database } from '@cloudflare/workers-types';
 import webpush from 'web-push';
 import {
+	MAX_SUBSCRIPTIONS_PER_USER,
 	buildNewMailPayload,
 	parsePushSubscription,
 	pushErrorStatus,
 	readVapidConfiguration,
+	savePushSubscription,
 	scheduleNewMailNotification
 } from './push-notifications';
 
@@ -17,7 +19,7 @@ const validSubscription = {
 	expirationTime: null,
 	keys: {
 		p256dh: vapidKeys.publicKey,
-		auth: 'tBHItJI5svbpez7KI4CCXg'
+		auth: 'AAAAAAAAAAAAAAAAAAAAAA'
 	}
 };
 
@@ -134,4 +136,120 @@ describe('new-mail push payloads', () => {
 		assert.equal(pushErrorStatus({ statusCode: 410 }), 410);
 		assert.equal(pushErrorStatus(new Error('network error')), null);
 	});
+});
+
+type StoredPushRow = {
+	id: string;
+	user_id: string;
+	endpoint: string;
+	updated_at: string;
+	rowid: number;
+};
+
+function createMemoryPushDb() {
+	const rows: StoredPushRow[] = [];
+	let nextRowid = 1;
+	let clock = 0;
+
+	function prepare(sql: string) {
+		let bound: unknown[] = [];
+		const statement = {
+			bind(...args: unknown[]) {
+				bound = args;
+				return statement;
+			},
+			async run() {
+				if (sql.includes('INSERT INTO push_subscriptions')) {
+					const [id, userId, endpoint] = bound;
+					const existing = rows.find((row) => row.endpoint === String(endpoint));
+					clock += 1;
+					const updated_at = String(clock).padStart(4, '0');
+					if (existing) {
+						existing.user_id = String(userId);
+						existing.updated_at = updated_at;
+					} else {
+						rows.push({
+							id: String(id),
+							user_id: String(userId),
+							endpoint: String(endpoint),
+							updated_at,
+							rowid: nextRowid
+						});
+						nextRowid += 1;
+					}
+					return { meta: { changes: 1 } };
+				}
+				if (sql.includes('DELETE FROM push_subscriptions') && sql.includes('WHERE id = ?')) {
+					const index = rows.findIndex((row) => row.id === String(bound[0]));
+					if (index >= 0) rows.splice(index, 1);
+					return { meta: { changes: index >= 0 ? 1 : 0 } };
+				}
+				throw new Error(`Unexpected SQL: ${sql}`);
+			},
+			async all() {
+				if (!sql.includes('SELECT id FROM push_subscriptions')) {
+					throw new Error(`Unexpected SQL: ${sql}`);
+				}
+				const userId = String(bound[0]);
+				const keepEndpoint = String(bound[1]);
+				const list = rows
+					.filter((row) => row.user_id === userId)
+					.sort((left, right) => {
+						const keep =
+							Number(right.endpoint === keepEndpoint) - Number(left.endpoint === keepEndpoint);
+						if (keep !== 0) return keep;
+						if (left.updated_at !== right.updated_at) {
+							return left.updated_at < right.updated_at ? 1 : -1;
+						}
+						return right.rowid - left.rowid;
+					});
+				return { results: list.map((row) => ({ id: row.id })) };
+			}
+		};
+		return statement;
+	}
+
+	return {
+		db: {
+			prepare,
+			async batch(statements: Array<{ run: () => Promise<unknown> }>) {
+				for (const statement of statements) await statement.run();
+			}
+		} as unknown as D1Database,
+		rows
+	};
+}
+
+test('caps a user at ten subscriptions and keeps the newest endpoint', async () => {
+	const { db, rows } = createMemoryPushDb();
+	const keys = { p256dh: vapidKeys.publicKey, auth: 'AAAAAAAAAAAAAAAAAAAAAA' };
+
+	for (let index = 0; index < MAX_SUBSCRIPTIONS_PER_USER; index += 1) {
+		await savePushSubscription(db, 'user-1', {
+			endpoint: `https://push.example.com/subscriptions/device-${index}`,
+			expirationTime: null,
+			keys
+		});
+	}
+
+	await savePushSubscription(db, 'user-2', {
+		endpoint: 'https://push.example.com/subscriptions/other-user',
+		expirationTime: null,
+		keys
+	});
+
+	await savePushSubscription(db, 'user-1', {
+		endpoint: 'https://push.example.com/subscriptions/device-newest',
+		expirationTime: null,
+		keys
+	});
+
+	const userRows = rows.filter((row) => row.user_id === 'user-1');
+	assert.equal(userRows.length, MAX_SUBSCRIPTIONS_PER_USER);
+	assert.ok(userRows.some((row) => row.endpoint.endsWith('/device-newest')));
+	assert.equal(
+		userRows.some((row) => row.endpoint.endsWith('/device-0')),
+		false
+	);
+	assert.ok(rows.some((row) => row.user_id === 'user-2'));
 });

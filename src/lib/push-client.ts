@@ -35,18 +35,68 @@ export function subscriptionUsesPublicKey(
 	return applicationServerKeyMatches(subscription.options.applicationServerKey, publicKey);
 }
 
-export async function getPushSubscription(): Promise<PushSubscription | null> {
-	const registration = await navigator.serviceWorker.ready;
-	return registration.pushManager.getSubscription();
-}
+const SERVICE_WORKER_URL = '/service-worker.js';
+const WORKER_ACTIVATE_TIMEOUT_MS = 10_000;
 
-async function getExistingPushSubscription(): Promise<PushSubscription | null> {
+export async function getPushSubscription(): Promise<PushSubscription | null> {
 	const registration = await navigator.serviceWorker.getRegistration();
 	return registration?.pushManager.getSubscription() ?? null;
 }
 
+function waitUntilActive(registration: ServiceWorkerRegistration): Promise<ServiceWorkerRegistration> {
+	if (registration.active) return Promise.resolve(registration);
+
+	return new Promise((resolve, reject) => {
+		const pending = registration.installing ?? registration.waiting;
+		const timer = setTimeout(() => {
+			reject(new Error('The notification service worker did not activate'));
+		}, WORKER_ACTIVATE_TIMEOUT_MS);
+
+		let settled = false;
+		const finish = (error?: Error) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			if (error) reject(error);
+			else resolve(registration);
+		};
+
+		if (!pending) {
+			const onFound = () => {
+				const installing = registration.installing;
+				if (!installing) return;
+				installing.addEventListener('statechange', () => {
+					if (registration.active) finish();
+				});
+			};
+			registration.addEventListener('updatefound', onFound, { once: true });
+			return;
+		}
+
+		const onState = () => {
+			if (pending.state === 'activated' || registration.active) {
+				pending.removeEventListener('statechange', onState);
+				finish();
+				return;
+			}
+			if (pending.state === 'redundant') {
+				pending.removeEventListener('statechange', onState);
+				finish(new Error('The notification service worker was replaced before it activated'));
+			}
+		};
+		pending.addEventListener('statechange', onState);
+		onState();
+	});
+}
+
+async function ensurePushRegistration(): Promise<ServiceWorkerRegistration> {
+	const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL);
+	if (registration.active) return registration;
+	return waitUntilActive(registration);
+}
+
 export async function subscribeToPush(publicKey: string): Promise<PushSubscription> {
-	const registration = await navigator.serviceWorker.ready;
+	const registration = await ensurePushRegistration();
 	const existing = await registration.pushManager.getSubscription();
 	if (existing && subscriptionUsesPublicKey(existing, publicKey)) return existing;
 	if (existing) {
@@ -99,7 +149,7 @@ export async function isPushSubscriptionRegistered(
 /** Remove the current browser from the authenticated account before logout. */
 export async function disablePushForCurrentAccount(): Promise<void> {
 	if (!supportsWebPush()) return;
-	const subscription = await getExistingPushSubscription();
+	const subscription = await getPushSubscription();
 	if (!subscription) return;
 
 	let serverError: unknown;
@@ -122,7 +172,7 @@ export async function disablePushForCurrentAccount(): Promise<void> {
  */
 export async function discardPushSubscriptionFromAnotherAccount(): Promise<void> {
 	if (!supportsWebPush()) return;
-	const subscription = await getExistingPushSubscription();
+	const subscription = await getPushSubscription();
 	if (!subscription || (await isPushSubscriptionRegistered(subscription))) return;
 	await subscription.unsubscribe();
 }

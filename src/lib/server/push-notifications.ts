@@ -5,7 +5,7 @@ import webpush from 'web-push';
 const MAX_ENDPOINT_LENGTH = 2048;
 const MAX_KEY_LENGTH = 512;
 const MAX_USER_AGENT_LENGTH = 512;
-const MAX_SUBSCRIPTIONS_PER_USER = 10;
+export const MAX_SUBSCRIPTIONS_PER_USER = 10;
 const PUSH_REQUEST_TIMEOUT_MS = 10_000;
 const BASE64URL = /^[A-Za-z0-9_-]+={0,2}$/;
 
@@ -195,18 +195,29 @@ export async function savePushSubscription(
 		)
 		.run();
 
-	await db
+	await capUserSubscriptions(db, userId, subscription.endpoint);
+}
+
+async function capUserSubscriptions(
+	db: D1Database,
+	userId: string,
+	keepEndpoint: string
+): Promise<void> {
+	const { results } = await db
 		.prepare(
-			`DELETE FROM push_subscriptions
-			 WHERE user_id = ? AND id NOT IN (
-				 SELECT id FROM push_subscriptions
-				 WHERE user_id = ?
-				 ORDER BY (endpoint = ?) DESC, updated_at DESC, rowid DESC
-				 LIMIT ?
-			 )`
+			`SELECT id FROM push_subscriptions
+			 WHERE user_id = ?
+			 ORDER BY (endpoint = ?) DESC, updated_at DESC, rowid DESC`
 		)
-		.bind(userId, userId, subscription.endpoint, MAX_SUBSCRIPTIONS_PER_USER)
-		.run();
+		.bind(userId, keepEndpoint)
+		.all<{ id: string }>();
+
+	const extraIds = results.slice(MAX_SUBSCRIPTIONS_PER_USER).map((row) => row.id);
+	if (extraIds.length === 0) return;
+
+	await db.batch(
+		extraIds.map((id) => db.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(id))
+	);
 }
 
 export async function hasPushSubscription(

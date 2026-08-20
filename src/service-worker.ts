@@ -13,6 +13,14 @@ type PushPayload = {
 
 const worker = globalThis as unknown as ServiceWorkerGlobalScope;
 
+worker.addEventListener('install', () => {
+	void worker.skipWaiting();
+});
+
+worker.addEventListener('activate', (event) => {
+	event.waitUntil(worker.clients.claim());
+});
+
 function stringValue(value: unknown, fallback: string): string {
 	return typeof value === 'string' && value.trim() ? value.trim() : fallback;
 }
@@ -79,9 +87,14 @@ worker.addEventListener('notificationclick', (event: NotificationEvent) => {
 			for (const client of windows) {
 				const windowClient = client as WindowClient;
 				if (new URL(windowClient.url).origin !== worker.location.origin) continue;
-				await windowClient.navigate(destination.href);
-				await windowClient.focus();
-				return;
+				try {
+					await windowClient.navigate(destination.href);
+					await windowClient.focus();
+					return;
+				} catch {
+					await worker.clients.openWindow(destination.href);
+					return;
+				}
 			}
 			await worker.clients.openWindow(destination.href);
 		})()
