@@ -45,5 +45,21 @@
 		"remixicon": "^4.9.1",
 		"web-push": "^3.6.7",
 		"zod": "^3.25.0"
+	},
+	"cloudflare": {
+		"bindings": {
+			"DB": {
+				"description": "D1 database for mail, users, and threads."
+			},
+			"ATTACHMENTS": {
+				"description": "R2 bucket for inbound and outbound attachments."
+			},
+			"RESEND_API_KEY": {
+				"description": "Full-access key from [Resend API keys](https://resend.com/api-keys) (send + domains + receiving)."
+			},
+			"RESEND_WEBHOOK_SECRET": {
+				"description": "Shown once when you create the webhook at [Resend webhooks](https://resend.com/webhooks). Starts with `whsec_`."
+			}
+		}
 	}
 }
