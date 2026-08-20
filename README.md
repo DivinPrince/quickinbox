@@ -254,6 +254,29 @@ No Resend key or webhook is used on this track. `vite dev` never runs the
 Send yourself a message from another account. It should land within a few
 seconds (Resend webhook or Cloudflare Routing → Worker).
 
+### Desktop notifications (optional)
+
+QuickMail can use Web Push to notify signed-in users when new mail arrives,
+even when no QuickMail tab is open. Generate one VAPID key pair for the
+deployment:
+
+```bash
+bunx web-push generate-vapid-keys
+bunx wrangler secret put VAPID_PUBLIC_KEY
+bunx wrangler secret put VAPID_PRIVATE_KEY
+bunx wrangler secret put VAPID_SUBJECT   # e.g. mailto:admin@example.com
+bun run db:migrate:remote
+bun run deploy
+```
+
+For local development, put the same three values in `.dev.vars` and run the
+local migrations. Users can then opt in under **Settings → Desktop
+notifications**. Permission is requested only after they press **Enable**.
+Subscriptions are stored per user and browser in D1; expired browser endpoints
+are removed after the push service reports them as gone. Keep the private key
+secret, and avoid changing the pair after users subscribe or they will need to
+enable notifications again.
+
 ---
 
 # Development

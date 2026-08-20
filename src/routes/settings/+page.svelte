@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import Check from '$lib/components/Check.svelte';
 	import AddressField from '$lib/components/AddressField.svelte';
+	import DesktopNotifications from '$lib/components/DesktopNotifications.svelte';
 	import {
 		readThemePreference,
 		setThemePreference,
@@ -273,6 +274,8 @@
 			{/each}
 		</div>
 	</section>
+
+	<DesktopNotifications configured={data.push.configured} publicKey={data.push.publicKey} />
 
 	<section class="surface-lg card">
 		<h2><Icon name="pencil-line" size={18} /> Signature</h2>

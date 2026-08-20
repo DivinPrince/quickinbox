@@ -3,7 +3,7 @@
 	"name": "quickmail",
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"compatibility_date": "2025-06-01",
-	"compatibility_flags": ["nodejs_compat"],
+	"compatibility_flags": ["nodejs_compat", "enable_nodejs_http_modules"],
 	"workers_dev": true,
 
 	// Your Cloudflare account is picked up from `wrangler login`. If you belong

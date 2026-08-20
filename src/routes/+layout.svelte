@@ -4,6 +4,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Topbar from '$lib/components/Topbar.svelte';
+	import { disablePushForCurrentAccount } from '$lib/push-client';
 	import { watchSystemTheme } from '$lib/theme';
 	import type { LayoutData } from './$types';
 
@@ -36,8 +37,14 @@
 	});
 
 	async function logout() {
-		await fetch('/api/auth/login', { method: 'DELETE' });
-		window.location.href = '/login';
+		try {
+			await disablePushForCurrentAccount();
+		} catch (error) {
+			console.warn('Could not fully remove the push subscription during logout', error);
+		} finally {
+			await fetch('/api/auth/login', { method: 'DELETE' });
+			window.location.href = '/login';
+		}
 	}
 </script>
 
