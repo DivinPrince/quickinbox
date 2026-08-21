@@ -17,10 +17,6 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 		label?: string | null;
 		signature?: string | null;
 	};
-	if (body.isDefault) {
-		await setDefaultAddress(db, locals.user.id, params.id!);
-	}
-
 	if (body.label !== undefined || body.signature !== undefined) {
 		try {
 			await updateAddress(db, locals.user.id, params.id!, {
@@ -33,6 +29,10 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 				{ status: 400 }
 			);
 		}
+	}
+
+	if (body.isDefault) {
+		await setDefaultAddress(db, locals.user.id, params.id!);
 	}
 
 	return json({ addresses: await listAddressesForUser(db, locals.user.id) });
