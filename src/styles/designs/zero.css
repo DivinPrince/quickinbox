@@ -1,0 +1,480 @@
+/*
+ * 0.email / Zero.
+ *
+ * Scoped entirely to [data-design='zero'] so a third design can land as
+ * another file without touching this one.
+ *
+ * Colour, type, and radius come from Mail-0/Zero `globals.css`. Compose
+ * chrome, sidebar width, and stacked thread rows match the same source
+ * (Figma 0.email-design / node 5537-2149).
+ */
+
+:root[data-design='zero'] {
+	--font-sans: 'Geist Variable', 'Geist', ui-sans-serif, system-ui, sans-serif;
+	--color-bg: hsl(0 0% 100%);
+	--color-surface: hsl(0 0% 100%);
+	--color-surface-muted: #f5f5f5;
+	--color-surface-hover: hsl(240 4.8% 95.9%);
+	--color-text: hsl(240 10% 3.9%);
+	--color-text-secondary: hsl(240 3.8% 46.1%);
+	--color-muted: #8c8c8c;
+	--color-accent: #006ffe;
+	--color-accent-hover: #0056cc;
+	--color-accent-soft: rgba(0, 111, 254, 0.1);
+	--color-accent-text: #0066ff;
+	--color-on-accent: #ffffff;
+	--color-line: hsl(240 5.9% 90%);
+	--color-focus-line: hsl(240 10% 3.9%);
+	--color-focus-halo: rgba(0, 111, 254, 0.16);
+	--color-scrim: rgba(0, 0, 0, 0.25);
+	--color-danger: hsl(0 84.2% 60.2%);
+	--color-star: #eab308;
+	--tone-good-fg: #14532d;
+	--tone-good-bg: #dcfce7;
+	--tone-warn-fg: #7c2d12;
+	--tone-warn-bg: #ffedd5;
+	--tone-bad-fg: #7f1d1d;
+	--tone-bad-bg: #fee2e2;
+	--tone-notice-line: #fed7aa;
+	--shadow-xs: none;
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+	--shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
+	--shadow-header: 0 1px 0 hsl(240 5.9% 90%);
+	--sidebar-width: 14rem;
+	--sidebar-width-collapsed: 3rem;
+	--topbar-height: 3.25rem;
+	--zero-row-hover: #f5f5f5;
+	--zero-preview: #8c8c8c;
+	--zero-icon: #6d6d6d;
+	--radius-control: 0.5rem;
+}
+
+:root[data-design='zero'][data-theme='dark'] {
+	color-scheme: dark;
+	--color-bg: hsl(240 3.9% 7%);
+	--color-surface: hsl(240 3.7% 10.2%);
+	--color-surface-muted: hsl(240 3.7% 15.9%);
+	--color-surface-hover: hsl(240 5.9% 10%);
+	--color-text: hsl(0 0% 98%);
+	--color-text-secondary: hsl(240 5% 64.9%);
+	--color-muted: #8c8c8c;
+	--color-accent: #006ffe;
+	--color-accent-hover: #0056cc;
+	--color-accent-soft: rgba(0, 111, 254, 0.14);
+	--color-accent-text: #437dfb;
+	--color-on-accent: #ffffff;
+	--color-line: hsl(240 3.7% 20%);
+	--color-focus-line: hsl(240 4.9% 83.9%);
+	--color-focus-halo: rgba(0, 111, 254, 0.22);
+	--color-scrim: rgba(0, 0, 0, 0.6);
+	--color-danger: hsl(0 62.8% 50%);
+	--color-star: #facc15;
+	--tone-good-fg: #86efac;
+	--tone-good-bg: rgba(34, 197, 94, 0.16);
+	--tone-warn-fg: #fdba74;
+	--tone-warn-bg: rgba(249, 115, 22, 0.16);
+	--tone-bad-fg: #fca5a5;
+	--tone-bad-bg: rgba(239, 68, 68, 0.16);
+	--tone-notice-line: rgba(249, 115, 22, 0.45);
+	--shadow-xs: none;
+	--shadow-sm: none;
+	--shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+	--shadow-header: 0 1px 0 hsl(240 3.7% 15.9%);
+	--zero-row-hover: rgba(250, 250, 250, 0.05);
+	--zero-preview: #8c8c8c;
+	--zero-icon: #898989;
+}
+
+:root[data-design='zero'] body {
+	font-feature-settings: 'ss01' on, 'cv01' on;
+	letter-spacing: -0.011em;
+}
+
+:root[data-design='zero'] .surface,
+:root[data-design='zero'] .surface-lg,
+:root[data-design='zero'] .auth-card {
+	border-radius: var(--radius-control);
+	box-shadow: none;
+	border: 1px solid var(--color-line);
+}
+
+:root[data-design='zero'] .btn-primary,
+:root[data-design='zero'] .btn-ghost,
+:root[data-design='zero'] .icon-btn,
+:root[data-design='zero'] .auth-input {
+	border-radius: var(--radius-control);
+}
+
+:root[data-design='zero'] .btn-primary {
+	height: 2rem;
+	padding: 0 0.75rem;
+	font-size: 0.875rem;
+	font-weight: 500;
+	box-shadow: none;
+}
+
+:root[data-design='zero'] .app-main {
+	padding: 0.75rem 0.75rem 1.5rem;
+}
+
+:root[data-design='zero'] .sidebar {
+	width: var(--sidebar-width);
+	padding: 0.625rem 0.75rem 0.5rem;
+	background: var(--color-bg);
+	box-shadow: inset -1px 0 0 var(--color-line);
+}
+
+:root[data-design='zero'] .sidebar.collapsed {
+	width: var(--sidebar-width-collapsed);
+	padding: 0.5rem 0.375rem;
+}
+
+:root[data-design='zero'] .sidebar.collapsed .brand {
+	justify-content: center;
+}
+
+:root[data-design='zero'] .sidebar.collapsed .new-message {
+	padding: 0;
+}
+
+:root[data-design='zero'] .sidebar-top {
+	padding: 0.25rem 0.125rem 0.5rem;
+}
+
+:root[data-design='zero'] .brand {
+	gap: 0.5rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+	letter-spacing: -0.03em;
+}
+
+:root[data-design='zero'] .brand-name {
+	font-variant-numeric: tabular-nums;
+}
+
+:root[data-design='zero'] .new-message {
+	height: 2rem;
+	margin-bottom: 1.25rem;
+	border-radius: 0.5rem;
+	font-size: 0.875rem;
+	font-weight: 500;
+	line-height: 1;
+	color: #ffffff;
+	background: #006ffe;
+	box-shadow: none;
+	border: none;
+}
+
+:root[data-design='zero'] .new-message:hover {
+	background: #0056cc;
+}
+
+:root[data-design='zero'][data-theme='light'] .new-message {
+	border: 1px solid #e5e7eb;
+}
+
+:root[data-design='zero'] .nav {
+	gap: 0.125rem;
+}
+
+:root[data-design='zero'] .nav-link {
+	height: 2rem;
+	padding: 0 0.5rem;
+	border-radius: 0.5rem;
+	font-size: 0.875rem;
+	color: var(--color-text-secondary);
+}
+
+:root[data-design='zero'] .nav-link:hover {
+	background: var(--color-surface-muted);
+	color: var(--color-text);
+}
+
+:root[data-design='zero'] .nav-link.active {
+	background: var(--color-surface-muted);
+	color: var(--color-text);
+	font-weight: 500;
+}
+
+:root[data-design='zero'] .nav-badge {
+	min-width: 1.125rem;
+	padding: 0.0625rem 0.3125rem;
+	border-radius: 0.375rem;
+	font-size: 0.6875rem;
+	font-weight: 500;
+	color: var(--color-text);
+	background: var(--color-surface-hover);
+}
+
+:root[data-design='zero'] .nav-dot {
+	background: #006ffe;
+}
+
+:root[data-design='zero'] .nav-tools {
+	margin-top: 0.5rem;
+	padding-top: 0.5rem;
+}
+
+:root[data-design='zero'] .section-title {
+	letter-spacing: 0.04em;
+	font-weight: 500;
+}
+
+:root[data-design='zero'] .collapse-btn {
+	width: 1.75rem;
+	height: 1.75rem;
+	border-radius: 0.5rem;
+	background: transparent;
+	color: var(--zero-icon);
+}
+
+:root[data-design='zero'] .topbar {
+	height: var(--topbar-height);
+	padding: 0 0.75rem;
+	background: var(--color-bg);
+	box-shadow: inset 0 -1px 0 var(--color-line);
+}
+
+:root[data-design='zero'] .search {
+	height: 2rem;
+	max-width: 36rem;
+	padding: 0 0.625rem;
+	border-radius: 0.5rem;
+	background: var(--color-surface-muted);
+	color: var(--zero-icon);
+	box-shadow: none;
+}
+
+:root[data-design='zero'] .search:focus-within {
+	background: var(--color-surface);
+	box-shadow: inset 0 0 0 1px var(--color-line);
+}
+
+:root[data-design='zero'] .account-trigger {
+	border-radius: 0.5rem;
+	padding: 0.125rem 0.25rem 0.125rem 0.5rem;
+}
+
+:root[data-design='zero'] .avatar {
+	border-radius: 9999px;
+	background: var(--color-surface-muted);
+}
+
+:root[data-design='zero'] .menu {
+	border-radius: 0.5rem;
+	box-shadow: var(--shadow-md);
+	border: 1px solid var(--color-line);
+}
+
+:root[data-design='zero'] .mailbox {
+	background: var(--color-bg);
+	border-radius: 0;
+	box-shadow: none;
+	border: none;
+}
+
+:root[data-design='zero'] .mailbox .toolbar {
+	padding: 0.5rem 0.75rem;
+	box-shadow: none;
+}
+
+:root[data-design='zero'] .mailbox .title {
+	font-size: 1rem;
+	font-weight: 600;
+	letter-spacing: -0.02em;
+}
+
+:root[data-design='zero'] .mailbox .pill {
+	height: 1.75rem;
+	border-radius: 0.5rem;
+	box-shadow: inset 0 0 0 1px var(--color-line);
+}
+
+:root[data-design='zero'] .mailbox .pill-on {
+	background: var(--color-surface-muted);
+	box-shadow: none;
+}
+
+:root[data-design='zero'] .mailbox .tool-btn,
+:root[data-design='zero'] .mailbox .pager-btn {
+	border-radius: 0.5rem;
+}
+
+:root[data-design='zero'] .mailbox .list {
+	padding: 0 0.25rem 0.5rem;
+	background: var(--color-bg);
+}
+
+:root[data-design='zero'] .mailbox .row {
+	display: grid;
+	grid-template-columns: auto auto 1fr;
+	align-items: start;
+	gap: 0.375rem;
+	margin: 0.25rem 0.25rem 0;
+	padding: 0.5rem 0.5rem 0.5rem 0.375rem;
+	background: transparent;
+	box-shadow: none;
+	border-radius: 0.5rem;
+}
+
+:root[data-design='zero'] .mailbox .row:last-child {
+	box-shadow: none;
+}
+
+:root[data-design='zero'] .mailbox .row.unread {
+	background: transparent;
+}
+
+:root[data-design='zero'] .mailbox .row:hover,
+:root[data-design='zero'] .mailbox .row.unread:hover {
+	background: var(--zero-row-hover);
+}
+
+:root[data-design='zero'] .mailbox .row.checked,
+:root[data-design='zero'] .mailbox .row.checked:hover {
+	background: var(--color-accent-soft);
+	box-shadow: inset 0 0 0 1px var(--color-line);
+}
+
+:root[data-design='zero'] .mailbox .row-link {
+	display: grid;
+	grid-template-columns: 2rem minmax(0, 1fr) auto;
+	grid-template-areas:
+		'avatar sender date'
+		'avatar body body';
+	align-items: start;
+	gap: 0.125rem 0.75rem;
+	padding: 0;
+}
+
+:root[data-design='zero'] .mailbox .avatar {
+	grid-area: avatar;
+	width: 2rem;
+	height: 2rem;
+	margin-top: 0.125rem;
+	font-size: 0.6875rem;
+}
+
+:root[data-design='zero'] .mailbox .sender {
+	grid-area: sender;
+	font-size: 0.875rem;
+	font-weight: 500;
+	text-transform: none;
+	color: var(--color-text);
+}
+
+:root[data-design='zero'] .mailbox .row.unread .sender {
+	font-weight: 700;
+}
+
+:root[data-design='zero'] .mailbox .unread-pip {
+	display: inline-block;
+	width: 0.5rem;
+	height: 0.5rem;
+	margin-left: 0.125rem;
+	border-radius: 9999px;
+	background: #006ffe;
+	flex-shrink: 0;
+}
+
+:root[data-design='zero'] .mailbox .date {
+	grid-area: date;
+	font-size: 0.75rem;
+	font-weight: 400;
+	color: var(--zero-preview);
+	opacity: 0.7;
+}
+
+:root[data-design='zero'] .mailbox .row.unread .date {
+	font-weight: 400;
+	color: var(--zero-preview);
+}
+
+:root[data-design='zero'] .mailbox .body {
+	grid-area: body;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 0.25rem;
+	white-space: normal;
+	overflow: hidden;
+}
+
+:root[data-design='zero'] .mailbox .subject,
+:root[data-design='zero'] .mailbox .row.unread .subject {
+	font-size: 0.875rem;
+	font-weight: 400;
+	color: var(--zero-preview);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+:root[data-design='zero'] .mailbox .preview-sep {
+	display: none;
+}
+
+:root[data-design='zero'] .mailbox .preview {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	white-space: normal;
+	font-size: 0.75rem;
+	line-height: 1.4;
+	color: var(--color-text-secondary);
+}
+
+:root[data-design='zero'] .mailbox .indicators {
+	display: none;
+}
+
+:root[data-design='zero'] .mailbox .row-actions {
+	background: linear-gradient(to right, transparent, var(--zero-row-hover) 1.25rem);
+	border-radius: 0.5rem;
+}
+
+:root[data-design='zero'] .mailbox .star {
+	margin-top: 0.375rem;
+	color: var(--zero-icon);
+}
+
+:root[data-design='zero'] .mailbox .list-foot {
+	box-shadow: none;
+	padding: 0.5rem 0.875rem 0.75rem;
+}
+
+:root[data-design='zero'] .mailbox .search-note {
+	margin: 0 0.5rem 0.25rem;
+	border-radius: 0.5rem;
+	box-shadow: none;
+}
+
+@media (max-width: 780px) {
+	:root[data-design='zero'] .mailbox .row-link {
+		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-areas:
+			'sender date'
+			'body body';
+	}
+
+	:root[data-design='zero'] .mailbox .avatar {
+		display: none;
+	}
+}
+
+:root[data-design='zero'] .empty-icon {
+	border-radius: 0.5rem;
+	box-shadow: none;
+	border: 1px solid var(--color-line);
+	background: var(--color-surface-muted);
+}
+
+:root[data-design='zero'] .theme-option,
+:root[data-design='zero'] .theme-preview {
+	border-radius: 0.5rem;
+}
+
+:root[data-design='zero'] .reply-prompt {
+	border-radius: 0.5rem;
+}

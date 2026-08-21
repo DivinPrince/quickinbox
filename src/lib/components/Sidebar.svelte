@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { getActiveDesign } from '$lib/designs';
 	import Icon from './Icon.svelte';
 	import Logo from './Logo.svelte';
 	import DomainSwitcher from './DomainSwitcher.svelte';
@@ -46,6 +47,8 @@
 	function isActive(href: string): boolean {
 		return $page.url.pathname === href || $page.url.pathname.startsWith(`${href}/`);
 	}
+
+	const design = $derived(getActiveDesign());
 </script>
 
 {#if mobileOpen}
@@ -59,15 +62,15 @@
 
 <aside class="sidebar" class:collapsed class:mobile-open={mobileOpen}>
 	<div class="sidebar-top">
-		<a href="/inbox" class="brand" title="Mail">
-			<Logo size={30} />
-			{#if !collapsed}<span class="brand-name">Mail</span>{/if}
+		<a href="/inbox" class="brand" title={design.brandName}>
+			<Logo size={design.mark === 'zero' ? 22 : 30} />
+			{#if !collapsed}<span class="brand-name">{design.brandName}</span>{/if}
 		</a>
 	</div>
 
-	<a href="/compose" class="new-message" title="New message">
+	<a href="/compose" class="new-message" title={design.composeLabel}>
 		<Icon name="pencil-line" size={collapsed ? 18 : 16} />
-		{#if !collapsed}<span>New message</span>{/if}
+		{#if !collapsed}<span>{design.composeLabel}</span>{/if}
 	</a>
 
 	<nav class="nav">

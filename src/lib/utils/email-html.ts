@@ -124,6 +124,11 @@ blockquote { border-color: rgba(0, 0, 0, 0.12) !important; }
 :root[data-theme='dark'] blockquote { border-color: rgba(255, 255, 255, 0.16) !important; }
 :root[data-theme='dark'] .quote-toggle { color: #a8a8b3; background: #2b2b31; }
 :root[data-theme='dark'] .quote-toggle:hover { background: #3a3a42; }
+
+:root[data-design='zero'] a { color: #0066ff; }
+:root[data-design='zero'][data-theme='dark'] a { color: #437dfb !important; }
+:root[data-design='zero'][data-theme='dark'] .quote-toggle { color: #8c8c8c; background: #26262b; }
+:root[data-design='zero'][data-theme='dark'] .quote-toggle:hover { background: #313136; }
 `;
 
 /**

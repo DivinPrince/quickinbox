@@ -4,6 +4,7 @@
 	import Check from '$lib/components/Check.svelte';
 	import AddressField from '$lib/components/AddressField.svelte';
 	import DesktopNotifications from '$lib/components/DesktopNotifications.svelte';
+	import DesignPicker from '$lib/components/DesignPicker.svelte';
 	import {
 		readThemePreference,
 		setThemePreference,
@@ -300,6 +301,16 @@
 
 	<section class="surface-lg card">
 		<h2><Icon name="contrast-2-line" size={18} /> Appearance</h2>
+
+		<h3 class="appearance-label">Design</h3>
+		<p class="card-hint">
+			A visual language for the whole app. 0.email applies Zero’s inbox; more designs can be
+			registered in the catalog without touching this page.
+		</p>
+		<DesignPicker />
+
+		<h3 class="appearance-label appearance-label-later">Color</h3>
+		<p class="card-hint">Light, dark, or follow the system — applied inside the selected design.</p>
 
 		<div class="theme-options" role="radiogroup" aria-label="Theme">
 			{#each THEME_OPTIONS as option (option.value)}
@@ -663,11 +674,23 @@
 		color: var(--tone-good-fg);
 	}
 
+	.appearance-label {
+		margin-top: 0.25rem;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		letter-spacing: -0.01em;
+		color: var(--color-text);
+	}
+
+	.appearance-label-later {
+		margin-top: 1.5rem;
+	}
+
 	.theme-options {
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 0.625rem;
-		margin-top: 1rem;
+		margin-top: 0.75rem;
 	}
 
 	.theme-option {

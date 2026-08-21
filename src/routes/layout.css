@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'remixicon/fonts/remixicon.css';
+@import '../styles/designs/zero.css';
 
 @theme {
 	--font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;

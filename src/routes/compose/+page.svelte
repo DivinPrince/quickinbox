@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
 	import AttachmentPicker from '$lib/components/AttachmentPicker.svelte';
+	import { getActiveDesign } from '$lib/designs';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import type { OutboundAttachmentInput } from '$lib/types';
 	import type { PageData } from './$types';
@@ -35,6 +36,8 @@
 	let savedAt = $state('');
 
 	const isEmpty = $derived(!to.trim() && !subject.trim() && isHtmlEmpty(html));
+	const design = $derived(getActiveDesign());
+	const composeTitle = $derived(draftId ? 'Draft' : design.composeLabel);
 
 	async function saveDraft() {
 		if (savingDraft || isEmpty) return;
@@ -120,13 +123,13 @@
 </script>
 
 <svelte:head>
-	<title>{draftId ? 'Draft' : 'Compose'} — Mail</title>
+	<title>{composeTitle} — {design.brandName}</title>
 </svelte:head>
 
 <form class="compose-page" onsubmit={submit}>
 	<header class="compose-header">
 		<div class="compose-heading">
-			<h1 class="page-title">{draftId ? 'Draft' : 'New message'}</h1>
+			<h1 class="page-title">{composeTitle}</h1>
 			{#if savedAt}<span class="saved">Saved {savedAt}</span>{/if}
 		</div>
 

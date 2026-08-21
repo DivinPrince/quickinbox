@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-design="mail">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
 		<script>
-			// Resolve the theme before first paint so there is no light flash.
+			// Resolve theme and design before first paint so there is no flash.
 			(() => {
 				try {
 					const stored = localStorage.getItem('mail:theme') || 'system';
@@ -15,6 +15,13 @@
 					document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 				} catch {
 					document.documentElement.dataset.theme = 'light';
+				}
+
+				try {
+					document.documentElement.dataset.design =
+						localStorage.getItem('mail:design') || 'mail';
+				} catch {
+					document.documentElement.dataset.design = 'mail';
 				}
 			})();
 		</script>

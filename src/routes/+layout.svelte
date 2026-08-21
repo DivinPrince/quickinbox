@@ -5,10 +5,12 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Topbar from '$lib/components/Topbar.svelte';
 	import { disablePushForCurrentAccount } from '$lib/push-client';
+	import { getActiveDesign, hydrateDesign } from '$lib/designs';
 	import { watchSystemTheme } from '$lib/theme';
+	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
 
-	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
+	let { children, data }: { children: Snippet; data: LayoutData } = $props();
 
 	// Onboarding runs before the user has an address, so the shell would be empty.
 	const showShell = $derived(Boolean(data.user) && $page.url.pathname !== '/onboarding');
@@ -22,6 +24,11 @@
 
 	// app.html already applied the theme; this keeps "System" live afterwards.
 	$effect(() => watchSystemTheme());
+
+	// Same for the visual design — stamp from storage and keep the store in step.
+	$effect(() => hydrateDesign());
+
+	const design = $derived(getActiveDesign());
 
 	// Remember the collapsed sidebar between visits.
 	$effect(() => {
@@ -56,6 +63,9 @@
 		href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
 		rel="stylesheet"
 	/>
+	{#each design.fonts as font (font.href)}
+		<link rel="stylesheet" href={font.href} />
+	{/each}
 </svelte:head>
 
 {#if showShell}

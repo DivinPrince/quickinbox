@@ -34,6 +34,7 @@
 		const doc = frame?.contentDocument;
 		if (!doc) return;
 		doc.documentElement.dataset.theme = document.documentElement.dataset.theme ?? 'light';
+		doc.documentElement.dataset.design = document.documentElement.dataset.design ?? 'mail';
 	}
 
 	/**
@@ -81,7 +82,7 @@
 		theme = new MutationObserver(syncTheme);
 		theme.observe(document.documentElement, {
 			attributes: true,
-			attributeFilter: ['data-theme']
+			attributeFilter: ['data-theme', 'data-design']
 		});
 	}
 

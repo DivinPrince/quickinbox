@@ -6,6 +6,7 @@
 	import EmptyState from './EmptyState.svelte';
 	import DeliveryStatus from './DeliveryStatus.svelte';
 	import { formatRelativeDate } from '$lib/utils/date';
+	import { getActiveDesign, type MailboxLayout } from '$lib/designs';
 	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 
 	let {
@@ -27,6 +28,19 @@
 	};
 
 	const meta = $derived(META[view]);
+	const design = $derived(getActiveDesign());
+
+	function mailboxLayoutAttr(layout: MailboxLayout): MailboxLayout {
+		switch (layout) {
+			case 'row':
+			case 'stack':
+				return layout;
+			default: {
+				const _never: never = layout;
+				return _never;
+			}
+		}
+	}
 
 	// Local copy so stars and reads can flip before the server round trip lands.
 	let items = $state<ThreadSummary[]>([]);
@@ -148,7 +162,7 @@
 	const rangeEnd = $derived(Math.min(mailbox.page * mailbox.pageSize, mailbox.total));
 </script>
 
-<section class="mailbox">
+<section class="mailbox" data-layout={mailboxLayoutAttr(design.mailboxLayout)}>
 	<header class="toolbar">
 		<div class="toolbar-left">
 			<div class="select-all">
@@ -456,6 +470,9 @@
 
 							<span class="sender" title={people(thread)}>
 								<span class="sender-names">{people(thread)}</span>
+								{#if !thread.is_read}
+									<span class="unread-pip" aria-hidden="true"></span>
+								{/if}
 								{#if thread.message_count > 1}
 									<span class="count">{thread.message_count}</span>
 								{/if}
@@ -465,7 +482,7 @@
 							<span class="body">
 								<span class="subject">{thread.subject || '(no subject)'}</span>
 								{#if thread.preview}
-									<span class="preview">— {thread.preview}</span>
+									<span class="preview"><span class="preview-sep">— </span>{thread.preview}</span>
 								{/if}
 							</span>
 
@@ -875,6 +892,10 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.unread-pip {
+		display: none;
 	}
 
 	/* How many messages the conversation holds. */
