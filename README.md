@@ -28,6 +28,11 @@ bun run setup
 bash scripts/setup.sh
 ```
 
+The button deploys to **your** Cloudflare account. If the form asks for
+`CLOUDFLARE_ACCOUNT_ID` (typical when your login can see more than one
+account), paste the ID from the dashboard sidebar — `wrangler whoami` also
+prints it. Do not commit that ID into `wrangler.jsonc`.
+
 The wizard creates the D1 database and R2 bucket, writes config, and onboards
 your domain. Budget about 30 minutes — most of that is waiting on DNS.
 
@@ -64,6 +69,10 @@ Only needed if you cannot run the wizard.
 bun install          # or: npm install
 bunx wrangler login
 ```
+
+If `wrangler whoami` lists more than one account, copy `.env.example` to `.env`
+and set `CLOUDFLARE_ACCOUNT_ID` (dashboard sidebar). The setup wizard prompts
+for this when it cannot pick an account automatically.
 
 Cloudflare Email Sending needs **Wrangler 4.123+** (older versions hit a
 removed API path and 404).
@@ -290,6 +299,7 @@ migrations/          D1 schema, applied in order
 | Webhook 500 | `bunx wrangler tail` |
 | Attachments missing | R2 bucket must exist and match `bucket_name` in `wrangler.jsonc` |
 | `database_id` errors on deploy | Paste the id from `wrangler d1 create` into `wrangler.jsonc` |
+| Deploy to Cloudflare / wrangler: more than one account, or no account id | Set `CLOUDFLARE_ACCOUNT_ID` from the dashboard sidebar or `wrangler whoami`. Use `.env` (see `.env.example`) or the deploy-button form — do not commit a personal id in `wrangler.jsonc` |
 | Setup shows no Cloudflare domains | Set `CLOUDFLARE_MAIL_DOMAINS` and `EMAIL_PROVIDER=cloudflare`, restart the dev server |
 
 ## License

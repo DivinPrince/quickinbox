@@ -7,8 +7,9 @@
 	"workers_dev": true,
 
 	// Your Cloudflare account is picked up from `wrangler login`. If you belong
-	// to more than one account, set CLOUDFLARE_ACCOUNT_ID in your environment
-	// or uncomment this and paste the ID from the Cloudflare dashboard sidebar.
+	// to more than one account, set CLOUDFLARE_ACCOUNT_ID in `.env` (see
+	// `.env.example`) or uncomment this and paste the ID from the dashboard
+	// sidebar. `bun run setup` writes this locally — do not commit a real ID.
 	// "account_id": "",
 
 	// Deploys to <name>.<your-subdomain>.workers.dev out of the box. To serve it
