@@ -7,7 +7,10 @@ export const GET: RequestHandler = async ({ locals, platform, url }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const all = url.searchParams.get('all') === '1' && locals.user.is_admin;
+	const all =
+		url.searchParams.get('all') === '1' &&
+		locals.user.is_admin &&
+		(locals.authMethod === 'session' || locals.apiScopes.includes('admin'));
 	const addresses = all
 		? await listAllAddresses(db)
 		: await listAddressesForUser(db, locals.user.id);

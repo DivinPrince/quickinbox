@@ -1,10 +1,11 @@
-import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
+import type { R2Bucket } from '@cloudflare/workers-types';
 import PostalMime, { type Address, type Attachment } from 'postal-mime';
 import { insertAttachmentBytes } from './attachments';
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL } from './constants';
 import { recordUnroutedEmail, resolveInboundRoute } from './domains';
 import { collectInboundRecipients, parseEmailAddress } from './email-address';
 import { emailExistsByProviderId, insertEmail } from './mail-store';
+import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
 import { normalizeMessageId } from './send-mail';
 
 export type CloudflareInboundMessage = {
@@ -15,8 +16,7 @@ export type CloudflareInboundMessage = {
 	setReject(reason: string): void;
 };
 
-export type CloudflareInboundEnv = {
-	DB: D1Database;
+export type CloudflareInboundEnv = PushNotificationEnv & {
 	ATTACHMENTS: R2Bucket;
 };
 
@@ -87,6 +87,12 @@ export async function handleCloudflareInbound(
 	});
 
 	await storeInboundAttachments(env, emailId, parsed.attachments);
+	await scheduleNewMailNotification(env, {
+		emailId,
+		userId: route.userId,
+		from,
+		subject
+	});
 }
 
 async function storeInboundAttachments(

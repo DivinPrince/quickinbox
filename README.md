@@ -1,299 +1,269 @@
 # QuickMail
 
-A web mail client for your own domain, on Cloudflare's edge. Inbox, threads,
-attachments, a rich-text composer, multiple domains, and multiple users —
-`you@yourdomain.com`, no third-party mailbox.
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/DivinPrince/quickmail)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 
-Deploys to Cloudflare Workers.
+Self-hosted email for your own domain, running on Cloudflare Workers.
+Get `you@yourdomain.com` with a full web client — no third-party mailbox,
+no servers to maintain.
 
-> **MIT licensed.** Use it, modify it, ship it — commercially or not. See
-> [LICENSE.md](LICENSE.md).
+## Features
 
-## What you get
+- **Real mail in and out** — the provider delivers straight into the Worker, nothing is polled
+- **Threads** — replies group into conversations, quoted history collapses
+- **Attachments** — inbound files land in R2, outbound files upload from the composer
+- **Safe HTML** — received HTML renders in a sandboxed iframe
+- **Multiple domains and users** — per-user addresses, admin catch-all, unrouted-mail view
+- **Delivery status** — delivered / bounced / complained tracking
+- **REST API, CLI, and MCP server** — send and read mail from scripts, the terminal, or AI agents
+- Light and dark themes
 
-- **Real mail in and out** — nothing is polled. The provider delivers into the Worker.
-- **Threads** — replies group into conversations; quoted history collapses.
-- **Attachments** — inbound files land in R2; outbound files upload from the composer.
-- **Safe HTML** — received HTML renders in a sandboxed iframe.
-- **Multiple domains and users** — each user has addresses and a default sending identity. Admins get a catch-all and an unrouted-mail view.
-- **Delivery status** — Resend reports delivered / bounced / complained over webhooks. Cloudflare marks a send `sent` once the binding accepts it.
-- **Light and dark themes.**
+## Quick start
 
----
+Click **Deploy to Cloudflare** above, or run the setup wizard locally:
 
-# Choose a mail provider
+```bash
+bun run setup
+# if bun isn't installed yet:
+bash scripts/setup.sh
+```
 
-One provider is active per deploy. Set `EMAIL_PROVIDER` to `resend` (default) or
-`cloudflare`. Do not point the same domain's apex MX at both.
+The wizard creates the D1 database and R2 bucket, writes config, and onboards
+your domain. Budget about 30 minutes — most of that is waiting on DNS.
 
-| | [Resend](https://resend.com) | [Cloudflare Email Service](https://developers.cloudflare.com/email-service/) |
-|---|---|---|
-| Outbound | `POST https://api.resend.com/emails` | Workers `env.EMAIL.send()` |
-| Inbound | Webhook → `/api/webhooks/resend` | Worker `email()` handler |
-| DNS | Records Resend gives you (any DNS host) | **Cloudflare DNS required** |
-| Cost | Resend free tier + Cloudflare | Email Sending needs a **Workers paid** plan. Routing is free. |
-| Delivery events | Webhooks (`delivered`, `bounced`, …) | Accepted send is stored as `sent` |
-| Best if | You already use Resend, or the domain is not on Cloudflare DNS | The zone is already on Cloudflare and you want mail on the same account |
+You need:
 
-Resend webhooks carry **metadata only**. On `email.received` the app fetches the
-body and attachments from Resend. Cloudflare delivers the full MIME on
-`message.raw` — no second HTTP fetch.
+1. A domain you control
+2. A [Cloudflare](https://dash.cloudflare.com) account
+3. Either a [Resend](https://resend.com) account, **or** the domain on Cloudflare DNS plus a Workers paid plan
 
----
+## Choosing a mail provider
 
-# Setup
+One provider is active per deploy, selected by `EMAIL_PROVIDER` (`resend` is
+the default, `cloudflare` is the alternative). Do not point the same domain's
+apex MX at both.
 
-Budget about 30 minutes. Most of it is DNS.
+|                 | [Resend](https://resend.com)             | [Cloudflare Email Service](https://developers.cloudflare.com/email-service/) |
+| --------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
+| Outbound        | Resend API                               | Workers `env.EMAIL.send()`                                                    |
+| Inbound         | Webhook → `/api/webhooks/resend`         | Worker `email()` handler                                                      |
+| DNS             | Any DNS host                             | **Cloudflare DNS required**                                                   |
+| Cost            | Resend free tier + Cloudflare            | Requires a **Workers paid** plan                                              |
+| Delivery events | `delivered`, `bounced`, `complained`, …  | Accepted send is stored as `sent`                                             |
 
-**You need**
+Pick Resend if your DNS lives elsewhere or you already use it. Pick Cloudflare
+Email if the zone is already on Cloudflare and you want everything on one account.
 
-1. A domain you control.
-2. A [Cloudflare](https://dash.cloudflare.com) account.
-3. Either a [Resend](https://resend.com) account, **or** the domain on Cloudflare DNS plus a Workers paid plan (Cloudflare Email Sending).
+## Manual setup
 
-## 1. Install
+Only needed if you cannot run the wizard.
+
+### 1. Install
 
 ```bash
 bun install          # or: npm install
 bunx wrangler login
 ```
 
-Use **Wrangler 4.123 or newer** for Cloudflare Email Sending. `4.96` calls an
-old `/email/sending/enable` path and gets a 404. Check with
-`bunx wrangler --version`. Upgrade with `bun add -d wrangler@latest`.
+Cloudflare Email Sending needs **Wrangler 4.123+** (older versions hit a
+removed API path and 404).
 
-## 2. Create D1 and R2
+### 2. Create D1 and R2
 
 ```bash
 bunx wrangler d1 create quickmail
 bunx wrangler r2 bucket create quickmail-attachments
 ```
 
-`d1 create` prints a `database_id`. Open `wrangler.jsonc` and replace
-`REPLACE_WITH_YOUR_D1_DATABASE_ID` with it.
-
-Set `"name"` to whatever you want the Worker called. To serve from your own
-hostname, uncomment the `routes` block — that zone must be on the same account.
+Copy the printed `database_id` into `wrangler.jsonc` (replacing
+`REPLACE_WITH_YOUR_D1_DATABASE_ID`), then run migrations:
 
 ```bash
 bun run db:migrate:remote
 ```
 
-Then follow **exactly one** provider track.
+To serve from your own hostname, uncomment the `routes` block in
+`wrangler.jsonc` — the zone must be on the same Cloudflare account.
 
----
+Then follow **exactly one** provider track below.
 
-## Track A — Resend
+### Track A — Resend
 
-`EMAIL_PROVIDER` can be omitted or set to `resend`.
+1. **Verify the domain** in Resend (**Domains → Add Domain**) and add every
+   record they show, including the apex `MX` — without it, mail never arrives.
+   Enable **sending and receiving** on the domain.
 
-### A1. Verify the domain
+2. **Set the API key** (create it with full access — send + domains + receiving):
 
-In Resend: **Domains → Add Domain**. Add every record they show, including the
-apex `MX`. Without that MX, mail never arrives.
+   ```bash
+   bunx wrangler secret put RESEND_API_KEY
+   ```
 
-| Record | Purpose |
-|---|---|
-| `TXT` on `resend._domainkey` | DKIM |
-| `TXT` + `MX` on `send` | SPF and bounces |
-| **`MX` on the apex** | **Receiving** |
+3. **Deploy, then create the webhook** (the URL must be public):
 
-Add DMARC on `_dmarc` while you test:
+   ```bash
+   bun run deploy
+   ```
 
-```txt
-v=DMARC1; p=none; rua=mailto:you@yourdomain.com; pct=100; adkim=s; aspf=s
-```
+   In [Resend → Webhooks](https://resend.com/webhooks) add a webhook pointing to
+   `https://<your-worker-url>/api/webhooks/resend` with the events
+   `email.received`, `email.sent`, `email.delivered`, `email.bounced`,
+   `email.complained`, `email.delivery_delayed`, `email.failed`.
 
-Start at `p=none`, then tighten to `p=quarantine`. Enable **sending and
-receiving** on the domain. Create an API key with full access (send + domains +
-receiving).
+4. **Save the signing secret** (shown once) and redeploy:
 
-```bash
-bunx wrangler secret put RESEND_API_KEY     # paste the re_... key
-```
+   ```bash
+   bunx wrangler secret put RESEND_WEBHOOK_SECRET
+   bun run deploy
+   ```
 
-### A2. Deploy, then create the webhook
+While testing, a DMARC record on `_dmarc` is recommended:
+`v=DMARC1; p=none; rua=mailto:you@yourdomain.com; pct=100; adkim=s; aspf=s`
+(tighten to `p=quarantine` later).
 
-The webhook URL has to be public, so deploy first:
+### Track B — Cloudflare Email Service
 
-```bash
-bun run deploy
-```
+The zone must use **Cloudflare DNS**.
 
-Resend dashboard → [Webhooks](https://resend.com/webhooks) → **Add Webhook**:
+1. **Onboard the domain** for both
+   [Email Sending](https://dash.cloudflare.com/?to=/:account/email-service/sending)
+   and [Email Routing](https://dash.cloudflare.com/?to=/:account/email-service/routing)
+   in the dashboard, or with Wrangler 4.123+:
 
-- **URL** — `https://<your-worker-url>/api/webhooks/resend`
-- **Events** — `email.received`, `email.sent`, `email.delivered`, `email.bounced`,
-  `email.complained`, `email.delivery_delayed`, `email.failed`
+   ```bash
+   bunx wrangler email sending enable yourdomain.com
+   bunx wrangler email routing enable yourdomain.com
+   ```
 
-Or:
+2. **Route inbound mail to the Worker.** In the Email Routing dashboard, enable
+   **Catch-all** with the action **Send to a Worker** → this app. The catch-all
+   is what lets users create arbitrary addresses in Settings. (This step is
+   dashboard-only — the CLI can't set a Worker as the catch-all action.)
 
-```bash
-curl -X POST https://api.resend.com/webhooks \
-  -H "Authorization: Bearer $RESEND_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"endpoint":"https://<your-worker-url>/api/webhooks/resend",
-       "events":["email.received","email.sent","email.delivered","email.bounced","email.complained","email.delivery_delayed","email.failed"]}'
-```
+3. **Configure the Worker** in `wrangler.jsonc` and deploy:
 
-The response contains `signing_secret` — **shown once**. Save it and redeploy:
+   ```jsonc
+   "vars": {
+     "EMAIL_PROVIDER": "cloudflare",
+     "CLOUDFLARE_MAIL_DOMAINS": "yourdomain.com" // comma-separate multiple domains
+   }
+   ```
 
-```bash
-bunx wrangler secret put RESEND_WEBHOOK_SECRET   # the whsec_... value
-bun run deploy
-```
+   ```bash
+   bun run deploy
+   ```
 
-Jump to [First run](#first-run).
-
----
-
-## Track B — Cloudflare Email Service
-
-Uses the [Email Service](https://developers.cloudflare.com/email-service/)
-Workers binding (`env.EMAIL.send()`) plus Email Routing. The zone must use
-**Cloudflare DNS**.
-
-### B1. Enable sending and routing
-
-Dashboard (reliable):
-
-1. [Email Sending](https://dash.cloudflare.com/?to=/:account/email-service/sending) → **Onboard Domain** → your zone. Cloudflare adds `cf-bounce` MX/SPF/DKIM and `_dmarc`.
-2. [Email Routing](https://dash.cloudflare.com/?to=/:account/email-service/routing) → **Onboard Domain** on the same zone. Apex MX must point at Cloudflare (`route1.mx.cloudflare.net`, …).
-
-CLI (Wrangler **≥ 4.123**):
-
-```bash
-bunx wrangler email sending enable yourdomain.com
-bunx wrangler email routing enable yourdomain.com
-```
-
-Confirm:
-
-```bash
-bunx wrangler email sending list
-bunx wrangler email routing settings yourdomain.com
-bunx wrangler email sending dns get yourdomain.com
-bunx wrangler email routing dns get yourdomain.com
-```
-
-Sending should show `enabled: yes`. Routing should show `Enabled: true` and
-`Status: ready`.
-
-### B2. Send all inbound mail to this Worker
-
-QuickMail lets users create arbitrary mailboxes (`you@`, `billing@`). Email
-Routing only has 200 named rules and does not know about D1, so you need a
-**catch-all → Worker**.
-
-The Wrangler catch-all update only accepts `forward` or `drop`. Set the Worker
-action in the dashboard:
-
-1. Open [Email Routing](https://dash.cloudflare.com/?to=/:account/email-service/routing) for the domain.
-2. Enable **Catch-all**.
-3. Action: **Send to a Worker**.
-4. Worker: this app (`quickmail`, or whatever `"name"` is in `wrangler.jsonc`).
-5. Save.
-
-The dashboard may require one verified personal destination before rules can be
-saved. Verify it if asked — do **not** forward production mail there.
-
-A named rule (local-part `you` → Worker) also works for a single address, but
-catch-all is what makes “add an address in Settings” work.
-
-### B3. Point the Worker at Cloudflare Email
-
-In `wrangler.jsonc`:
-
-```jsonc
-"vars": {
-  "EMAIL_PROVIDER": "cloudflare",
-  "CLOUDFLARE_MAIL_DOMAINS": "yourdomain.com"
-}
-```
-
-Comma-separate more domains if you onboard several:
-`yourdomain.com,mail.example.com`.
-
-Locally, put the same keys in `.dev.vars` (copy `.dev.vars.example`). `.dev.vars`
-overrides `wrangler.jsonc` vars in `vite dev`.
-
-```bash
-bun run deploy
-```
-
-No Resend key or webhook is used on this track. `vite dev` never runs the
-`email()` handler — inbound only works on a **deployed** Worker or
-`bun run preview`.
-
----
+Inbound mail only works on a **deployed** Worker (or `bun run preview`) —
+`vite dev` never runs the `email()` handler.
 
 ## First run
 
-1. Open the deployed URL (or `http://localhost:5173` after `bun run dev`).
-2. `/setup` — pick a domain the provider can see, then create the admin (name,
-   local-part, password). That address is both the inbox and the login.
-3. Later users go through `/onboarding` to claim an address on a connected domain.
+1. Open the deployed URL.
+2. Visit `/setup` — pick a domain and create the admin account (name,
+   address, password). That address is both the inbox and the login.
+3. Later users claim addresses through `/onboarding`.
 
-Send yourself a message from another account. It should land within a few
-seconds (Resend webhook or Cloudflare Routing → Worker).
+Send yourself a message from another account — it should land within seconds.
 
----
+### Desktop notifications (optional)
 
-# Development
+QuickMail can push-notify users about new mail even with no tab open:
 
 ```bash
-cp .dev.vars.example .dev.vars    # fill in the provider you are using
+bunx web-push generate-vapid-keys
+bunx wrangler secret put VAPID_PUBLIC_KEY
+bunx wrangler secret put VAPID_PRIVATE_KEY
+bunx wrangler secret put VAPID_SUBJECT   # e.g. mailto:admin@example.com
+bun run db:migrate:remote
+bun run deploy
+```
+
+Users opt in under **Settings → Desktop notifications**. Don't rotate the key
+pair after users subscribe, or they'll have to re-enable.
+
+## Development
+
+```bash
+cp .dev.vars.example .dev.vars    # fill in the provider you're using
 bun install
 bun run db:migrate:local
-bun run dev                       # D1 and R2 via platformProxy, secrets from .dev.vars
+bun run dev
 ```
 
-```bash
-bun run preview   # production build + wrangler dev (needed for Cloudflare inbound)
-bun run check     # svelte-check
-bun run deploy    # build, wrap the Worker with email(), ship
-```
+| Command           | Purpose                                                  |
+| ----------------- | -------------------------------------------------------- |
+| `bun run dev`     | Vite dev server (D1/R2 via platformProxy)                |
+| `bun run preview` | Production build + `wrangler dev` (Cloudflare inbound)   |
+| `bun run check`   | svelte-check                                             |
+| `bun run test`    | Unit tests                                               |
+| `bun run deploy`  | Build, wrap the Worker with `email()`, deploy            |
 
-`bun run build` runs SvelteKit, then
-`scripts/wrap-cloudflare-worker.mjs`. The adapter writes a fetch-only Worker;
-the wrap adds the `email()` handler from `src/worker.ts` without overwriting
-that file.
+**Testing inbound with Resend:** webhooks can't reach `localhost`, so tunnel it
+(`cloudflared tunnel --url http://localhost:5173`) and point a **throwaway**
+webhook at the tunnel — never repoint production.
 
-### Testing inbound mail
+**Testing inbound with Cloudflare Email:** use `bun run preview` or a deploy.
 
-**Resend.** Webhooks cannot reach `localhost`. Tunnel it:
-
-```bash
-cloudflared tunnel --url http://localhost:5173
-```
-
-Point a **second, throwaway** webhook at the tunnel. Do not repoint production
-or mail stops when the tunnel dies.
-
-**Cloudflare Email.** Use `bun run preview` or a deploy. The catch-all must
-target this Worker.
-
-Forgot the admin password:
+**Forgot the admin password:**
 
 ```bash
 bun scripts/reset-admin-password.mjs you@example.com newpassword --local
 ```
 
-Drop `--local` to reset production.
+## API access
 
-## How QuickMail routes inbound mail
+Any user can mint a long-lived API key under **Settings → API keys** and use it
+as a bearer token:
 
-Both providers accept every local-part on a connected domain. The app then:
+```sh
+curl https://your-worker/api/mail \
+  -H "Authorization: Bearer qm_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"to": "you@example.com", "subject": "hello", "text": "hi"}'
+```
 
-1. Exact match in `addresses` → that user.
-2. Else the domain's **catch-all owner** (Admin) → that user.
-3. Else the row is stored in `unrouted_emails` and listed in Admin.
+`GET /api/mail?view=inbox` lists conversations. Keys are scoped (`mail:read`,
+`mail:send`, admin) and only the SHA-256 hash is stored — the raw value is
+shown once. Revoking a key takes effect immediately.
 
-That in-app catch-all is separate from Cloudflare Email Routing's catch-all.
-Routing's catch-all gets the message **into** the Worker. QuickMail's catch-all
-decides **which user** sees it.
+## CLI and MCP
 
-## Layout
+```bash
+curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickmail/main/scripts/install.sh | sh
+quickmail login --url https://<your-instance> --token <key from Settings>
+quickmail inbox
+quickmail send --to someone@example.com --subject "Hi" --body "Hello"
+```
+
+The same credentials drive an MCP server for Claude, Cursor, and other agents:
+
+```json
+{
+  "mcpServers": {
+    "quickmail": {
+      "command": "bunx",
+      "args": ["quickmail", "mcp"],
+      "env": {
+        "QUICKMAIL_URL": "https://mail.example.com",
+        "QUICKMAIL_TOKEN": "qm_live_…"
+      }
+    }
+  }
+}
+```
+
+Tools: `list_threads`, `get_thread`, `search_mail`, `send_message`, `reply`,
+`list_attachments`.
+
+## How inbound routing works
+
+Both providers accept every address on a connected domain. The app then routes:
+
+1. Exact match in `addresses` → that user
+2. Else the domain's catch-all owner (admin) → that user
+3. Else stored as unrouted and listed in the admin view
+
+## Project structure
 
 ```
 src/
@@ -302,43 +272,27 @@ src/
   lib/
     components/      sidebar, mailbox, composer, thread view
     server/          providers, inbound, D1, auth
-    utils/           HTML, quoting, dates, attachments
 scripts/
+  setup.sh / setup.mjs         first-run wizard
   wrap-cloudflare-worker.mjs   attach email() after the SvelteKit build
+cli/                 quickmail CLI + MCP server
 migrations/          D1 schema, applied in order
 ```
 
 ## Troubleshooting
 
-**`wrangler email sending enable` → 404.** Wrangler is too old. Use 4.123+ or
-onboard under **Compute → Email Service → Email Sending** in the dashboard.
+| Symptom | Fix |
+| --- | --- |
+| `wrangler email sending enable` → 404 | Wrangler too old — upgrade to 4.123+ |
+| Mail never arrives (Resend) | `dig MX yourdomain.com` must point at Resend; enable receiving on the domain |
+| Mail never arrives (Cloudflare) | Apex MX must be Cloudflare Routing, catch-all must target this Worker, `EMAIL_PROVIDER=cloudflare`, Worker must be deployed |
+| Webhook 401 | `RESEND_WEBHOOK_SECRET` mismatch — secrets are shown once; recreate the webhook |
+| Webhook 500 | `bunx wrangler tail` |
+| Attachments missing | R2 bucket must exist and match `bucket_name` in `wrangler.jsonc` |
+| `database_id` errors on deploy | Paste the id from `wrangler d1 create` into `wrangler.jsonc` |
+| Setup shows no Cloudflare domains | Set `CLOUDFLARE_MAIL_DOMAINS` and `EMAIL_PROVIDER=cloudflare`, restart the dev server |
 
-**Catch-all cannot be set to a Worker from the CLI.** Expected.
-`wrangler email routing rules update … catch-all` only allows `forward` or
-`drop`. Use the dashboard (step B2).
+## License
 
-**Mail sends but never arrives (Resend).** `dig MX yourdomain.com` should point
-at Resend. Receiving must be enabled on the domain.
-
-**Mail sends but never arrives (Cloudflare).** Apex MX must be Cloudflare
-Routing. Catch-all must send to this Worker. `EMAIL_PROVIDER` must be
-`cloudflare`. The Worker must be deployed (`vite dev` will not receive).
-
-**Webhook 401.** `RESEND_WEBHOOK_SECRET` does not match. Secrets are shown once
-— delete the webhook and create a new one.
-
-**Webhook 500.** `bunx wrangler tail`.
-
-**Attachments missing.** Confirm the R2 bucket exists and `bucket_name` in
-`wrangler.jsonc` matches.
-
-**`database_id` errors on deploy.** Paste the id from `wrangler d1 create` into
-`wrangler.jsonc`.
-
-**Setup shows no Cloudflare domains.** Set `CLOUDFLARE_MAIL_DOMAINS` (and
-`EMAIL_PROVIDER=cloudflare`) in `.dev.vars` or `wrangler.jsonc` vars, then
-restart the dev server.
-
----
-
-MIT licensed — see [LICENSE.md](LICENSE.md). Copyright © 2026 Irasubiza Divin Prince.
+[MIT](LICENSE.md) — use it, modify it, ship it, commercially or not.
+Copyright © 2026 Irasubiza Divin Prince.

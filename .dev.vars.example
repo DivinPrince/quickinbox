@@ -3,8 +3,9 @@
 #
 # In production these live as Worker secrets / vars instead.
 
-# resend (default) or cloudflare
-EMAIL_PROVIDER=resend
+# resend (default) or cloudflare. Set in wrangler.jsonc vars for production;
+# uncomment here only to override locally.
+# EMAIL_PROVIDER=resend
 
 # --- Resend (EMAIL_PROVIDER=resend) ---
 # From https://resend.com/api-keys — needs full access (send + domains + receiving).
@@ -17,3 +18,10 @@ RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # --- Cloudflare Email (EMAIL_PROVIDER=cloudflare) ---
 # Comma-separated domains already onboarded in Email Service / Email Routing.
 # CLOUDFLARE_MAIL_DOMAINS=example.com,mail.example.com
+
+# --- Desktop notifications (optional) ---
+# Generate once with: bunx web-push generate-vapid-keys
+# Production values should be added with `wrangler secret put`, not committed.
+# VAPID_PUBLIC_KEY=REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY
+# VAPID_PRIVATE_KEY=REPLACE_WITH_YOUR_VAPID_PRIVATE_KEY
+# VAPID_SUBJECT=mailto:admin@example.com

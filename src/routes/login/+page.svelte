@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Logo from '$lib/components/Logo.svelte';
+	import { discardPushSubscriptionFromAnotherAccount } from '$lib/push-client';
 
 	let email = $state('');
 	let password = $state('');
@@ -21,6 +22,11 @@
 			if (!res.ok) {
 				error = data.error ?? 'Login failed';
 				return;
+			}
+			try {
+				await discardPushSubscriptionFromAnotherAccount();
+			} catch (pushError) {
+				console.warn('Could not reconcile the existing push subscription after login', pushError);
 			}
 			window.location.href = '/inbox';
 		} catch {
