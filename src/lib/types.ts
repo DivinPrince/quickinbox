@@ -61,6 +61,7 @@ export type MailAddress = {
 	domain_id: string;
 	domain_name: string;
 	address: string;
+	/** From display name on outbound mail. Falls back to the account name. */
 	label: string | null;
 	is_default: boolean;
 	created_at: string;

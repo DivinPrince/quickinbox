@@ -167,11 +167,17 @@
 					aria-label="Send from"
 				>
 					{#each addresses as address (address.id)}
-						<option value={address.id}>{address.address}</option>
+						<option value={address.id}>
+							{address.label ? `${address.label} · ${address.address}` : address.address}
+						</option>
 					{/each}
 				</select>
 			{:else}
-				<span class="field-static">{addresses[0]?.address ?? '—'}</span>
+				<span class="field-static">
+					{addresses[0]?.label
+						? `${addresses[0].label} · ${addresses[0].address}`
+						: (addresses[0]?.address ?? '—')}
+				</span>
 			{/if}
 		</div>
 

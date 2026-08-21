@@ -242,6 +242,29 @@ export async function createAddress(
 	return created;
 }
 
+export async function updateAddress(
+	db: D1Database,
+	userId: string,
+	addressId: string,
+	patch: { label?: string | null }
+): Promise<MailAddress> {
+	const current = await getAddressForUser(db, userId, addressId);
+	if (!current) {
+		throw new Error('Address not found');
+	}
+
+	const label = patch.label !== undefined ? patch.label?.trim() || null : current.label;
+
+	await db
+		.prepare('UPDATE addresses SET label = ? WHERE id = ? AND user_id = ?')
+		.bind(label, addressId, userId)
+		.run();
+
+	const saved = await getAddressForUser(db, userId, addressId);
+	if (!saved) throw new Error('Failed to update address');
+	return saved;
+}
+
 export async function setDefaultAddress(
 	db: D1Database,
 	userId: string,

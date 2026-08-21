@@ -1,5 +1,10 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { deleteAddress, listAddressesForUser, setDefaultAddress } from '$lib/server/domains';
+import {
+	deleteAddress,
+	listAddressesForUser,
+	setDefaultAddress,
+	updateAddress
+} from '$lib/server/domains';
 
 export const PATCH: RequestHandler = async ({ params, request, locals, platform }) => {
 	const db = platform?.env.DB;
@@ -7,9 +12,20 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const body = (await request.json()) as { isDefault?: boolean };
+	const body = (await request.json()) as { isDefault?: boolean; label?: string | null };
 	if (body.isDefault) {
 		await setDefaultAddress(db, locals.user.id, params.id!);
+	}
+
+	if (body.label !== undefined) {
+		try {
+			await updateAddress(db, locals.user.id, params.id!, { label: body.label });
+		} catch (error) {
+			return json(
+				{ error: error instanceof Error ? error.message : 'Could not update address' },
+				{ status: 400 }
+			);
+		}
 	}
 
 	return json({ addresses: await listAddressesForUser(db, locals.user.id) });

@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getEmailForUser, listThreadMessages, markThreadRead } from '$lib/server/mail-store';
+import { resolveReplyFromAddress } from '$lib/server/outbox';
 import { displaySubject } from '$lib/server/threads';
 
 export const load: PageServerLoad = async ({ params, locals, platform }) => {
@@ -17,12 +18,17 @@ export const load: PageServerLoad = async ({ params, locals, platform }) => {
 	await markThreadRead(platform.env.DB, locals.user.id, email);
 	const messages = await listThreadMessages(platform.env.DB, locals.user.id, email);
 
+	const latest = messages[messages.length - 1] ?? email;
+	const replyIdentity = await resolveReplyFromAddress(platform.env.DB, locals.user, latest);
+
 	return {
 		threadId: email.thread_id ?? email.id,
 		/** The message that was linked to — expanded first when the page opens. */
 		focusId: email.id,
 		trashed: Boolean(email.deleted_at),
 		subject: displaySubject(messages[0]?.subject ?? email.subject),
+		replyFrom: replyIdentity?.address ?? null,
+		replyFromName: replyIdentity?.label?.trim() || null,
 		messages: messages.map((message) => ({ ...message, is_read: true }))
 	};
 };

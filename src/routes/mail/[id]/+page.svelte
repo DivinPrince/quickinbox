@@ -205,6 +205,14 @@
 						{latest?.direction === 'inbound' ? latest.from_addr : latest?.to_addr}
 					</strong>
 				</p>
+				{#if data.replyFrom}
+					<p class="reply-from">
+						From
+						<strong>
+							{#if data.replyFromName}{data.replyFromName} · {/if}{data.replyFrom}
+						</strong>
+					</p>
+				{/if}
 
 				<RichTextEditor bind:html={replyHtml} embedded minHeight={160} placeholder="Reply…" />
 
@@ -300,13 +308,19 @@
 		box-shadow: inset 0 1px 0 var(--color-line);
 	}
 
-	.reply-to {
-		margin-bottom: 0.625rem;
+	.reply-to,
+	.reply-from {
+		margin: 0;
 		font-size: 0.8125rem;
 		color: var(--color-muted);
 	}
 
-	.reply-to strong {
+	.reply-from {
+		margin: 0.25rem 0 0.625rem;
+	}
+
+	.reply-to strong,
+	.reply-from strong {
 		font-weight: 500;
 		color: var(--color-text-secondary);
 	}

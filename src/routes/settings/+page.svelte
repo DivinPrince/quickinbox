@@ -64,9 +64,11 @@
 	const addresses = $derived(edited ?? data.addresses);
 
 	let localPart = $state('');
+	let displayName = $state('');
 	let domainId = $state('');
 	let error = $state('');
 	let busy = $state(false);
+	let savingId = $state('');
 
 	let keyName = $state('');
 	let sendScope = $state(true);
@@ -199,7 +201,7 @@
 			const res = await fetch('/api/addresses', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ domainId, localPart })
+				body: JSON.stringify({ domainId, localPart, label: displayName.trim() || null })
 			});
 			const body = await res.json();
 			if (!res.ok) {
@@ -208,10 +210,36 @@
 			}
 			edited = [...addresses, body.address];
 			localPart = '';
+			displayName = '';
 		} catch {
 			error = 'Network error';
 		} finally {
 			busy = false;
+		}
+	}
+
+	async function saveLabel(id: string, label: string) {
+		const current = addresses.find((address) => address.id === id);
+		if (!current || (current.label ?? '') === label.trim()) return;
+
+		savingId = id;
+		error = '';
+		try {
+			const res = await fetch(`/api/addresses/${id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ label: label.trim() || null })
+			});
+			const body = await res.json();
+			if (!res.ok) {
+				error = body.error ?? 'Could not save that name';
+				return;
+			}
+			edited = body.addresses;
+		} catch {
+			error = 'Network error';
+		} finally {
+			savingId = '';
 		}
 	}
 
@@ -304,13 +332,24 @@
 
 	<section class="surface-lg card">
 		<h2><Icon name="at-line" size={18} /> Addresses</h2>
+		<p class="card-hint">
+			The From name is what recipients see. Leave it blank to use your account name.
+		</p>
 
 		<ul class="address-list">
 			{#each addresses as address (address.id)}
 				<li class="address-row">
 					<div class="min-w-0 flex-1">
-						<p class="address-value">{address.address}</p>
-						<p class="address-domain">{address.domain_name}</p>
+						<input
+							type="text"
+							class="name-input"
+							value={address.label ?? ''}
+							placeholder="From name"
+							aria-label="From name for {address.address}"
+							disabled={savingId === address.id}
+							onchange={(event) => saveLabel(address.id, event.currentTarget.value)}
+						/>
+						<p class="address-domain">{address.address}</p>
 					</div>
 
 					{#if address.is_default}
@@ -337,12 +376,21 @@
 
 		<form class="add-form" onsubmit={addAddress}>
 			<div class="add-field">
+				<label class="field-title" for="new-display-name">From name</label>
+				<input
+					id="new-display-name"
+					type="text"
+					bind:value={displayName}
+					placeholder="Support"
+					class="name-add-input"
+					autocomplete="off"
+				/>
 				<AddressField
 					bind:localPart
 					bind:domainId
 					domains={data.domains}
 					placeholder="another"
-					label="Add an address"
+					label="Address"
 				/>
 			</div>
 			<button type="submit" class="btn-primary" disabled={busy || !localPart.trim()}>
@@ -530,6 +578,13 @@
 		font-weight: 600;
 	}
 
+	.card-hint {
+		margin-top: 0.375rem;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+		color: var(--color-muted);
+	}
+
 	.signature-form {
 		margin-top: 1rem;
 	}
@@ -697,17 +752,46 @@
 		box-shadow: inset 0 1px 0 var(--color-line);
 	}
 
-	.address-value {
+	.name-input {
+		width: 100%;
 		font-size: 0.875rem;
 		font-weight: 500;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		color: var(--color-text);
+		background: transparent;
+		outline: none;
+	}
+
+	.name-input::placeholder {
+		color: var(--color-muted);
+		font-weight: 400;
 	}
 
 	.address-domain {
+		margin-top: 0.125rem;
 		font-size: 0.75rem;
 		color: var(--color-muted);
+	}
+
+	.field-title {
+		display: block;
+		font-size: 0.8125rem;
+		color: var(--color-text-secondary);
+	}
+
+	.name-add-input {
+		width: 100%;
+		margin: 0.5rem 0 0.875rem;
+		padding: 0.625rem 0.875rem;
+		border-radius: 0.625rem;
+		font-size: 0.9375rem;
+		color: var(--color-text);
+		background: var(--color-surface-muted);
+		box-shadow: inset 0 0 0 1px var(--color-line);
+		outline: none;
+	}
+
+	.name-add-input:focus {
+		box-shadow: inset 0 0 0 1px var(--color-focus-line), 0 0 0 3px var(--color-focus-halo);
 	}
 
 	.badge {
