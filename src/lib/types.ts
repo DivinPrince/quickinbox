@@ -64,6 +64,8 @@ export type MailAddress = {
 	/** From display name on outbound mail. Falls back to the account name. */
 	label: string | null;
 	is_default: boolean;
+	/** Sign-off for this mailbox. Falls back to the account signature when empty. */
+	signature: string | null;
 	created_at: string;
 };
 

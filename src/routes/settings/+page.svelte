@@ -253,6 +253,31 @@
 		if (res.ok) edited = body.addresses;
 	}
 
+	async function saveMailboxSignature(id: string, value: string) {
+		const current = addresses.find((address) => address.id === id);
+		if (!current || (current.signature ?? '') === value.trim()) return;
+
+		savingId = id;
+		error = '';
+		try {
+			const res = await fetch(`/api/addresses/${id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ signature: value })
+			});
+			const body = await res.json();
+			if (!res.ok) {
+				error = body.error ?? 'Could not save that signature';
+				return;
+			}
+			edited = body.addresses;
+		} catch {
+			error = 'Network error';
+		} finally {
+			savingId = '';
+		}
+	}
+
 	async function remove(id: string) {
 		const res = await fetch(`/api/addresses/${id}`, { method: 'DELETE' });
 		const body = await res.json();
@@ -307,6 +332,7 @@
 
 	<section class="surface-lg card">
 		<h2><Icon name="pencil-line" size={18} /> Signature</h2>
+		<p class="card-hint">Used when a mailbox has no signature of its own.</p>
 
 		<form class="signature-form" onsubmit={saveSignature}>
 			<textarea
@@ -333,43 +359,56 @@
 	<section class="surface-lg card">
 		<h2><Icon name="at-line" size={18} /> Addresses</h2>
 		<p class="card-hint">
-			The From name is what recipients see. Leave it blank to use your account name.
+			The From name is what recipients see. A signature on an address replaces the account
+			signature for that mailbox. Leave either blank to use the account default.
 		</p>
 
 		<ul class="address-list">
 			{#each addresses as address (address.id)}
 				<li class="address-row">
-					<div class="min-w-0 flex-1">
-						<input
-							type="text"
-							class="name-input"
-							value={address.label ?? ''}
-							placeholder="From name"
-							aria-label="From name for {address.address}"
-							disabled={savingId === address.id}
-							onchange={(event) => saveLabel(address.id, event.currentTarget.value)}
-						/>
-						<p class="address-domain">{address.address}</p>
+					<div class="address-head">
+						<div class="min-w-0 flex-1">
+							<input
+								type="text"
+								class="name-input"
+								value={address.label ?? ''}
+								placeholder="From name"
+								aria-label="From name for {address.address}"
+								disabled={savingId === address.id}
+								onchange={(event) => saveLabel(address.id, event.currentTarget.value)}
+							/>
+							<p class="address-domain">{address.address}</p>
+						</div>
+
+						{#if address.is_default}
+							<span class="badge">Default</span>
+						{:else}
+							<button type="button" class="btn-ghost text-xs" onclick={() => makeDefault(address.id)}>
+								Make default
+							</button>
+						{/if}
+
+						{#if addresses.length > 1}
+							<button
+								type="button"
+								class="icon-btn"
+								aria-label="Remove {address.address}"
+								onclick={() => remove(address.id)}
+							>
+								<Icon name="delete-bin-line" size={15} />
+							</button>
+						{/if}
 					</div>
-
-					{#if address.is_default}
-						<span class="badge">Default</span>
-					{:else}
-						<button type="button" class="btn-ghost text-xs" onclick={() => makeDefault(address.id)}>
-							Make default
-						</button>
-					{/if}
-
-					{#if addresses.length > 1}
-						<button
-							type="button"
-							class="icon-btn"
-							aria-label="Remove {address.address}"
-							onclick={() => remove(address.id)}
-						>
-							<Icon name="delete-bin-line" size={15} />
-						</button>
-					{/if}
+					<textarea
+						class="mailbox-signature"
+						rows="2"
+						maxlength={MAX_EMAIL_SIGNATURE_LENGTH}
+						value={address.signature ?? ''}
+						placeholder="Signature for this address"
+						aria-label="Signature for {address.address}"
+						disabled={savingId === address.id}
+						onchange={(event) => saveMailboxSignature(address.id, event.currentTarget.value)}
+					></textarea>
 				</li>
 			{/each}
 		</ul>
@@ -743,13 +782,20 @@
 
 	.address-row {
 		display: flex;
-		align-items: center;
-		gap: 0.625rem;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.5rem;
 		padding: 0.75rem 0;
 	}
 
 	.address-row + .address-row {
 		box-shadow: inset 0 1px 0 var(--color-line);
+	}
+
+	.address-head {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
 	}
 
 	.name-input {
@@ -764,6 +810,26 @@
 	.name-input::placeholder {
 		color: var(--color-muted);
 		font-weight: 400;
+	}
+
+	.mailbox-signature {
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		resize: vertical;
+		border-radius: 0.625rem;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+		background: var(--color-surface-muted);
+		box-shadow: inset 0 0 0 1px var(--color-line);
+		outline: none;
+	}
+
+	.mailbox-signature:focus {
+		box-shadow: inset 0 0 0 1px var(--color-focus-line), 0 0 0 3px var(--color-focus-halo);
+	}
+
+	.mailbox-signature::placeholder {
+		color: var(--color-muted);
 	}
 
 	.address-domain {

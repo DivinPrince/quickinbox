@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
 	appendEmailSignature,
-	normalizeEmailSignature
+	MAX_EMAIL_SIGNATURE_LENGTH,
+	normalizeEmailSignature,
+	parseMailboxSignature,
+	pickEmailSignature
 } from './email-signature';
 
 	describe('email signatures', () => {
@@ -43,6 +46,22 @@ import {
 		assert.deepEqual(
 			appendEmailSignature({ text: 'Hello', html: '<p>Hello</p>', signature: '   ' }),
 			{ text: 'Hello', html: '<p>Hello</p>' }
+		);
+	});
+
+	test('picks a mailbox signature over the account signature', () => {
+		assert.equal(pickEmailSignature('Support', 'Best,\nEmmanuel'), 'Support');
+		assert.equal(pickEmailSignature('  ', 'Best,\nEmmanuel'), 'Best,\nEmmanuel');
+		assert.equal(pickEmailSignature(null, ''), '');
+	});
+
+	test('rejects mailbox signatures over the character limit', () => {
+		assert.equal(parseMailboxSignature('  Best  '), 'Best');
+		assert.equal(parseMailboxSignature('   '), null);
+		assert.equal(parseMailboxSignature('x'.repeat(MAX_EMAIL_SIGNATURE_LENGTH))?.length, 1000);
+		assert.throws(
+			() => parseMailboxSignature('x'.repeat(MAX_EMAIL_SIGNATURE_LENGTH + 1)),
+			/1000 characters or fewer/
 		);
 	});
 });

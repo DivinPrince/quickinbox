@@ -19,6 +19,23 @@ function escapeHtml(value: string): string {
 		.replaceAll("'", '&#39;');
 }
 
+/** Mailbox sign-off wins when set; otherwise the account signature. */
+export function pickEmailSignature(
+	mailbox: string | null | undefined,
+	account: string | null | undefined
+): string {
+	return normalizeEmailSignature(mailbox ?? '') || normalizeEmailSignature(account ?? '');
+}
+
+/** Empty input becomes null so the mailbox falls back to the account signature. */
+export function parseMailboxSignature(value: string): string | null {
+	const signature = normalizeEmailSignature(value);
+	if (signature.length > MAX_EMAIL_SIGNATURE_LENGTH) {
+		throw new Error(`Signature must be ${MAX_EMAIL_SIGNATURE_LENGTH} characters or fewer`);
+	}
+	return signature || null;
+}
+
 /** Append the configured sign-off to both MIME alternatives exactly once at send time. */
 export function appendEmailSignature(input: {
 	text: string;
