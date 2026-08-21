@@ -235,6 +235,35 @@ quickmail inbox
 quickmail send --to someone@example.com --subject "Hi" --body "Hello"
 ```
 
+If the instance is protected by Cloudflare Access, provide a service-token pair
+in addition to the QuickMail API key:
+
+```bash
+quickmail login \
+  --url https://mail.example.com \
+  --token qm_live_xxx \
+  --cf-access-client-id xxx.access \
+  --cf-access-client-secret xxx
+```
+
+Both Access values are required together. For an environment-only CLI or MCP,
+set `QUICKMAIL_URL` and `QUICKMAIL_TOKEN` together. That pair does not inherit
+saved Access credentials; provide both Access environment variables when the
+environment-selected instance is protected:
+
+```text
+QUICKMAIL_URL
+QUICKMAIL_TOKEN
+QUICKMAIL_CF_ACCESS_CLIENT_ID
+QUICKMAIL_CF_ACCESS_CLIENT_SECRET
+```
+
+Saved configuration remains mode `0600`. Every API request sends the Access
+service-token headers and QuickMail's independent bearer token. QuickMail does
+not follow API redirects; an Access redirect or HTML login response reports a
+Cloudflare Access diagnostic distinct from a QuickMail JSON `401` or `403`.
+Neither credential is included in diagnostics.
+
 The same credentials drive an MCP server for Claude, Cursor, and other agents:
 
 ```json
@@ -245,7 +274,9 @@ The same credentials drive an MCP server for Claude, Cursor, and other agents:
       "args": ["quickmail", "mcp"],
       "env": {
         "QUICKMAIL_URL": "https://mail.example.com",
-        "QUICKMAIL_TOKEN": "qm_live_…"
+        "QUICKMAIL_TOKEN": "qm_live_…",
+        "QUICKMAIL_CF_ACCESS_CLIENT_ID": "xxx.access",
+        "QUICKMAIL_CF_ACCESS_CLIENT_SECRET": "xxx"
       }
     }
   }
@@ -254,6 +285,39 @@ The same credentials drive an MCP server for Claude, Cursor, and other agents:
 
 Tools: `list_threads`, `get_thread`, `search_mail`, `send_message`, `reply`,
 `list_attachments`.
+
+### Cloudflare Access deployment
+
+Access and QuickMail authorization are independent gates. Keep the normal
+identity-provider **Allow** policy for browser users, then add a **Service Auth**
+policy matching the CLI/MCP service token. Cloudflare documents the required
+policy action and the `CF-Access-Client-Id` / `CF-Access-Client-Secret` headers in
+[Service tokens](https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/).
+Do not enable a single `Authorization`-header service-token mode: QuickMail owns
+that header for its scoped API key.
+
+Do not bypass `/api`, `/api/auth`, or the UI. When Resend handles inbound mail,
+create a separate Access application scoped exactly to
+`/api/webhooks/resend` and give only that application a public **Bypass** policy;
+the Worker must still validate every Resend signature. Cloudflare documents
+path-scoped applications in
+[Application paths](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/)
+and narrowly scoped bypasses in
+[Common Access policies](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/common-policies/).
+
+Cloudflare Email delivery invokes the Worker's `email()` handler instead of the
+protected HTTP hostname, so it needs no HTTP bypass. See
+[Email Workers](https://developers.cloudflare.com/email-routing/email-workers/).
+
+Rotate and revoke the two credential systems independently:
+
+1. Create a replacement Access service token, update CLI/MCP secrets, verify it,
+   then revoke the old Access token.
+2. Create a replacement QuickMail API key with the same least-privilege scopes,
+   update CLI/MCP secrets, verify it, then revoke the old API key.
+
+Compromise of one credential must not be treated as compromise of the other,
+but rotate both if their storage environment may have been exposed.
 
 ## How inbound routing works
 

@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { stdin as stdinStream } from 'node:process';
 import {
+	createQuickMailClient,
 	QuickMailClient,
 	QuickMailError,
 	safeDownloadName,
@@ -12,7 +13,8 @@ import { clearConfig, loadConfig, saveConfig } from './config.ts';
 const HELP = `quickmail — operate a QuickMail instance from the terminal
 
 Usage:
-  quickmail login --url <https://mail.example.com> --token <qm_live_…>
+  quickmail login --url <https://mail.example.com> --token <qm_live_…> \\
+    [--cf-access-client-id <id.access> --cf-access-client-secret <secret>]
   quickmail logout
   quickmail whoami
 
@@ -40,8 +42,11 @@ Admin:
 MCP:
   quickmail mcp
 
-Auth is a Settings → API keys bearer token. QUICKMAIL_URL and QUICKMAIL_TOKEN
-override the saved config. Use --json on mail/admin commands for raw output.
+Auth uses a Settings → API keys bearer token. Set QUICKMAIL_URL and
+QUICKMAIL_TOKEN together; this environment pair never inherits saved Access
+credentials. Configure both QUICKMAIL_CF_ACCESS_CLIENT_ID and
+QUICKMAIL_CF_ACCESS_CLIENT_SECRET or neither. Use --json on mail/admin commands
+for raw output.
 `;
 
 type Flags = Record<string, string | boolean>;
@@ -146,8 +151,7 @@ function printThreads(page: { threads: ThreadSummary[]; total: number; page: num
 }
 
 async function clientFromConfig(): Promise<QuickMailClient> {
-	const config = await loadConfig();
-	return new QuickMailClient(config.url, config.token);
+	return createQuickMailClient(await loadConfig());
 }
 
 async function resolveUserId(client: QuickMailClient, idOrEmail: string): Promise<string> {
@@ -187,15 +191,25 @@ async function run(argv: string[]): Promise<number> {
 		case 'login': {
 			const url = flagString(flags, 'url');
 			const token = flagString(flags, 'token') ?? process.env.QUICKMAIL_TOKEN;
+			const flagAccessClientId = flagString(flags, 'cf-access-client-id');
+			const flagAccessClientSecret = flagString(flags, 'cf-access-client-secret');
+			const hasAccessFlag =
+				Object.hasOwn(flags, 'cf-access-client-id') || Object.hasOwn(flags, 'cf-access-client-secret');
+			const cfAccessClientId = hasAccessFlag
+				? (flagAccessClientId ?? '')
+				: process.env.QUICKMAIL_CF_ACCESS_CLIENT_ID;
+			const cfAccessClientSecret = hasAccessFlag
+				? (flagAccessClientSecret ?? '')
+				: process.env.QUICKMAIL_CF_ACCESS_CLIENT_SECRET;
 			if (!url) {
 				throw new Error('login requires --url');
 			}
 			if (!token) {
 				throw new Error('login requires --token or QUICKMAIL_TOKEN (create a key in Settings → API keys)');
 			}
-			const client = new QuickMailClient(url, token);
-			const user = await client.whoami();
-			const path = await saveConfig({ url, token });
+			const config = { url, token, cfAccessClientId, cfAccessClientSecret };
+			const user = await createQuickMailClient(config).whoami();
+			const path = await saveConfig(config);
 			console.log(`Logged in as ${user.email} (${path})`);
 			return 0;
 		}

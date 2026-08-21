@@ -1,5 +1,9 @@
 import { basename } from 'node:path';
-import { normalizeUrl } from './config.ts';
+import {
+	normalizeUrl,
+	validateAccessCredentials,
+	type CliConfig
+} from './config.ts';
 
 /** Keep downloads inside the working directory — never honor `../` or absolute names. */
 export function safeDownloadName(name: string): string {
@@ -15,6 +19,27 @@ export class QuickMailError extends Error {
 	) {
 		super(message);
 		this.name = 'QuickMailError';
+	}
+}
+
+export class QuickMailAccessError extends QuickMailError {
+	constructor(status: number) {
+		super(
+			status,
+			'Cloudflare Access blocked the API request. Verify the service-token credentials and Service Auth policy.'
+		);
+		this.name = 'QuickMailAccessError';
+	}
+}
+
+export type QuickMailClientOptions = {
+	cfAccessClientId?: string;
+	cfAccessClientSecret?: string;
+};
+
+function assertValidCredential(value: string): void {
+	if (!/^[\x21-\x7e]+$/.test(value)) {
+		throw new QuickMailError(0, 'Authentication credentials contain invalid characters.');
 	}
 }
 
@@ -103,33 +128,106 @@ export type ListThreadsQuery = {
 
 export class QuickMailClient {
 	readonly url: string;
+	readonly cfAccessClientId?: string;
+	readonly cfAccessClientSecret?: string;
 
 	constructor(
 		url: string,
-		readonly token: string
+		readonly token: string,
+		options: QuickMailClientOptions = {}
 	) {
 		this.url = normalizeUrl(url);
+		const access = validateAccessCredentials(
+			options.cfAccessClientId,
+			options.cfAccessClientSecret
+		);
+		this.cfAccessClientId = access.cfAccessClientId;
+		this.cfAccessClientSecret = access.cfAccessClientSecret;
+		for (const credential of [this.token, this.cfAccessClientId, this.cfAccessClientSecret]) {
+			if (credential !== undefined) assertValidCredential(credential);
+		}
 	}
 
-	async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+	private requestHeaders(init: RequestInit): Headers {
 		const headers = new Headers(init.headers);
-		headers.set('authorization', `Bearer ${this.token}`);
-		headers.set('accept', 'application/json');
+		try {
+			headers.set('authorization', `Bearer ${this.token}`);
+			if (this.cfAccessClientId && this.cfAccessClientSecret) {
+				headers.set('cf-access-client-id', this.cfAccessClientId);
+				headers.set('cf-access-client-secret', this.cfAccessClientSecret);
+			}
+		} catch {
+			throw new QuickMailError(
+				0,
+				'Authentication credentials contain invalid HTTP header characters.'
+			);
+		}
+		if (!headers.has('accept')) headers.set('accept', 'application/json');
 		if (init.body && !headers.has('content-type')) {
 			headers.set('content-type', 'application/json');
 		}
+		return headers;
+	}
 
-		const res = await fetch(`${this.url}${path}`, { ...init, headers });
+	private async fetchResponse(
+		path: string,
+		init: RequestInit = {},
+		responseKind: 'json' | 'attachment' = 'json'
+	): Promise<Response> {
+		let res: Response;
+		try {
+			res = await fetch(`${this.url}${path}`, {
+				...init,
+				headers: this.requestHeaders(init),
+				redirect: 'manual'
+			});
+		} catch (error) {
+			if (error instanceof QuickMailError) throw error;
+			const message = error instanceof Error ? error.message : 'Network request failed';
+			throw new QuickMailError(0, this.redactCredentials(message));
+		}
+		const contentType = res.headers.get('content-type')?.toLowerCase() ?? '';
+		const contentDisposition = res.headers.get('content-disposition') ?? '';
+		const isHtmlAttachment =
+			res.ok &&
+			responseKind === 'attachment' &&
+			contentType.includes('text/html') &&
+			/^\s*attachment(?:;|$)/i.test(contentDisposition);
+		if (
+			(res.status >= 300 && res.status < 400) ||
+			(contentType.includes('text/html') && !isHtmlAttachment)
+		) {
+			throw new QuickMailAccessError(res.status);
+		}
+		return res;
+	}
+
+	private redactCredentials(message: string): string {
+		let redacted = message;
+		const credentials = [this.token, this.cfAccessClientId, this.cfAccessClientSecret]
+			.filter((credential): credential is string => Boolean(credential))
+			.sort((left, right) => right.length - left.length);
+		for (const credential of credentials) {
+			redacted = redacted.replaceAll(credential, '[REDACTED]');
+		}
+		return redacted;
+	}
+
+	async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+		const res = await this.fetchResponse(path, init);
 		if (res.headers.get('content-type')?.includes('application/json')) {
 			const body = (await res.json()) as T & { error?: string };
 			if (!res.ok) {
-				throw new QuickMailError(res.status, body.error ?? res.statusText);
+				throw new QuickMailError(
+					res.status,
+					this.redactCredentials(body.error ?? res.statusText)
+				);
 			}
 			return body;
 		}
 
 		if (!res.ok) {
-			throw new QuickMailError(res.status, res.statusText);
+			throw new QuickMailError(res.status, this.redactCredentials(res.statusText));
 		}
 		return undefined as T;
 	}
@@ -185,9 +283,10 @@ export class QuickMailClient {
 	}
 
 	async downloadAttachment(emailId: string, attachmentId: string): Promise<{ bytes: Uint8Array; filename: string; type: string }> {
-		const res = await fetch(
-			`${this.url}/api/mail/${encodeURIComponent(emailId)}/attachments/${encodeURIComponent(attachmentId)}?download=1`,
-			{ headers: { authorization: `Bearer ${this.token}` } }
+		const res = await this.fetchResponse(
+			`/api/mail/${encodeURIComponent(emailId)}/attachments/${encodeURIComponent(attachmentId)}?download=1`,
+			{ headers: { accept: 'application/octet-stream' } },
+			'attachment'
 		);
 		if (!res.ok) {
 			throw new QuickMailError(res.status, 'Failed to download attachment');
@@ -265,4 +364,11 @@ export class QuickMailClient {
 		);
 		return body.unrouted;
 	}
+}
+
+export function createQuickMailClient(config: CliConfig): QuickMailClient {
+	return new QuickMailClient(config.url, config.token, {
+		cfAccessClientId: config.cfAccessClientId,
+		cfAccessClientSecret: config.cfAccessClientSecret
+	});
 }

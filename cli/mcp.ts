@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { QuickMailClient, QuickMailError, type MailboxView } from './client.ts';
+import { createQuickMailClient, QuickMailError, type MailboxView } from './client.ts';
 import { loadConfig } from './config.ts';
 
 const views = ['inbox', 'starred', 'drafts', 'sent', 'trash'] as const;
@@ -22,7 +22,7 @@ function fail(error: unknown) {
 
 export async function startMcpServer(): Promise<void> {
 	const config = await loadConfig();
-	const client = new QuickMailClient(config.url, config.token);
+	const client = createQuickMailClient(config);
 
 	const server = new McpServer({ name: 'quickmail', version: '1.0.0' });
 
