@@ -1,6 +1,6 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { MailAddress, OutboundAttachmentInput, User } from '$lib/types';
-import { appendEmailSignature } from '$lib/email-signature';
+import { appendEmailSignature, pickEmailSignature } from '$lib/email-signature';
 import { base64ByteLength, insertAttachments } from './attachments';
 import { MAX_TOTAL_ATTACHMENT_BYTES } from './constants';
 import {
@@ -88,6 +88,7 @@ export async function resolveReplyFromAddress(
 			domain_name: domain.name,
 			address: mailbox,
 			label: null,
+			signature: null,
 			is_default: false,
 			created_at: new Date().toISOString()
 		};
@@ -117,7 +118,7 @@ export async function sendAndStore(
 	const { text, html } = appendEmailSignature({
 		text: bodyText,
 		html: bodyHtml,
-		signature: await getEmailSignature(env.DB, user.id)
+		signature: pickEmailSignature(from.signature, await getEmailSignature(env.DB, user.id))
 	});
 
 	const attachments = input.attachments ?? [];

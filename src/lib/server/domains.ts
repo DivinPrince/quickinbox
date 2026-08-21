@@ -1,5 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { Domain, MailAddress } from '$lib/types';
+import { parseMailboxSignature } from '$lib/email-signature';
 import type { EmailProvider, ProviderDomain } from './email-provider';
 
 type DomainRow = {
@@ -22,6 +23,7 @@ type AddressRow = {
 	address: string;
 	label: string | null;
 	is_default: number;
+	signature: string | null;
 	created_at: string;
 };
 
@@ -48,6 +50,7 @@ function mapAddress(row: AddressRow): MailAddress {
 		address: row.address,
 		label: row.label,
 		is_default: row.is_default === 1,
+		signature: row.signature,
 		created_at: row.created_at
 	};
 }
@@ -160,7 +163,7 @@ export async function syncDomains(db: D1Database, provider: EmailProvider): Prom
 /* -------------------------------------------------------------------------- */
 
 const ADDRESS_SELECT = `SELECT a.id, a.user_id, a.domain_id, d.name AS domain_name, a.address,
-	a.label, a.is_default, a.created_at
+	a.label, a.is_default, a.signature, a.created_at
 	FROM addresses a JOIN domains d ON d.id = a.domain_id`;
 
 export async function listAddressesForUser(
@@ -246,7 +249,7 @@ export async function updateAddress(
 	db: D1Database,
 	userId: string,
 	addressId: string,
-	patch: { label?: string | null }
+	patch: { label?: string | null; signature?: string | null }
 ): Promise<MailAddress> {
 	const current = await getAddressForUser(db, userId, addressId);
 	if (!current) {
@@ -254,10 +257,14 @@ export async function updateAddress(
 	}
 
 	const label = patch.label !== undefined ? patch.label?.trim() || null : current.label;
+	let signature = current.signature;
+	if (patch.signature !== undefined) {
+		signature = parseMailboxSignature(patch.signature ?? '');
+	}
 
 	await db
-		.prepare('UPDATE addresses SET label = ? WHERE id = ? AND user_id = ?')
-		.bind(label, addressId, userId)
+		.prepare('UPDATE addresses SET label = ?, signature = ? WHERE id = ? AND user_id = ?')
+		.bind(label, signature, addressId, userId)
 		.run();
 
 	const saved = await getAddressForUser(db, userId, addressId);

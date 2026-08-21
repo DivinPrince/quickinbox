@@ -20,6 +20,7 @@ type AddressRow = {
 	address: string;
 	label: string | null;
 	is_default: number;
+	signature: string | null;
 	created_at: string;
 };
 
@@ -73,6 +74,7 @@ const defaultAddress: AddressRow = {
 	address: 'ada@example.com',
 	label: 'Office',
 	is_default: 1,
+	signature: null,
 	created_at: user.created_at
 };
 

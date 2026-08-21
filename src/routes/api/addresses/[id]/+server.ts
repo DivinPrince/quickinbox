@@ -12,20 +12,27 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const body = (await request.json()) as { isDefault?: boolean; label?: string | null };
-	if (body.isDefault) {
-		await setDefaultAddress(db, locals.user.id, params.id!);
-	}
-
-	if (body.label !== undefined) {
+	const body = (await request.json()) as {
+		isDefault?: boolean;
+		label?: string | null;
+		signature?: string | null;
+	};
+	if (body.label !== undefined || body.signature !== undefined) {
 		try {
-			await updateAddress(db, locals.user.id, params.id!, { label: body.label });
+			await updateAddress(db, locals.user.id, params.id!, {
+				label: body.label,
+				signature: body.signature
+			});
 		} catch (error) {
 			return json(
 				{ error: error instanceof Error ? error.message : 'Could not update address' },
 				{ status: 400 }
 			);
 		}
+	}
+
+	if (body.isDefault) {
+		await setDefaultAddress(db, locals.user.id, params.id!);
 	}
 
 	return json({ addresses: await listAddressesForUser(db, locals.user.id) });
