@@ -1,16 +1,11 @@
 import { applyDesign, readDesignId, setDesignPreference } from './apply';
-import { DEFAULT_DESIGN_ID, getDesign, isDesignId } from './catalog';
+import { DEFAULT_DESIGN_ID, getDesign } from './catalog';
 import type { DesignDefinition } from './types';
 
-function initialId(): string {
-	if (typeof document !== 'undefined') {
-		const stamped = document.documentElement.dataset.design;
-		if (isDesignId(stamped)) return stamped!;
-	}
-	return DEFAULT_DESIGN_ID;
-}
-
-let designId = $state(initialId());
+// Always start at the default so the SSR markup matches the first client
+// render. app.html already stamped data-design for CSS; this store catches
+// up in hydrateDesign() after mount.
+let designId = $state(DEFAULT_DESIGN_ID);
 
 export function getActiveDesignId(): string {
 	return designId;

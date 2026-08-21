@@ -6,7 +6,6 @@
 	import EmptyState from './EmptyState.svelte';
 	import DeliveryStatus from './DeliveryStatus.svelte';
 	import { formatRelativeDate } from '$lib/utils/date';
-	import { getActiveDesign, type MailboxLayout } from '$lib/designs';
 	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 
 	let {
@@ -28,19 +27,6 @@
 	};
 
 	const meta = $derived(META[view]);
-	const design = $derived(getActiveDesign());
-
-	function mailboxLayoutAttr(layout: MailboxLayout): MailboxLayout {
-		switch (layout) {
-			case 'row':
-			case 'stack':
-				return layout;
-			default: {
-				const _never: never = layout;
-				return _never;
-			}
-		}
-	}
 
 	// Local copy so stars and reads can flip before the server round trip lands.
 	let items = $state<ThreadSummary[]>([]);
@@ -162,7 +148,7 @@
 	const rangeEnd = $derived(Math.min(mailbox.page * mailbox.pageSize, mailbox.total));
 </script>
 
-<section class="mailbox" data-layout={mailboxLayoutAttr(design.mailboxLayout)}>
+<section class="mailbox">
 	<header class="toolbar">
 		<div class="toolbar-left">
 			<div class="select-all">

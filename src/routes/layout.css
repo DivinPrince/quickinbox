@@ -1,6 +1,21 @@
 @import 'tailwindcss';
 @import 'remixicon/fonts/remixicon.css';
+@import '../styles/designs/layouts.css';
 @import '../styles/designs/zero.css';
+
+/*
+ * Copy that belongs to a specific design is rendered for every catalog
+ * entry and shown via [data-for-design]. Default: Mail. Each design CSS
+ * file reveals its own labels.
+ */
+[data-for-design] {
+	display: none;
+}
+
+:root[data-design='mail'] [data-for-design='mail'],
+:root:not([data-design]) [data-for-design='mail'] {
+	display: inline;
+}
 
 @theme {
 	--font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;

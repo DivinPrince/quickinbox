@@ -8,6 +8,8 @@
  *     from `layout.css`
  *  4. If you need a new brand mark, add a `DesignMark` variant and handle
  *     it exhaustively in `Logo.svelte`
+ *  5. If `mailboxLayout` is not `row`, add the id to the first-paint map
+ *     in `app.html` so the inbox does not flash the Mail row layout
  *
  * Light / dark / system stay independent — they resolve to `data-theme`
  * and each design supplies tokens for both schemes.

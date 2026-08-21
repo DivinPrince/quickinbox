@@ -15,6 +15,7 @@ export function readDesignId(): string {
 export function applyDesign(id: string): void {
 	const design = getDesign(id);
 	document.documentElement.dataset.design = design.id;
+	document.documentElement.dataset.mailboxLayout = design.mailboxLayout;
 }
 
 export function setDesignPreference(id: string): void {

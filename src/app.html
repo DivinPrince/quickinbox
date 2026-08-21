@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-design="mail">
+<html lang="en" data-design="mail" data-mailbox-layout="row">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -18,10 +18,15 @@
 				}
 
 				try {
-					document.documentElement.dataset.design =
-						localStorage.getItem('mail:design') || 'mail';
+					const design = localStorage.getItem('mail:design') || 'mail';
+					document.documentElement.dataset.design = design;
+					// First-paint layout only. The catalog is the source of truth
+					// after hydrate; add an entry here when a new design is not `row`.
+					document.documentElement.dataset.mailboxLayout =
+						design === 'zero' ? 'stack' : 'row';
 				} catch {
 					document.documentElement.dataset.design = 'mail';
+					document.documentElement.dataset.mailboxLayout = 'row';
 				}
 			})();
 		</script>

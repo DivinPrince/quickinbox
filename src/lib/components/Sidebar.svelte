@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { getActiveDesign } from '$lib/designs';
+	import { listDesigns } from '$lib/designs';
 	import Icon from './Icon.svelte';
 	import Logo from './Logo.svelte';
 	import DomainSwitcher from './DomainSwitcher.svelte';
@@ -48,7 +48,7 @@
 		return $page.url.pathname === href || $page.url.pathname.startsWith(`${href}/`);
 	}
 
-	const design = $derived(getActiveDesign());
+	const designs = listDesigns();
 </script>
 
 {#if mobileOpen}
@@ -62,15 +62,23 @@
 
 <aside class="sidebar" class:collapsed class:mobile-open={mobileOpen}>
 	<div class="sidebar-top">
-		<a href="/inbox" class="brand" title={design.brandName}>
-			<Logo size={design.mark === 'zero' ? 22 : 30} />
-			{#if !collapsed}<span class="brand-name">{design.brandName}</span>{/if}
+		<a href="/inbox" class="brand" title="Inbox">
+			<Logo size={30} />
+			{#if !collapsed}
+				{#each designs as item (item.id)}
+					<span class="brand-name" data-for-design={item.id}>{item.brandName}</span>
+				{/each}
+			{/if}
 		</a>
 	</div>
 
-	<a href="/compose" class="new-message" title={design.composeLabel}>
+	<a href="/compose" class="new-message" title="Compose">
 		<Icon name="pencil-line" size={collapsed ? 18 : 16} />
-		{#if !collapsed}<span>{design.composeLabel}</span>{/if}
+		{#if !collapsed}
+			{#each designs as item (item.id)}
+				<span data-for-design={item.id}>{item.composeLabel}</span>
+			{/each}
+		{/if}
 	</a>
 
 	<nav class="nav">

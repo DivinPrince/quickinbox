@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
 import { DEFAULT_DESIGN_ID, DESIGNS, getDesign, isDesignId } from './catalog';
-import { DESIGN_STORAGE_KEY, readDesignId } from './apply';
+import { applyDesign, DESIGN_STORAGE_KEY, readDesignId } from './apply';
 import type { DesignDefinition, DesignMark, MailboxLayout } from './types';
 
 const MARKS = new Set<DesignMark>(['mail', 'zero']);
@@ -78,6 +78,15 @@ describe('design catalog', () => {
 		assert.ok(css.includes('--sidebar-width: 14rem'));
 	});
 
+	test('stacked mailbox layout is a shared stylesheet, not a one-off in 0.email', () => {
+		const cssPath = fileURLToPath(new URL('../../styles/designs/layouts.css', import.meta.url));
+		assert.ok(existsSync(cssPath));
+		const css = readFileSync(cssPath, 'utf8');
+		assert.ok(css.includes("[data-mailbox-layout='stack']"));
+		assert.equal(getDesign('zero').mailboxLayout, 'stack');
+		assert.equal(getDesign('mail').mailboxLayout, 'row');
+	});
+
 	test('persists the choice under a stable key', () => {
 		assert.equal(DESIGN_STORAGE_KEY, 'mail:design');
 		if (typeof localStorage === 'undefined') return;
@@ -88,5 +97,17 @@ describe('design catalog', () => {
 		localStorage.setItem(DESIGN_STORAGE_KEY, 'not-a-design');
 		assert.equal(readDesignId(), DEFAULT_DESIGN_ID);
 		localStorage.removeItem(DESIGN_STORAGE_KEY);
+	});
+
+	test('applyDesign stamps both the design and the mailbox layout on the root', () => {
+		if (typeof document === 'undefined') return;
+		applyDesign('zero');
+		assert.equal(document.documentElement.dataset.design, 'zero');
+		assert.equal(document.documentElement.dataset.mailboxLayout, 'stack');
+		applyDesign('mail');
+		assert.equal(document.documentElement.dataset.design, 'mail');
+		assert.equal(document.documentElement.dataset.mailboxLayout, 'row');
+		applyDesign('not-a-design');
+		assert.equal(document.documentElement.dataset.design, 'mail');
 	});
 });
