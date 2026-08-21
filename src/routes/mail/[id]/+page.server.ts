@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { parseEmailAddress } from '$lib/server/email-address';
 import { getEmailForUser, listThreadMessages, markThreadRead } from '$lib/server/mail-store';
+import { resolveReplyFromAddress } from '$lib/server/outbox';
 import { displaySubject } from '$lib/server/threads';
 
 export const load: PageServerLoad = async ({ params, locals, platform }) => {
@@ -19,12 +19,7 @@ export const load: PageServerLoad = async ({ params, locals, platform }) => {
 	const messages = await listThreadMessages(platform.env.DB, locals.user.id, email);
 
 	const latest = messages[messages.length - 1] ?? email;
-	const replyFrom = parseEmailAddress(
-		latest.direction === 'inbound' ? latest.to_addr : latest.from_addr
-	);
-	const replyFromName =
-		locals.addresses.find((address) => address.address.toLowerCase() === replyFrom)?.label ??
-		null;
+	const replyIdentity = await resolveReplyFromAddress(platform.env.DB, locals.user, latest);
 
 	return {
 		threadId: email.thread_id ?? email.id,
@@ -32,8 +27,8 @@ export const load: PageServerLoad = async ({ params, locals, platform }) => {
 		focusId: email.id,
 		trashed: Boolean(email.deleted_at),
 		subject: displaySubject(messages[0]?.subject ?? email.subject),
-		replyFrom,
-		replyFromName,
+		replyFrom: replyIdentity?.address ?? null,
+		replyFromName: replyIdentity?.label?.trim() || null,
 		messages: messages.map((message) => ({ ...message, is_read: true }))
 	};
 };

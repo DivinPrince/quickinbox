@@ -205,12 +205,14 @@
 						{latest?.direction === 'inbound' ? latest.from_addr : latest?.to_addr}
 					</strong>
 				</p>
-				<p class="reply-from">
-					From
-					<strong>
-						{#if data.replyFromName}{data.replyFromName} · {/if}{data.replyFrom}
-					</strong>
-				</p>
+				{#if data.replyFrom}
+					<p class="reply-from">
+						From
+						<strong>
+							{#if data.replyFromName}{data.replyFromName} · {/if}{data.replyFrom}
+						</strong>
+					</p>
+				{/if}
 
 				<RichTextEditor bind:html={replyHtml} embedded minHeight={160} placeholder="Reply…" />
 

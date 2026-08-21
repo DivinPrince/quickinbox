@@ -56,12 +56,15 @@ export async function resolveFromAddress(
  * Replies come from the mailbox that received the original, not the default
  * sending identity. Catch-all mail uses that exact recipient if the user owns
  * the domain, even when the local-part is not a saved address.
+ *
+ * Returns null when the user has no sending identity, so the thread page can
+ * still load.
  */
 export async function resolveReplyFromAddress(
 	db: D1Database,
 	user: User,
 	original: { direction: 'inbound' | 'outbound'; to_addr: string; from_addr: string }
-): Promise<MailAddress> {
+): Promise<MailAddress | null> {
 	const mailbox = parseEmailAddress(
 		original.direction === 'inbound' ? original.to_addr : original.from_addr
 	);
@@ -90,7 +93,7 @@ export async function resolveReplyFromAddress(
 		};
 	}
 
-	return resolveFromAddress(db, user);
+	return getDefaultAddress(db, user.id);
 }
 
 /** Send through the configured provider, then record it in the Sent folder. */
