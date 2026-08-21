@@ -3,7 +3,13 @@ import type { MailAddress, OutboundAttachmentInput, User } from '$lib/types';
 import { appendEmailSignature } from '$lib/email-signature';
 import { base64ByteLength, insertAttachments } from './attachments';
 import { MAX_TOTAL_ATTACHMENT_BYTES } from './constants';
-import { getAddressForUser, getDefaultAddress } from './domains';
+import {
+	getAddressForUser,
+	getDefaultAddress,
+	getDomainByName,
+	listAddressesForUser
+} from './domains';
+import { parseEmailAddress } from './email-address';
 import { getEmailSignature } from './email-signature';
 import { stripHtml } from './html';
 import { insertEmail } from './mail-store';
@@ -12,6 +18,8 @@ import { escapeHtml, parseRecipients, sendOutboundEmail } from './send-mail';
 
 export type ComposeInput = {
 	fromAddressId?: string | null;
+	/** Pre-resolved identity — used by replies so we can send from the received mailbox. */
+	fromAddress?: MailAddress | null;
 	to: string;
 	cc?: string | null;
 	bcc?: string | null;
@@ -44,6 +52,47 @@ export async function resolveFromAddress(
 	return address;
 }
 
+/**
+ * Replies come from the mailbox that received the original, not the default
+ * sending identity. Catch-all mail uses that exact recipient if the user owns
+ * the domain, even when the local-part is not a saved address.
+ */
+export async function resolveReplyFromAddress(
+	db: D1Database,
+	user: User,
+	original: { direction: 'inbound' | 'outbound'; to_addr: string; from_addr: string }
+): Promise<MailAddress> {
+	const mailbox = parseEmailAddress(
+		original.direction === 'inbound' ? original.to_addr : original.from_addr
+	);
+
+	const owned = await listAddressesForUser(db, user.id);
+	const exact = owned.find((address) => address.address.toLowerCase() === mailbox);
+	if (exact) return exact;
+
+	const domainName = mailbox.split('@')[1];
+	const domain = domainName ? await getDomainByName(db, domainName) : null;
+	const canSendOnDomain =
+		domain &&
+		(domain.catchall_user_id === user.id ||
+			owned.some((address) => address.domain_id === domain.id));
+
+	if (domain && canSendOnDomain && mailbox.includes('@')) {
+		return {
+			id: `reply:${mailbox}`,
+			user_id: user.id,
+			domain_id: domain.id,
+			domain_name: domain.name,
+			address: mailbox,
+			label: null,
+			is_default: false,
+			created_at: new Date().toISOString()
+		};
+	}
+
+	return resolveFromAddress(db, user);
+}
+
 /** Send through the configured provider, then record it in the Sent folder. */
 export async function sendAndStore(
 	env: { DB: D1Database; ATTACHMENTS: R2Bucket },
@@ -52,7 +101,7 @@ export async function sendAndStore(
 	input: ComposeInput
 ): Promise<{ emailId: string; providerId: string; from: MailAddress }> {
 	// resolveFromAddress scopes the lookup to this user, so ownership is implied.
-	const from = await resolveFromAddress(env.DB, user, input.fromAddressId);
+	const from = input.fromAddress ?? (await resolveFromAddress(env.DB, user, input.fromAddressId));
 
 	const bodyHtml = input.html?.trim() || null;
 	const bodyText = input.text?.trim() || (bodyHtml ? stripHtml(bodyHtml) : '');
@@ -79,7 +128,7 @@ export async function sendAndStore(
 
 	const { providerId } = await sendOutboundEmail(provider, {
 		from,
-		senderName: user.name,
+		senderName: from.label?.trim() || user.name,
 		to: input.to,
 		cc: input.cc ?? undefined,
 		bcc: input.bcc ?? undefined,

@@ -12,7 +12,7 @@ import {
 	markThreadRead,
 	setEmailFlags
 } from '$lib/server/mail-store';
-import { sendAndStore } from '$lib/server/outbox';
+import { resolveReplyFromAddress, sendAndStore } from '$lib/server/outbox';
 import { buildReferences, displaySubject } from '$lib/server/threads';
 import type { OutboundAttachmentInput } from '$lib/types';
 
@@ -113,15 +113,11 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 	// Replying to our own message continues the conversation with its recipient.
 	const to = original.direction === 'inbound' ? original.from_addr : original.to_addr;
 
-	// Reply from the address the message was sent to, so threads stay coherent.
-	const preferredAddress =
-		original.direction === 'inbound'
-			? locals.addresses.find(
-					(address) => address.address.toLowerCase() === original.to_addr.toLowerCase()
-				)
-			: locals.addresses.find(
-					(address) => address.address.toLowerCase() === original.from_addr.toLowerCase()
-				);
+	// Reply from the mailbox that received the original. Catch-all mail uses
+	// that exact recipient when the user can send on the domain.
+	const fromAddress = body.fromAddressId
+		? undefined
+		: await resolveReplyFromAddress(db, locals.user, original);
 
 	try {
 		const provider = getEmailProvider(platform);
@@ -130,7 +126,8 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 			provider,
 			locals.user,
 			{
-				fromAddressId: body.fromAddressId ?? preferredAddress?.id,
+				fromAddressId: body.fromAddressId,
+				fromAddress,
 				to,
 				subject,
 				text: body.text,
