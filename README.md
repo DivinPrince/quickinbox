@@ -28,6 +28,12 @@ bun run setup
 bash scripts/setup.sh
 ```
 
+The button deploys to **your** Cloudflare account. If the form asks for
+`CLOUDFLARE_ACCOUNT_ID` (typical when your login can see more than one
+account), paste the ID from the dashboard sidebar — `wrangler whoami` also
+prints it. Prefer `.env` or `wrangler.deploy.jsonc` over committing that ID
+into the public `wrangler.jsonc`.
+
 The wizard creates the D1 database and R2 bucket, writes config, and onboards
 your domain. Budget about 30 minutes — most of that is waiting on DNS.
 
@@ -65,8 +71,30 @@ bun install          # or: npm install
 bunx wrangler login
 ```
 
+If `wrangler whoami` lists more than one account, copy `.env.example` to `.env`
+and set `CLOUDFLARE_ACCOUNT_ID` (dashboard sidebar). The setup wizard prompts
+for this when it cannot pick an account automatically.
+
 Cloudflare Email Sending needs **Wrangler 4.123+** (older versions hit a
 removed API path and 404).
+
+### Keeping a personal deploy in sync
+
+If you run your own mailbox from this repo (or a private sibling checkout),
+put real Cloudflare bindings in `wrangler.deploy.jsonc` — copy
+`wrangler.deploy.jsonc.example` and fill in account / D1 / route values.
+That file is gitignored. `bun run deploy`, `bun run db:migrate:remote`, and
+`bun run preview` pick it up automatically, so you can `git pull` the latest
+QuickMail without committing personal hostnames or ids into the template.
+
+```bash
+cp wrangler.deploy.jsonc.example wrangler.deploy.jsonc
+# edit database_id, account_id, routes, EMAIL_PROVIDER, …
+bun run db:migrate:remote
+bun run deploy
+```
+
+The setup wizard writes the same private file for you.
 
 ### 2. Create D1 and R2
 
@@ -75,8 +103,9 @@ bunx wrangler d1 create quickmail
 bunx wrangler r2 bucket create quickmail-attachments
 ```
 
-Copy the printed `database_id` into `wrangler.jsonc` (replacing
-`REPLACE_WITH_YOUR_D1_DATABASE_ID`), then run migrations:
+Copy the printed `database_id` into `wrangler.deploy.jsonc` (preferred; see
+`wrangler.deploy.jsonc.example`) or `wrangler.jsonc`, replacing
+`REPLACE_WITH_YOUR_D1_DATABASE_ID`, then run migrations:
 
 ```bash
 bun run db:migrate:remote
@@ -290,8 +319,9 @@ migrations/          D1 schema, applied in order
 | Mail never arrives (Cloudflare) | Apex MX must be Cloudflare Routing, catch-all must target this Worker, `EMAIL_PROVIDER=cloudflare`, Worker must be deployed |
 | Webhook 401 | `RESEND_WEBHOOK_SECRET` mismatch — secrets are shown once; recreate the webhook |
 | Webhook 500 | `bunx wrangler tail` |
-| Attachments missing | R2 bucket must exist and match `bucket_name` in `wrangler.jsonc` |
-| `database_id` errors on deploy | Paste the id from `wrangler d1 create` into `wrangler.jsonc` |
+| Attachments missing | R2 bucket must exist and match `bucket_name` in `wrangler.jsonc` (or `wrangler.deploy.jsonc`) |
+| `database_id` errors on deploy | Paste the id from `wrangler d1 create` into `wrangler.deploy.jsonc` (preferred) or `wrangler.jsonc` |
+| Deploy to Cloudflare / wrangler: more than one account, or no account id | Set `CLOUDFLARE_ACCOUNT_ID` in `.env` (see `.env.example`) or `account_id` in `wrangler.deploy.jsonc` — do not commit a personal id in the public template |
 | Setup shows no Cloudflare domains | Set `CLOUDFLARE_MAIL_DOMAINS` and `EMAIL_PROVIDER=cloudflare`, restart the dev server |
 
 ## License

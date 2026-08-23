@@ -10,18 +10,18 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && bun scripts/wrap-cloudflare-worker.mjs",
-		"preview": "bun run build && wrangler dev",
+		"preview": "bun run build && node scripts/wrangler-with-env.mjs dev",
 		"setup": "node scripts/setup.mjs",
-		"deploy": "bun run build && wrangler deploy",
-		"db:migrate:local": "wrangler d1 migrations apply quickmail --local",
-		"db:migrate:remote": "wrangler d1 migrations apply quickmail --remote",
+		"deploy": "bun run build && node scripts/wrangler-with-env.mjs deploy",
+		"db:migrate:local": "node scripts/wrangler-with-env.mjs d1 migrations apply quickmail --local",
+		"db:migrate:remote": "node scripts/wrangler-with-env.mjs d1 migrations apply quickmail --remote",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:clean": "bun scripts/check-template-clean.mjs",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"cf-typegen": "wrangler types",
+		"cf-typegen": "node scripts/wrangler-with-env.mjs types",
 		"quickmail": "bun cli/main.ts",
-		"test": "bun test src/lib/email-signature.test.ts src/lib/mobile.test.ts src/lib/push-client.test.ts src/lib/utils/html.test.ts src/lib/server/api-access.test.ts src/lib/server/api-tokens.test.ts src/lib/server/outbox.test.ts src/lib/server/push-notifications.test.ts cli/client.test.ts"
+		"test": "bun test src/lib/email-signature.test.ts src/lib/mobile.test.ts src/lib/push-client.test.ts src/lib/utils/html.test.ts src/lib/server/api-access.test.ts src/lib/server/api-tokens.test.ts src/lib/server/outbox.test.ts src/lib/server/push-notifications.test.ts cli/client.test.ts scripts/cloudflare-env.test.ts scripts/wrangler-config.test.ts"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20260601.1",
@@ -65,6 +65,9 @@
 			},
 			"RESEND_WEBHOOK_SECRET": {
 				"description": "Only for `EMAIL_PROVIDER=resend`: shown once when you create the webhook at [Resend webhooks](https://resend.com/webhooks). Keep the placeholder if using Cloudflare Email."
+			},
+			"CLOUDFLARE_ACCOUNT_ID": {
+				"description": "Your Cloudflare account ID (dashboard sidebar, or `wrangler whoami`). Required if your login can see more than one account. Leave empty only when you have a single account. Prefer `.env` or `wrangler.deploy.jsonc` — do not commit this into the public `wrangler.jsonc`."
 			}
 		}
 	}

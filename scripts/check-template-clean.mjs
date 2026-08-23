@@ -24,6 +24,7 @@ const FORBIDDEN = [
 	{ label: 'Cloudflare API token', pattern: /\bCLOUDFLARE_API_TOKEN\s*[:=]\s*["']?[A-Za-z0-9_-]{30,}/ },
 	{ label: 'Private key block', pattern: /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----/ },
 	{ label: 'Live Cloudflare account id', pattern: /^\s*"account_id"\s*:\s*"[0-9a-f]{32}"/m },
+	{ label: 'Live Cloudflare account id in env', pattern: /^CLOUDFLARE_ACCOUNT_ID\s*=\s*[0-9a-f]{32}\s*$/m },
 	{ label: 'Maintainer infrastructure name', pattern: /divinprince[.-]/i }
 ];
 
@@ -94,7 +95,13 @@ if (!existsSync(wranglerPath)) {
 }
 
 // 4. The licence has to ship with the code.
-for (const required of ['LICENSE.md', 'README.md', '.dev.vars.example']) {
+for (const required of [
+	'LICENSE.md',
+	'README.md',
+	'.dev.vars.example',
+	'.env.example',
+	'wrangler.deploy.jsonc.example'
+]) {
 	if (!tracked.includes(required)) {
 		fail(`${required} is missing from the repository`);
 	}

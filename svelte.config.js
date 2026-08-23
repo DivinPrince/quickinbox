@@ -1,4 +1,9 @@
 import adapter from '@sveltejs/adapter-cloudflare';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { resolveWranglerConfig } from './scripts/wrangler-config.mjs';
+
+const wrangler = resolveWranglerConfig(dirname(fileURLToPath(import.meta.url)));
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -7,9 +12,9 @@ const config = {
 	},
 	kit: {
 		adapter: adapter({
-			config: 'wrangler.jsonc',
+			config: wrangler.file,
 			platformProxy: {
-				configPath: 'wrangler.jsonc',
+				configPath: wrangler.file,
 				persist: { path: '.wrangler/state/v3' }
 			}
 		}),

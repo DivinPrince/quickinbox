@@ -17,9 +17,19 @@ import { delimiter, join } from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as stdinStream, stdout as stdoutStream } from 'node:process';
 import { fileURLToPath } from 'node:url';
+import {
+	applyCloudflareAuthEnv,
+	isCloudflareAccountId,
+	setAccountIdInWrangler
+} from './cloudflare-env.mjs';
+import {
+	PRIVATE_WRANGLER_CONFIG,
+	TEMPLATE_WRANGLER_CONFIG
+} from './wrangler-config.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const wranglerFile = join(root, 'wrangler.jsonc');
+const wranglerTemplateFile = join(root, TEMPLATE_WRANGLER_CONFIG);
+const wranglerDeployFile = join(root, PRIVATE_WRANGLER_CONFIG);
 const devVarsFile = join(root, '.dev.vars');
 const devVarsExample = join(root, '.dev.vars.example');
 const envFile = join(root, '.env');
@@ -59,8 +69,9 @@ let rl = null;
 function printHelp() {
 	console.log(`QuickMail setup
 
-Installs tools, logs you into Cloudflare, creates D1/R2, writes env and
-wrangler config, and onboards your mail domain.
+Installs tools, logs you into Cloudflare, picks an account if your login
+can see more than one, creates D1/R2, writes env and a private
+wrangler.deploy.jsonc (gitignored), and onboards your mail domain.
 
   bun run setup
   bash scripts/setup.sh
@@ -174,6 +185,20 @@ function bunBin() {
 
 function hasBun() {
 	return Boolean(bunBin());
+}
+
+function applyCloudflareAuthFromDisk() {
+	const texts = [];
+	if (existsSync(envFile)) texts.push(readFileSync(envFile, 'utf8'));
+	if (existsSync(devVarsFile)) texts.push(readFileSync(devVarsFile, 'utf8'));
+	applyCloudflareAuthEnv(process.env, texts);
+}
+
+function rememberAccountId(id) {
+	const accountId = id.trim().toLowerCase();
+	process.env.CLOUDFLARE_ACCOUNT_ID = accountId;
+	upsertEnvFile(envFile, { CLOUDFLARE_ACCOUNT_ID: accountId });
+	return accountId;
 }
 
 function childEnv(extra = {}) {
@@ -344,14 +369,21 @@ function readMutedLine() {
 }
 
 function readWrangler() {
-	if (!existsSync(wranglerFile)) {
-		throw new Error('wrangler.jsonc is missing. Run this from the QuickMail repo root.');
+	// Prefer an existing private deploy config so re-running setup does not
+	// wipe personal bindings. Fall back to the public template, which must
+	// stay placeholder-clean for release.
+	if (existsSync(wranglerDeployFile)) {
+		return readFileSync(wranglerDeployFile, 'utf8');
 	}
-	return readFileSync(wranglerFile, 'utf8');
+	if (!existsSync(wranglerTemplateFile)) {
+		throw new Error(`${TEMPLATE_WRANGLER_CONFIG} is missing. Run this from the QuickMail repo root.`);
+	}
+	return readFileSync(wranglerTemplateFile, 'utf8');
 }
 
 function writeWrangler(source) {
-	writeFileSync(wranglerFile, source.endsWith('\n') ? source : `${source}\n`);
+	// Always write personal config to the gitignored deploy overlay.
+	writeFileSync(wranglerDeployFile, source.endsWith('\n') ? source : `${source}\n`);
 }
 
 function jsoncString(source, key) {
@@ -585,11 +617,39 @@ async function ensureLogin() {
 	return pickAccount(next.accounts);
 }
 
+async function askAccountId() {
+	log('  wrangler did not list an account. Paste the ID from the Cloudflare dashboard sidebar.');
+	if (args.yes) {
+		throw new Error(
+			'Set CLOUDFLARE_ACCOUNT_ID (32-character hex from the dashboard sidebar) and re-run.'
+		);
+	}
+	while (true) {
+		const raw = (await prompt('Cloudflare account ID')).trim();
+		if (isCloudflareAccountId(raw)) {
+			const id = rememberAccountId(raw);
+			ok(`account ${id}`);
+			return { name: id, id };
+		}
+		warn('Paste the 32-character hex ID from the dashboard sidebar (or wrangler whoami).');
+	}
+}
+
 async function pickAccount(accounts) {
-	if (accounts.length === 0) return null;
+	const existing = process.env.CLOUDFLARE_ACCOUNT_ID?.trim() ?? '';
+	if (isCloudflareAccountId(existing)) {
+		const id = existing.toLowerCase();
+		const match = accounts.find((account) => account.id === id);
+		rememberAccountId(id);
+		ok(match ? `account ${match.name}` : `CLOUDFLARE_ACCOUNT_ID ${id}`);
+		return match ?? { name: id, id };
+	}
+
+	if (accounts.length === 0) return askAccountId();
+
 	if (accounts.length === 1) {
 		ok(`account ${accounts[0].name}`);
-		upsertEnvFile(envFile, { CLOUDFLARE_ACCOUNT_ID: accounts[0].id });
+		rememberAccountId(accounts[0].id);
 		return accounts[0];
 	}
 
@@ -599,7 +659,7 @@ async function pickAccount(accounts) {
 	});
 
 	if (args.yes) {
-		upsertEnvFile(envFile, { CLOUDFLARE_ACCOUNT_ID: accounts[0].id });
+		rememberAccountId(accounts[0].id);
 		ok(`using ${accounts[0].name}`);
 		return accounts[0];
 	}
@@ -611,7 +671,7 @@ async function pickAccount(accounts) {
 		chosen = accounts[index];
 		if (!chosen) warn('Pick a number from the list.');
 	}
-	upsertEnvFile(envFile, { CLOUDFLARE_ACCOUNT_ID: chosen.id });
+	rememberAccountId(chosen.id);
 	ok(`using ${chosen.name}`);
 	return chosen;
 }
@@ -1043,7 +1103,11 @@ function printNextSteps(state) {
 		log('  Local inbound needs a tunnel (cloudflared) — production uses the public Worker URL.');
 	}
 
-	log(`\n  ${c.dim('wrangler.jsonc now has a real D1 id. Do not commit that back to the public template.')}`);
+	log(
+		`\n  ${c.dim(
+			`${PRIVATE_WRANGLER_CONFIG} now has your D1 id (and maybe account_id). It is gitignored — the public ${TEMPLATE_WRANGLER_CONFIG} stays clean.`
+		)}`
+	);
 	if (state.publicUrl) log(`\n  ${c.green(state.publicUrl)}`);
 }
 
@@ -1057,6 +1121,8 @@ async function main() {
 
 	log(`\n${c.bold('QuickMail setup')}`);
 	log(c.dim('  A mailbox on your domain, on Cloudflare.\n'));
+
+	applyCloudflareAuthFromDisk();
 
 	const total = 8;
 
@@ -1111,6 +1177,9 @@ async function main() {
 		domains: provider === 'cloudflare' ? domain : ''
 	});
 	if (hostname) source = setRoutes(source, hostname);
+	if (isCloudflareAccountId(process.env.CLOUDFLARE_ACCOUNT_ID ?? '')) {
+		source = setAccountIdInWrangler(source, process.env.CLOUDFLARE_ACCOUNT_ID);
+	}
 	if (provider === 'cloudflare' && versionGte(wranglerVer, ADDRESSES_WRANGLER)) {
 		source = setAddresses(source, [`*@${domain}`]);
 	} else {

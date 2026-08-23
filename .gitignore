@@ -7,6 +7,7 @@ node_modules
 .wrangler
 worker-wrapper.js
 wrangler.deploy.jsonc
+!wrangler.deploy.jsonc.example
 /.svelte-kit
 /build
 

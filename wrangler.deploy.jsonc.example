@@ -1,0 +1,59 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	// Private deploy overlay — copy to wrangler.deploy.jsonc (gitignored) and
+	// fill in real values. `bun run deploy` / migrate / preview pick this file
+	// up automatically when it exists, so you can pull latest QuickMail without
+	// committing account ids, D1 ids, or personal hostnames into the template.
+	"name": "quickmail",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"compatibility_date": "2025-06-01",
+	"compatibility_flags": ["nodejs_compat", "enable_nodejs_http_modules"],
+	"workers_dev": true,
+
+	// From the Cloudflare dashboard sidebar, or: wrangler whoami
+	// "account_id": "REPLACE_WITH_YOUR_ACCOUNT_ID",
+
+	// "routes": [
+	// 	{
+	// 		"pattern": "mail.example.com",
+	// 		"custom_domain": true
+	// 	}
+	// ],
+
+	"assets": {
+		"directory": ".svelte-kit/cloudflare",
+		"binding": "ASSETS"
+	},
+
+	"vars": {
+		"EMAIL_PROVIDER": "resend",
+		"CLOUDFLARE_MAIL_DOMAINS": ""
+	},
+
+	"send_email": [
+		{
+			"name": "EMAIL",
+			"remote": true
+		}
+	],
+
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "quickmail",
+			"database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+			"migrations_dir": "migrations"
+		}
+	],
+
+	"r2_buckets": [
+		{
+			"binding": "ATTACHMENTS",
+			"bucket_name": "quickmail-attachments"
+		}
+	],
+
+	"observability": {
+		"enabled": true
+	}
+}
