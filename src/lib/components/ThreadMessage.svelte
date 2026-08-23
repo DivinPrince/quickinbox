@@ -19,6 +19,7 @@
 
 	const outbound = $derived(message.direction === 'outbound');
 	const sender = $derived(outbound ? 'me' : message.from_addr);
+	const senderEmail = $derived(emailOf(message.from_addr));
 	const initial = $derived((message.from_addr[0] ?? '?').toUpperCase());
 
 	/** Text-only messages get the same treatment as HTML ones. */
@@ -28,6 +29,54 @@
 	const snippet = $derived(text.body.replace(/\s+/g, ' ').trim().slice(0, 140));
 
 	let quoteOpen = $state(false);
+	let copied = $state(false);
+	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+	$effect(() => () => clearTimeout(copiedTimer));
+
+	/** `Name <a@b.com>` and bare addresses both copy as `a@b.com`. */
+	function emailOf(value: string): string {
+		const bracket = value.match(/<([^>]+)>/);
+		if (bracket?.[1]) return bracket[1].trim();
+		const email = value.match(/[^\s<>]+@[^\s<>]+/);
+		return (email?.[0] ?? value).trim();
+	}
+
+	function markCopied() {
+		copied = true;
+		clearTimeout(copiedTimer);
+		copiedTimer = setTimeout(() => (copied = false), 1600);
+	}
+
+	function writeClipboard(value: string): boolean {
+		const input = document.createElement('textarea');
+		input.value = value;
+		input.setAttribute('readonly', '');
+		input.style.cssText = 'position:fixed;left:-9999px;top:0';
+		document.body.appendChild(input);
+		input.select();
+		const ok = document.execCommand('copy');
+		input.remove();
+		return ok;
+	}
+
+	async function copySender(event?: Event) {
+		event?.stopPropagation();
+		try {
+			await navigator.clipboard.writeText(senderEmail);
+			markCopied();
+			return;
+		} catch {
+			if (writeClipboard(senderEmail)) markCopied();
+		}
+	}
+
+	function onSenderKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			void copySender();
+		}
+	}
 </script>
 
 <article class="message" class:collapsed={!expanded}>
@@ -35,13 +84,33 @@
 		<header class="head">
 			<div class="avatar" class:self={outbound}>{outbound ? 'me' : initial}</div>
 
-			<button type="button" class="who" onclick={onToggle}>
+			<div class="who">
 				<p class="name">
-					{sender}
-					<span class="direction">to {message.to_addr}</span>
+					<span
+						class="sender"
+						role="button"
+						tabindex="0"
+						title={copied ? 'Copied' : `Copy ${senderEmail}`}
+						onclick={copySender}
+						onkeydown={onSenderKeydown}
+					>
+						{sender}
+					</span>
+					<button
+						type="button"
+						class="copy-sender"
+						class:copied
+						aria-label={copied ? 'Copied' : `Copy ${senderEmail}`}
+						onclick={copySender}
+					>
+						<Icon name={copied ? 'check-line' : 'file-copy-line'} size={13} />
+					</button>
+					<button type="button" class="direction" onclick={onToggle}>to {message.to_addr}</button>
 				</p>
-				<p class="when">{formatFullDate(message.created_at)}</p>
-			</button>
+				<button type="button" class="when" onclick={onToggle}>
+					{formatFullDate(message.created_at)}
+				</button>
+			</div>
 
 			{#if outbound}
 				<DeliveryStatus status={message.status} detail={message.status_detail} />
@@ -146,21 +215,75 @@
 	}
 
 	.name {
+		display: flex;
+		align-items: center;
+		min-width: 0;
 		font-size: 0.875rem;
 		font-weight: 500;
 		color: var(--color-text);
+	}
+
+	.sender {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		user-select: text;
+		cursor: pointer;
+	}
+
+	.sender:hover,
+	.sender:focus-visible {
+		text-decoration: underline;
+		text-underline-offset: 0.15em;
+	}
+
+	.copy-sender {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		width: 1.25rem;
+		height: 1.25rem;
+		margin-left: 0.25rem;
+		border-radius: 0.25rem;
+		color: var(--color-muted);
+		opacity: 0;
+	}
+
+	.copy-sender:hover,
+	.copy-sender:focus-visible,
+	.copy-sender.copied,
+	.name:hover .copy-sender {
+		opacity: 1;
+	}
+
+	.copy-sender:hover,
+	.copy-sender:focus-visible {
+		color: var(--color-text);
+		background: var(--color-surface-hover);
+	}
+
+	.copy-sender.copied {
+		color: var(--color-accent-text);
+	}
+
+	@media (hover: none) {
+		.copy-sender {
+			opacity: 1;
+		}
 	}
 
 	.direction {
 		margin-left: 0.375rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 		font-weight: 400;
 		color: var(--color-muted);
 	}
 
 	.when {
+		display: block;
 		margin-top: 0.125rem;
 		font-size: 0.75rem;
 		color: var(--color-muted);
