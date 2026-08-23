@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from '$lib/components/Icon.svelte';
+	import StackHeader from '$lib/components/StackHeader.svelte';
 	import AddressField from '$lib/components/AddressField.svelte';
 	import type { PageData } from './$types';
 
@@ -110,7 +111,7 @@
 </svelte:head>
 
 <div class="admin-page">
-	<h1>Admin</h1>
+	<StackHeader title="Admin" back={false} />
 
 	{#if data.loadError}
 		<div class="surface-lg banner">
@@ -300,10 +301,8 @@
 </div>
 
 <style>
-	.admin-page h1 {
-		font-size: 1.375rem;
-		font-weight: 600;
-		letter-spacing: -0.02em;
+	.admin-page :global(.stack-header) {
+		margin-bottom: 0;
 	}
 
 	.banner {
@@ -549,5 +548,12 @@
 		margin-top: 0.5rem;
 		font-size: 0.8125rem;
 		color: var(--color-danger);
+	}
+
+	@media (max-width: 900px) {
+		.admin-card {
+			padding: 1.25rem 1rem;
+			box-shadow: none;
+		}
 	}
 </style>

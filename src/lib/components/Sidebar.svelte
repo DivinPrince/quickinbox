@@ -10,15 +10,13 @@
 		domains,
 		activeDomainId,
 		isAdmin,
-		collapsed = $bindable(false),
-		mobileOpen = $bindable(false)
+		collapsed = $bindable(false)
 	}: {
 		counts: MailboxCounts;
 		domains: Domain[];
 		activeDomainId: string | null;
 		isAdmin: boolean;
 		collapsed?: boolean;
-		mobileOpen?: boolean;
 	} = $props();
 
 	type NavItem = {
@@ -48,16 +46,7 @@
 	}
 </script>
 
-{#if mobileOpen}
-	<button
-		type="button"
-		class="scrim"
-		aria-label="Close navigation"
-		onclick={() => (mobileOpen = false)}
-	></button>
-{/if}
-
-<aside class="sidebar" class:collapsed class:mobile-open={mobileOpen}>
+<aside class="sidebar" class:collapsed>
 	<div class="sidebar-top">
 		<a href="/inbox" class="brand" title="Mail">
 			<Logo size={30} />
@@ -77,7 +66,6 @@
 				class="nav-link"
 				class:active={isActive(item.href)}
 				title={collapsed ? item.label : undefined}
-				onclick={() => (mobileOpen = false)}
 			>
 				<Icon name={item.icon} size={17} />
 				{#if !collapsed}
@@ -110,7 +98,6 @@
 				class="nav-link"
 				class:active={isActive(item.href)}
 				title={collapsed ? item.label : undefined}
-				onclick={() => (mobileOpen = false)}
 			>
 				<Icon name={item.icon} size={17} />
 				{#if !collapsed}<span class="nav-label">{item.label}</span>{/if}
@@ -307,30 +294,8 @@
 		color: var(--color-text);
 	}
 
-	.scrim {
-		position: fixed;
-		inset: 0;
-		z-index: 35;
-		background: var(--color-scrim);
-	}
-
 	@media (max-width: 900px) {
 		.sidebar {
-			transform: translateX(-100%);
-			box-shadow: var(--shadow-md);
-		}
-
-		.sidebar.mobile-open {
-			transform: none;
-		}
-
-		.scrim {
-			display: block;
-		}
-	}
-
-	@media (min-width: 901px) {
-		.scrim {
 			display: none;
 		}
 	}

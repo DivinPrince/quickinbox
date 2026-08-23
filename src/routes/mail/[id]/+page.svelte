@@ -5,6 +5,7 @@
 	import AttachmentPicker from '$lib/components/AttachmentPicker.svelte';
 	import ThreadMessage from '$lib/components/ThreadMessage.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
+	import { requestSkipViewTransition } from '$lib/app-chrome';
 	import type { OutboundAttachmentInput } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -81,6 +82,15 @@
 		goto('/inbox');
 	}
 
+	function goBack() {
+		requestSkipViewTransition();
+		if (typeof history !== 'undefined' && history.length > 1) {
+			history.back();
+			return;
+		}
+		void goto(backHref);
+	}
+
 	async function destroy() {
 		if (!latest) return;
 		await fetch(`/api/mail/${latest.id}`, { method: 'DELETE' });
@@ -130,9 +140,9 @@
 
 <div class="mail-page">
 	<header class="mail-toolbar">
-		<a href={backHref} class="btn-ghost" aria-label="Back">
+		<button type="button" class="btn-ghost back-btn" aria-label="Back" onclick={goBack}>
 			<Icon name="arrow-left-line" size={18} />
-		</a>
+		</button>
 
 		<div class="toolbar-actions">
 			<button
@@ -166,7 +176,7 @@
 				</button>
 			{/if}
 
-			<button type="button" class="btn-primary" onclick={() => (replyOpen = !replyOpen)}>
+			<button type="button" class="btn-primary reply-launch" onclick={() => (replyOpen = !replyOpen)}>
 				<Icon name="reply-line" size={16} />
 				{replyOpen ? 'Close' : 'Reply'}
 			</button>
@@ -196,50 +206,50 @@
 				/>
 			{/each}
 		</div>
+	</article>
 
-		{#if replyOpen}
-			<form class="reply-section" onsubmit={sendReply}>
-				<p class="reply-to">
-					Replying to
+	{#if replyOpen}
+		<form class="reply-section" onsubmit={sendReply}>
+			<p class="reply-to">
+				Replying to
+				<strong>
+					{latest?.direction === 'inbound' ? latest.from_addr : latest?.to_addr}
+				</strong>
+			</p>
+			{#if data.replyFrom}
+				<p class="reply-from">
+					From
 					<strong>
-						{latest?.direction === 'inbound' ? latest.from_addr : latest?.to_addr}
+						{#if data.replyFromName}{data.replyFromName} · {/if}{data.replyFrom}
 					</strong>
 				</p>
-				{#if data.replyFrom}
-					<p class="reply-from">
-						From
-						<strong>
-							{#if data.replyFromName}{data.replyFromName} · {/if}{data.replyFrom}
-						</strong>
-					</p>
-				{/if}
+			{/if}
 
-				<RichTextEditor bind:html={replyHtml} embedded minHeight={160} placeholder="Reply…" />
+			<RichTextEditor bind:html={replyHtml} embedded minHeight={160} placeholder="Reply…" />
 
-				<div class="reply-footer">
-					<AttachmentPicker bind:attachments={replyAttachments} />
-					<div class="reply-actions">
-						<button type="button" class="btn-ghost" onclick={() => (replyOpen = false)}>
-							Cancel
-						</button>
-						<button type="submit" class="btn-primary" disabled={sending}>
-							<Icon name="send-plane-2-fill" size={16} />
-							{sending ? 'Sending…' : 'Send'}
-						</button>
-					</div>
+			<div class="reply-footer">
+				<AttachmentPicker bind:attachments={replyAttachments} />
+				<div class="reply-actions">
+					<button type="button" class="btn-ghost" onclick={() => (replyOpen = false)}>
+						Cancel
+					</button>
+					<button type="submit" class="btn-primary" disabled={sending}>
+						<Icon name="send-plane-2-fill" size={16} />
+						{sending ? 'Sending…' : 'Send'}
+					</button>
 				</div>
+			</div>
 
-				{#if error}
-					<p class="reply-status">{error}</p>
-				{/if}
-			</form>
-		{:else}
-			<button type="button" class="reply-prompt" onclick={() => (replyOpen = true)}>
-				<Icon name="reply-line" size={15} />
-				Reply
-			</button>
-		{/if}
-	</article>
+			{#if error}
+				<p class="reply-status">{error}</p>
+			{/if}
+		</form>
+	{:else}
+		<button type="button" class="reply-prompt" onclick={() => (replyOpen = true)}>
+			<Icon name="reply-line" size={15} />
+			Reply
+		</button>
+	{/if}
 </div>
 
 <style>
@@ -346,6 +356,10 @@
 		color: var(--color-danger);
 	}
 
+	.back-btn {
+		flex-shrink: 0;
+	}
+
 	/* Dormant reply box at the foot of the thread; opens the composer. */
 	.reply-prompt {
 		display: flex;
@@ -363,5 +377,87 @@
 
 	.reply-prompt:hover {
 		background: var(--color-surface-muted);
+	}
+
+	@media (max-width: 900px) {
+		.mail-page {
+			display: flex;
+			flex-direction: column;
+			flex: 1;
+			width: 100%;
+			min-height: 0;
+			height: 100%;
+			background: var(--color-surface);
+		}
+
+		.mail-toolbar {
+			position: sticky;
+			top: 0;
+			z-index: 20;
+			min-height: calc(3.25rem + env(safe-area-inset-top));
+			margin: 0;
+			padding: env(safe-area-inset-top) 0.5rem 0.25rem;
+			background: var(--color-surface);
+			box-shadow: inset 0 -1px 0 var(--color-line);
+		}
+
+		.mail-toolbar .btn-primary {
+			padding-left: 0.75rem;
+			padding-right: 0.75rem;
+		}
+
+		.reply-launch {
+			display: none;
+		}
+
+		.mail-card {
+			flex: 1;
+			min-height: 0;
+			overflow-y: auto;
+			overscroll-behavior: contain;
+			margin: 0;
+			padding: 1.25rem 1rem 1.5rem;
+			border-radius: 0;
+			box-shadow: none;
+			background: var(--color-surface);
+		}
+
+		.mail-card h1 {
+			font-size: 1.125rem;
+		}
+
+		.reply-prompt {
+			flex-shrink: 0;
+			z-index: 10;
+			margin: 0;
+			width: auto;
+			border-radius: 0;
+			padding: 0.875rem 1rem calc(0.875rem + env(safe-area-inset-bottom));
+			background: var(--color-surface);
+			box-shadow: inset 0 1px 0 var(--color-line);
+		}
+
+		.reply-section {
+			flex-shrink: 0;
+			z-index: 10;
+			margin: 0;
+			padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+			background: var(--color-surface);
+			box-shadow: inset 0 1px 0 var(--color-line);
+		}
+
+		.reply-footer {
+			flex-direction: column;
+			align-items: stretch;
+		}
+
+		.reply-actions {
+			margin-left: 0;
+			width: 100%;
+		}
+
+		.reply-actions .btn-primary {
+			flex: 1;
+		}
 	}
 </style>

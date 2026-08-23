@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import StackHeader from '$lib/components/StackHeader.svelte';
 	import Check from '$lib/components/Check.svelte';
 	import AddressField from '$lib/components/AddressField.svelte';
 	import DesktopNotifications from '$lib/components/DesktopNotifications.svelte';
+	import InstallApp from '$lib/components/InstallApp.svelte';
 	import {
 		readThemePreference,
 		setThemePreference,
@@ -296,7 +298,7 @@
 <svelte:window onkeydown={handleWindowKeydown} />
 
 <div class="settings-page">
-	<h1>Settings</h1>
+	<StackHeader title="Settings" back={false} />
 
 	<section class="surface-lg card">
 		<h2><Icon name="contrast-2-line" size={18} /> Appearance</h2>
@@ -327,6 +329,8 @@
 			{/each}
 		</div>
 	</section>
+
+	<InstallApp />
 
 	<DesktopNotifications configured={data.push.configured} publicKey={data.push.publicKey} />
 
@@ -591,15 +595,24 @@
 		max-width: 42rem;
 	}
 
-	.settings-page h1 {
-		font-size: 1.375rem;
-		font-weight: 600;
-		letter-spacing: -0.02em;
+	.settings-page :global(.stack-header) {
+		margin-bottom: 0;
 	}
 
 	.card {
 		margin-top: 1.5rem;
 		padding: 1.5rem;
+	}
+
+	@media (max-width: 900px) {
+		.settings-page {
+			max-width: none;
+			padding-bottom: 1.5rem;
+		}
+
+		.card {
+			padding: 1.25rem 1rem;
+		}
 	}
 
 	.card-head {
@@ -1116,5 +1129,21 @@
 		overflow-x: auto;
 		font-size: 0.75rem;
 		white-space: nowrap;
+	}
+
+	@media (max-width: 900px) {
+		.settings-page {
+			max-width: none;
+		}
+
+		.card {
+			margin-top: 1rem;
+			padding: 1.25rem 1rem;
+			box-shadow: none;
+		}
+
+		.theme-options {
+			gap: 0.5rem;
+		}
 	}
 </style>

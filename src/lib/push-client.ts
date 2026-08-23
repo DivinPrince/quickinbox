@@ -1,3 +1,5 @@
+import { SERVICE_WORKER_URL } from './app-chrome';
+
 export function supportsWebPush(): boolean {
 	return (
 		typeof window !== 'undefined' &&
@@ -35,7 +37,6 @@ export function subscriptionUsesPublicKey(
 	return applicationServerKeyMatches(subscription.options.applicationServerKey, publicKey);
 }
 
-const SERVICE_WORKER_URL = '/service-worker.js';
 const WORKER_ACTIVATE_TIMEOUT_MS = 10_000;
 
 export async function getPushSubscription(): Promise<PushSubscription | null> {

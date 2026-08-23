@@ -107,4 +107,11 @@
 	.check.labeled:focus-visible {
 		box-shadow: inset 0 0 0 1.5px var(--color-accent), 0 0 0 3px var(--color-focus-halo);
 	}
+
+	@media (max-width: 900px) {
+		.check:not(.labeled) {
+			width: var(--touch-target);
+			height: var(--touch-target);
+		}
+	}
 </style>

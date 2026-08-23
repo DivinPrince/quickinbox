@@ -63,8 +63,8 @@ worker.addEventListener('push', (event: PushEvent) => {
 			if (!(await currentAccountOwnsSubscription())) return;
 			await worker.registration.showNotification(stringValue(payload.title, 'New message'), {
 				body: stringValue(payload.body, 'You received a new email.'),
-				icon: '/favicon.svg',
-				badge: '/favicon.svg',
+				icon: '/icons/icon-192.png',
+				badge: '/icons/icon-192.png',
 				tag: stringValue(payload.tag, 'quickmail-new-message'),
 				data: { url }
 			});

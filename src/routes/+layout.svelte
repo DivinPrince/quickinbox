@@ -4,8 +4,18 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Topbar from '$lib/components/Topbar.svelte';
+	import MobileChrome from '$lib/components/MobileChrome.svelte';
+	import SwipeBack from '$lib/components/SwipeBack.svelte';
 	import { disablePushForCurrentAccount } from '$lib/push-client';
 	import { watchSystemTheme } from '$lib/theme';
+	import {
+		isMailboxPath,
+		isStackedPath,
+		isStandaloneDisplay,
+		isUtilityPath,
+		registerAppServiceWorker
+	} from '$lib/app-chrome';
+	import { setupMobileViewTransitions } from '$lib/view-transitions';
 	import type { LayoutData } from './$types';
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
@@ -16,12 +26,35 @@
 	// Pages that read better centred than full-bleed.
 	const NARROW = ['/compose', '/mail', '/settings'];
 	const narrow = $derived(NARROW.some((path) => $page.url.pathname.startsWith(path)));
+	const stacked = $derived(isStackedPath($page.url.pathname));
+	const mailbox = $derived(isMailboxPath($page.url.pathname));
+	const utility = $derived(isUtilityPath($page.url.pathname));
 
 	let collapsed = $state(false);
-	let mobileOpen = $state(false);
+
+	setupMobileViewTransitions();
 
 	// app.html already applied the theme; this keeps "System" live afterwards.
 	$effect(() => watchSystemTheme());
+
+	$effect(() => {
+		registerAppServiceWorker();
+	});
+
+	$effect(() => {
+		const syncStandalone = () => {
+			document.documentElement.dataset.standalone = isStandaloneDisplay() ? 'true' : 'false';
+		};
+		syncStandalone();
+		const standalone = window.matchMedia('(display-mode: standalone)');
+		const fullscreen = window.matchMedia('(display-mode: fullscreen)');
+		standalone.addEventListener('change', syncStandalone);
+		fullscreen.addEventListener('change', syncStandalone);
+		return () => {
+			standalone.removeEventListener('change', syncStandalone);
+			fullscreen.removeEventListener('change', syncStandalone);
+		};
+	});
 
 	// Remember the collapsed sidebar between visits.
 	$effect(() => {
@@ -50,23 +83,27 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 	<link
 		href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
 		rel="stylesheet"
+		media="(min-width: 901px)"
 	/>
 </svelte:head>
 
 {#if showShell}
-	<div class="app-shell" data-collapsed={collapsed}>
+	<div
+		class="app-shell"
+		data-collapsed={collapsed}
+		data-stacked={stacked}
+		data-mailbox={mailbox}
+		data-utility={utility}
+	>
 		<Sidebar
 			counts={data.counts}
 			domains={data.domains}
 			activeDomainId={data.activeDomainId}
 			isAdmin={data.user!.is_admin}
 			bind:collapsed
-			bind:mobileOpen
 		/>
 
 		<div class="app-content">
@@ -74,14 +111,28 @@
 				userName={data.user!.name}
 				userEmail={data.user!.email}
 				addresses={data.addresses}
-				onToggleNav={() => (mobileOpen = !mobileOpen)}
 				onLogout={logout}
 			/>
 
 			<main class="app-main" class:app-main-narrow={narrow}>
-				{@render children()}
+				{#if stacked}
+					<SwipeBack href="/inbox">
+						{@render children()}
+					</SwipeBack>
+				{:else}
+					{@render children()}
+				{/if}
 			</main>
 		</div>
+
+		{#if !stacked}
+			<MobileChrome
+				counts={data.counts}
+				domains={data.domains}
+				activeDomainId={data.activeDomainId}
+				isAdmin={data.user!.is_admin}
+			/>
+		{/if}
 	</div>
 {:else}
 	{@render children()}

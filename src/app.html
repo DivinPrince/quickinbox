@@ -2,8 +2,52 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+		/>
 		<meta name="text-scale" content="scale" />
+		<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+		<meta name="theme-color" content="#17171a" media="(prefers-color-scheme: dark)" />
+		<meta name="color-scheme" content="light dark" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="Mail" />
+		<meta name="application-name" content="Mail" />
+		<meta name="format-detection" content="telephone=no" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+		<link
+			rel="apple-touch-startup-image"
+			media="(prefers-color-scheme: light) and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)"
+			href="/icons/splash-1170x2532.png"
+		/>
+		<link
+			rel="apple-touch-startup-image"
+			media="(prefers-color-scheme: dark) and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)"
+			href="/icons/splash-1170x2532-dark.png"
+		/>
+		<link
+			rel="apple-touch-startup-image"
+			media="(prefers-color-scheme: light) and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)"
+			href="/icons/splash-1179x2556.png"
+		/>
+		<link
+			rel="apple-touch-startup-image"
+			media="(prefers-color-scheme: dark) and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)"
+			href="/icons/splash-1179x2556-dark.png"
+		/>
+		<link
+			rel="apple-touch-startup-image"
+			media="(prefers-color-scheme: light) and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)"
+			href="/icons/splash-1290x2796.png"
+		/>
+		<link
+			rel="apple-touch-startup-image"
+			media="(prefers-color-scheme: dark) and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)"
+			href="/icons/splash-1290x2796-dark.png"
+		/>
 		<script>
 			// Resolve the theme before first paint so there is no light flash.
 			(() => {
@@ -13,6 +57,11 @@
 						stored === 'dark' ||
 						(stored === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
 					document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+					const color = dark ? '#17171a' : '#ffffff';
+					document.documentElement.style.background = color;
+					for (const theme of document.querySelectorAll('meta[name="theme-color"]')) {
+						theme.setAttribute('content', color);
+					}
 				} catch {
 					document.documentElement.dataset.theme = 'light';
 				}

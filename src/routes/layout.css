@@ -38,6 +38,8 @@
 	--sidebar-width: 15.5rem;
 	--sidebar-width-collapsed: 4.25rem;
 	--topbar-height: 3.75rem;
+	--bottom-nav-height: 3.5rem;
+	--touch-target: 2.75rem;
 }
 
 /*
@@ -80,8 +82,79 @@
 	--shadow-header: 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+html {
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+	background: var(--color-surface);
+}
+
 body {
 	@apply min-h-screen bg-[var(--color-bg)] font-sans text-[var(--color-text)] antialiased;
+	-webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 900px) {
+	:root {
+		--font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+	}
+
+	body:has(.app-shell) {
+		height: 100dvh;
+		overflow: hidden;
+		overscroll-behavior: none;
+	}
+
+	input,
+	select,
+	textarea {
+		font-size: 16px;
+	}
+
+	.icon-btn {
+		width: var(--touch-target);
+		height: var(--touch-target);
+		border-radius: 0.75rem;
+	}
+
+	.btn-primary,
+	.btn-ghost {
+		min-height: var(--touch-target);
+		padding-left: 1rem;
+		padding-right: 1rem;
+	}
+
+	a,
+	button {
+		touch-action: manipulation;
+	}
+}
+
+@media (display-mode: standalone), (display-mode: fullscreen) {
+	body {
+		user-select: none;
+		-webkit-user-select: none;
+	}
+
+	input,
+	textarea,
+	[contenteditable='true'],
+	.mail-body {
+		user-select: text;
+		-webkit-user-select: text;
+	}
+}
+
+html[data-standalone='true'] body {
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+html[data-standalone='true'] input,
+html[data-standalone='true'] textarea,
+html[data-standalone='true'] [contenteditable='true'],
+html[data-standalone='true'] .mail-body {
+	user-select: text;
+	-webkit-user-select: text;
 }
 
 .surface {
@@ -224,10 +297,11 @@ body {
 
 .auth-shell {
 	display: flex;
-	min-height: 100vh;
+	min-height: 100dvh;
 	align-items: center;
 	justify-content: center;
-	padding: 2rem 1rem;
+	padding: max(2rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+		max(2rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
 }
 
 .auth-card {
@@ -243,6 +317,26 @@ body {
 	font-size: 1.375rem;
 	font-weight: 600;
 	letter-spacing: -0.02em;
+}
+
+@media (max-width: 900px) {
+	.auth-shell {
+		align-items: stretch;
+		padding: 0;
+		background: var(--color-surface);
+	}
+
+	.auth-card {
+		display: flex;
+		flex-direction: column;
+		max-width: none;
+		min-height: 100dvh;
+		padding: max(2.5rem, calc(1.5rem + env(safe-area-inset-top)))
+			max(1.25rem, env(safe-area-inset-right)) max(2rem, calc(1.5rem + env(safe-area-inset-bottom)))
+			max(1.25rem, env(safe-area-inset-left));
+		border-radius: 0;
+		box-shadow: none;
+	}
 }
 
 .auth-input {
@@ -265,7 +359,7 @@ body {
 
 .app-shell {
 	display: flex;
-	min-height: 100vh;
+	min-height: 100dvh;
 }
 
 .app-content {
@@ -294,16 +388,142 @@ body {
 }
 
 @media (max-width: 900px) {
+	.app-shell {
+		position: fixed;
+		inset: 0;
+		min-height: 100dvh;
+		height: 100dvh;
+		overflow: hidden;
+	}
+
 	.app-content {
 		margin-left: 0;
+		height: 100%;
+		overflow: hidden;
 	}
 
 	.app-shell[data-collapsed='true'] .app-content {
 		margin-left: 0;
 	}
 
+	.app-shell,
+	.app-content,
 	.app-main {
-		padding: 1rem 1rem 2rem;
+		background: var(--color-bg);
+	}
+
+	.app-main {
+		flex: 1;
+		min-height: 0;
+		overflow-x: hidden;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		-webkit-overflow-scrolling: touch;
+		padding: 0 1rem calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 5.25rem);
+	}
+
+	.app-main-narrow {
+		max-width: none;
+	}
+
+	.app-shell[data-mailbox='true'] .app-main {
+		padding: 0 0 calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 5.25rem);
+	}
+
+	.app-shell[data-utility='true'] .app-main,
+	.app-shell[data-utility='true'] .app-content {
+		background: var(--color-surface);
+	}
+
+	.app-shell[data-utility='true'] .app-main {
+		padding: 0 1rem calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 5.25rem);
+	}
+
+	.app-shell[data-stacked='true'] .app-main,
+	.app-shell[data-stacked='true'] .app-content {
+		display: flex;
+		flex-direction: column;
+		padding: 0;
+		background: var(--color-surface);
+	}
+
+	.app-shell[data-stacked='true'] .app-main {
+		overflow: hidden;
+	}
+
+	html[data-nav='forward']::view-transition-old(root) {
+		animation: 180ms ease-in both vt-exit-left;
+	}
+
+	html[data-nav='forward']::view-transition-new(root) {
+		animation: 220ms ease-out both vt-enter-right;
+	}
+
+	html[data-nav='back']::view-transition-old(root) {
+		animation: 180ms ease-in both vt-exit-right;
+	}
+
+	html[data-nav='back']::view-transition-new(root) {
+		animation: 220ms ease-out both vt-enter-left;
+	}
+
+	html[data-nav='tab']::view-transition-old(root) {
+		animation: 120ms ease-out both vt-fade-out;
+	}
+
+	html[data-nav='tab']::view-transition-new(root) {
+		animation: 160ms ease-out both vt-fade-in;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		html[data-nav='forward']::view-transition-old(root),
+		html[data-nav='forward']::view-transition-new(root),
+		html[data-nav='back']::view-transition-old(root),
+		html[data-nav='back']::view-transition-new(root),
+		html[data-nav='tab']::view-transition-old(root),
+		html[data-nav='tab']::view-transition-new(root) {
+			animation: none;
+		}
+	}
+}
+
+@keyframes vt-enter-right {
+	from {
+		transform: translateX(18%);
+		opacity: 0.6;
+	}
+}
+
+@keyframes vt-enter-left {
+	from {
+		transform: translateX(-18%);
+		opacity: 0.6;
+	}
+}
+
+@keyframes vt-exit-left {
+	to {
+		transform: translateX(-12%);
+		opacity: 0;
+	}
+}
+
+@keyframes vt-exit-right {
+	to {
+		transform: translateX(12%);
+		opacity: 0;
+	}
+}
+
+@keyframes vt-fade-out {
+	to {
+		opacity: 0;
+	}
+}
+
+@keyframes vt-fade-in {
+	from {
+		opacity: 0;
 	}
 }
 

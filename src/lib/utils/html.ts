@@ -4,8 +4,13 @@ export function htmlToPlainText(html: string): string {
 }
 
 export function isHtmlEmpty(html: string): boolean {
-	const text = htmlToPlainText(html);
-	return !text && !html.includes('<img');
+	if (!html.trim()) return true;
+	if (html.includes('<img')) return false;
+	// Derived emptiness is evaluated during SSR, where DOMParser is unavailable.
+	if (typeof DOMParser === 'undefined') {
+		return !html.replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').trim();
+	}
+	return !htmlToPlainText(html);
 }
 
 export function formatFileSize(bytes: number): string {
