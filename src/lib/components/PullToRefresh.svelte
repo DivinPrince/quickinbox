@@ -83,7 +83,7 @@
 			return;
 		}
 		armed = true;
-		pull = Math.min(120, dy * 0.42);
+		pull = Math.max(0, Math.min(120, dy * 0.42));
 		if ('cancelable' in event && event.cancelable) event.preventDefault();
 	}
 

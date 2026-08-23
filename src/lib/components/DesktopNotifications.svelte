@@ -43,7 +43,7 @@
 	);
 
 	function pushErrorMessage(error: unknown): string {
-		return error instanceof Error ? error.message : 'Could not update desktop notifications';
+		return error instanceof Error ? error.message : 'Could not update notifications';
 	}
 
 	async function refreshPushState() {
@@ -141,7 +141,7 @@
 	{#if pushState === 'unconfigured'}
 		<p class="hint">
 			<Icon name="information-line" size={14} />
-			The server needs VAPID keys before desktop notifications can be enabled.
+			The server needs VAPID keys before notifications can be enabled.
 		</p>
 	{:else if pushState === 'unsupported'}
 		<p class="hint">

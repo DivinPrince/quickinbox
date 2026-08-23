@@ -18,10 +18,25 @@
 	} = $props();
 
 	let moreOpen = $state(false);
+	let sheetWasOpen = false;
+	let sheetEl: HTMLDivElement | undefined;
+	let trigger: HTMLButtonElement | undefined;
 
 	$effect(() => {
 		$page.url.pathname;
 		moreOpen = false;
+	});
+
+	$effect(() => {
+		if (moreOpen) {
+			sheetWasOpen = true;
+			queueMicrotask(() => sheetEl?.querySelector<HTMLElement>('a, button')?.focus());
+			return;
+		}
+		if (sheetWasOpen) {
+			sheetWasOpen = false;
+			trigger?.focus({ preventScroll: true });
+		}
 	});
 
 	$effect(() => {
@@ -67,6 +82,7 @@
 	{/each}
 
 	<button
+		bind:this={trigger}
 		type="button"
 		class="tab"
 		class:active={moreActive || moreOpen}
@@ -100,7 +116,14 @@
 {#if moreOpen}
 	<button type="button" class="sheet-scrim" aria-label="Close menu" onclick={() => (moreOpen = false)}
 	></button>
-	<div class="sheet" id="more-sheet" role="dialog" aria-label="More" aria-modal="true">
+	<div
+		bind:this={sheetEl}
+		class="sheet"
+		id="more-sheet"
+		role="dialog"
+		aria-label="More"
+		aria-modal="true"
+	>
 		<div class="sheet-handle" aria-hidden="true"></div>
 		<nav class="sheet-nav">
 			<a href="/drafts" class="sheet-link" class:active={$page.url.pathname === '/drafts'}>

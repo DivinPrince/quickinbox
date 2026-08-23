@@ -36,10 +36,10 @@
 	let savingDraft = $state(false);
 	let savedAt = $state('');
 
-	const isEmpty = $derived(!to.trim() && !subject.trim() && isHtmlEmpty(html));
+	const hasDraftText = $derived(Boolean(to.trim() || subject.trim() || !isHtmlEmpty(html)));
 
-	async function saveDraft() {
-		if (savingDraft || isEmpty) return;
+	async function saveDraft(): Promise<boolean> {
+		if (savingDraft || !hasDraftText) return false;
 		savingDraft = true;
 		error = '';
 
@@ -61,19 +61,25 @@
 			const body = await res.json();
 			if (!res.ok) {
 				error = body.error ?? 'Could not save draft';
-				return;
+				return false;
 			}
 			draftId = body.id;
 			savedAt = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+			return true;
 		} catch {
 			error = 'Network error';
+			return false;
 		} finally {
 			savingDraft = false;
 		}
 	}
 
 	async function closeComposer() {
-		if (!isEmpty) await saveDraft();
+		if (hasDraftText && !(await saveDraft())) return;
+		if (attachments.length > 0) {
+			error = 'Attachments are not saved with drafts. Send the message or remove them first.';
+			return;
+		}
 		requestSkipViewTransition();
 		await goto(draftId ? '/drafts' : '/inbox');
 	}
@@ -166,7 +172,7 @@
 			>
 				Cc/Bcc
 			</button>
-			<button type="button" class="btn-ghost" disabled={savingDraft || isEmpty} onclick={saveDraft}>
+			<button type="button" class="btn-ghost" disabled={savingDraft || !hasDraftText} onclick={saveDraft}>
 				<Icon name="save-line" size={15} />
 				{savingDraft ? 'Saving…' : 'Save draft'}
 			</button>
@@ -267,7 +273,7 @@
 				<button
 					type="button"
 					class="icon-btn"
-					disabled={savingDraft || isEmpty}
+					disabled={savingDraft || !hasDraftText}
 					aria-label={savingDraft ? 'Saving' : 'Save draft'}
 					onclick={saveDraft}
 				>

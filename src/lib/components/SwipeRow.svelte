@@ -73,7 +73,9 @@
 		if (!dragging) return;
 		dragging = false;
 		if (axis === 'x') {
-			rowEl?.releasePointerCapture(event.pointerId);
+			if (rowEl?.hasPointerCapture(event.pointerId)) {
+				rowEl.releasePointerCapture(event.pointerId);
+			}
 			if (offset <= -THRESHOLD && right) {
 				haptic(12);
 				offset = 0;

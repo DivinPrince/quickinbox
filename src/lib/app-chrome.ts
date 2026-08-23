@@ -100,3 +100,60 @@ export function haptic(ms = 10): void {
 		// Vibration is optional and can throw if the page is not focused.
 	}
 }
+
+/** In-app navigations only — `history.length` includes entries from before this tab loaded. */
+let inAppDepth = 0;
+
+export function noteInAppNavigation(type: string): void {
+	if (type === 'popstate') {
+		inAppDepth = Math.max(0, inAppDepth - 1);
+		return;
+	}
+	if (type === 'link' || type === 'goto') {
+		inAppDepth += 1;
+	}
+}
+
+export function hasInAppHistory(): boolean {
+	return inAppDepth > 0;
+}
+
+export type InstallPromptEvent = Event & { prompt: () => Promise<void> };
+
+let installPrompt: InstallPromptEvent | null = null;
+let capturingInstallPrompt = false;
+const installPromptListeners = new Set<(prompt: InstallPromptEvent | null) => void>();
+
+function notifyInstallPrompt(): void {
+	for (const listener of installPromptListeners) listener(installPrompt);
+}
+
+/** Listen from the persistent shell so Settings can still install after Inbox already saw the event. */
+export function captureInstallPrompt(): void {
+	if (typeof window === 'undefined' || capturingInstallPrompt) return;
+	capturingInstallPrompt = true;
+	window.addEventListener('beforeinstallprompt', (event) => {
+		event.preventDefault();
+		installPrompt = event as InstallPromptEvent;
+		notifyInstallPrompt();
+	});
+	window.addEventListener('appinstalled', () => {
+		installPrompt = null;
+		notifyInstallPrompt();
+	});
+}
+
+export function subscribeInstallPrompt(
+	listener: (prompt: InstallPromptEvent | null) => void
+): () => void {
+	installPromptListeners.add(listener);
+	listener(installPrompt);
+	return () => {
+		installPromptListeners.delete(listener);
+	};
+}
+
+export function clearInstallPrompt(): void {
+	installPrompt = null;
+	notifyInstallPrompt();
+}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import './layout.css';
+	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/stores';
 	import favicon from '$lib/assets/favicon.svg';
 	import Sidebar from '$lib/components/Sidebar.svelte';
@@ -9,10 +10,12 @@
 	import { disablePushForCurrentAccount } from '$lib/push-client';
 	import { watchSystemTheme } from '$lib/theme';
 	import {
+		captureInstallPrompt,
 		isMailboxPath,
 		isStackedPath,
 		isStandaloneDisplay,
 		isUtilityPath,
+		noteInAppNavigation,
 		registerAppServiceWorker
 	} from '$lib/app-chrome';
 	import { setupMobileViewTransitions } from '$lib/view-transitions';
@@ -34,11 +37,16 @@
 
 	setupMobileViewTransitions();
 
+	afterNavigate((navigation) => {
+		noteInAppNavigation(navigation.type);
+	});
+
 	// app.html already applied the theme; this keeps "System" live afterwards.
 	$effect(() => watchSystemTheme());
 
 	$effect(() => {
 		registerAppServiceWorker();
+		captureInstallPrompt();
 	});
 
 	$effect(() => {

@@ -1,10 +1,14 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
-	import { isIOS, isStandaloneDisplay } from '$lib/app-chrome';
+	import {
+		clearInstallPrompt,
+		isIOS,
+		isStandaloneDisplay,
+		subscribeInstallPrompt,
+		type InstallPromptEvent
+	} from '$lib/app-chrome';
 
-	type InstallPrompt = Event & { prompt: () => Promise<void> };
-
-	let deferred = $state<InstallPrompt | null>(null);
+	let deferred = $state<InstallPromptEvent | null>(null);
 	let standalone = $state(false);
 	let ios = $state(false);
 	let busy = $state(false);
@@ -12,13 +16,9 @@
 	$effect(() => {
 		standalone = isStandaloneDisplay();
 		ios = isIOS();
-
-		const onPrompt = (event: Event) => {
-			event.preventDefault();
-			deferred = event as InstallPrompt;
-		};
-		window.addEventListener('beforeinstallprompt', onPrompt);
-		return () => window.removeEventListener('beforeinstallprompt', onPrompt);
+		return subscribeInstallPrompt((prompt) => {
+			deferred = prompt;
+		});
 	});
 
 	async function install() {
@@ -26,7 +26,7 @@
 		busy = true;
 		try {
 			await deferred.prompt();
-			deferred = null;
+			clearInstallPrompt();
 		} finally {
 			busy = false;
 		}

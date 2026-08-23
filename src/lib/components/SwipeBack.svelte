@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { haptic, isMobileViewport, requestSkipViewTransition } from '$lib/app-chrome';
+	import { haptic, hasInAppHistory, isMobileViewport, requestSkipViewTransition } from '$lib/app-chrome';
 
 	let {
 		href,
@@ -22,7 +22,7 @@
 
 	function goBack() {
 		requestSkipViewTransition();
-		if (typeof history !== 'undefined' && history.length > 1) {
+		if (hasInAppHistory()) {
 			history.back();
 			return;
 		}

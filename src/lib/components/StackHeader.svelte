@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { hasInAppHistory } from '$lib/app-chrome';
 	import Icon from './Icon.svelte';
 
 	let {
@@ -25,7 +26,7 @@
 			await onBack();
 			return;
 		}
-		if (typeof history !== 'undefined' && history.length > 1) {
+		if (hasInAppHistory()) {
 			history.back();
 			return;
 		}

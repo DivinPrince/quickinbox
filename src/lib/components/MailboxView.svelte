@@ -39,6 +39,7 @@
 	let moreOpen = $state(false);
 	let selectMenuOpen = $state(false);
 	let selecting = $state(false);
+	let hadSelection = $state(false);
 	let longPressTimer = 0;
 	let longPressFired = false;
 	let pressX = 0;
@@ -48,10 +49,15 @@
 		items = mailbox.threads;
 		selected = [];
 		selecting = false;
+		hadSelection = false;
 	});
 
 	$effect(() => {
-		if (selected.length === 0) selecting = false;
+		if (selected.length > 0) hadSelection = true;
+		if (hadSelection && selected.length === 0) {
+			selecting = false;
+			hadSelection = false;
+		}
 	});
 
 	const hideMailboxTitle = $derived(isPrimaryTab(`/${view}`));
@@ -353,6 +359,31 @@
 							onclick={() => (moreOpen = false)}
 						></button>
 						<div class="menu menu-left" role="menu">
+							{#if selecting}
+								<button
+									type="button"
+									class="menu-item"
+									onclick={() => {
+										selected = [];
+										selecting = false;
+										hadSelection = false;
+										moreOpen = false;
+									}}
+								>
+									<Icon name="close-line" size={15} /> Cancel selection
+								</button>
+							{:else}
+								<button
+									type="button"
+									class="menu-item"
+									onclick={() => {
+										selecting = true;
+										moreOpen = false;
+									}}
+								>
+									<Icon name="checkbox-multiple-line" size={15} /> Select
+								</button>
+							{/if}
 							<button
 								type="button"
 								class="menu-item"
@@ -1153,7 +1184,14 @@
 		}
 
 		.mailbox.primary-tab:not(.selecting) .toolbar {
-			display: none;
+			justify-content: flex-end;
+			padding: 0.25rem 0.5rem;
+			background: var(--color-bg);
+			box-shadow: none;
+		}
+
+		.mailbox.primary-tab:not(.selecting) .toolbar-left {
+			margin-left: auto;
 		}
 
 		.mailbox.primary-tab:not(.selecting) .title,
@@ -1262,6 +1300,10 @@
 			gap: 0.625rem;
 			padding: 0.25rem 1rem;
 			min-height: 4.5rem;
+		}
+
+		.mailbox:not(.selecting) .row :global(.swipe-content) {
+			grid-template-columns: minmax(0, 1fr);
 		}
 
 		.mailbox:not(.selecting) .row :global(.check) {

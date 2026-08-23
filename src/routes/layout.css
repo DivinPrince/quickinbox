@@ -90,12 +90,13 @@ html {
 
 body {
 	@apply min-h-screen bg-[var(--color-bg)] font-sans text-[var(--color-text)] antialiased;
+
 	-webkit-tap-highlight-color: transparent;
 }
 
 @media (max-width: 900px) {
 	:root {
-		--font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+		--font-sans: -apple-system, blinkmacsystemfont, 'Segoe UI', roboto, system-ui, sans-serif;
 	}
 
 	body:has(.app-shell) {

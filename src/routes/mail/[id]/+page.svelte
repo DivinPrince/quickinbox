@@ -5,7 +5,7 @@
 	import AttachmentPicker from '$lib/components/AttachmentPicker.svelte';
 	import ThreadMessage from '$lib/components/ThreadMessage.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
-	import { requestSkipViewTransition } from '$lib/app-chrome';
+	import { hasInAppHistory, requestSkipViewTransition } from '$lib/app-chrome';
 	import type { OutboundAttachmentInput } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -84,7 +84,7 @@
 
 	function goBack() {
 		requestSkipViewTransition();
-		if (typeof history !== 'undefined' && history.length > 1) {
+		if (hasInAppHistory()) {
 			history.back();
 			return;
 		}
@@ -140,9 +140,18 @@
 
 <div class="mail-page">
 	<header class="mail-toolbar">
-		<button type="button" class="btn-ghost back-btn" aria-label="Back" onclick={goBack}>
+		<a
+			href={backHref}
+			class="btn-ghost back-btn"
+			aria-label="Back"
+			onclick={(event) => {
+				if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+				event.preventDefault();
+				goBack();
+			}}
+		>
 			<Icon name="arrow-left-line" size={18} />
-		</button>
+		</a>
 
 		<div class="toolbar-actions">
 			<button
@@ -313,9 +322,11 @@
 	}
 
 	.reply-section {
-		margin-top: 1.5rem;
-		padding-top: 1.25rem;
-		box-shadow: inset 0 1px 0 var(--color-line);
+		margin-top: 1rem;
+		padding: 1.75rem;
+		background: var(--color-surface);
+		border-radius: 1.25rem;
+		box-shadow: var(--shadow-sm);
 	}
 
 	.reply-to,
@@ -366,8 +377,8 @@
 		align-items: center;
 		gap: 0.5rem;
 		width: 100%;
-		margin-top: 1.5rem;
-		padding: 0.75rem 1rem;
+		margin-top: 1rem;
+		padding: 0.75rem 1.75rem;
 		border-radius: 9999px;
 		font-size: 0.875rem;
 		color: var(--color-text-secondary);

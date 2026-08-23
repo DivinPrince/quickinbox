@@ -4,12 +4,14 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+	hasInAppHistory,
 	isMailboxPath,
 	isMorePath,
 	isPrimaryTab,
 	isStackedPath,
 	isUtilityPath,
-	navDirection
+	navDirection,
+	noteInAppNavigation
 } from './app-chrome';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -48,6 +50,32 @@ test('puts secondary destinations under More', () => {
 	assert.equal(isMorePath('/admin'), true);
 	assert.equal(isMorePath('/inbox'), false);
 	assert.equal(isMorePath('/sent'), false);
+});
+
+test('counts only in-app link and goto navigations as back history', () => {
+	while (hasInAppHistory()) noteInAppNavigation('popstate');
+	noteInAppNavigation('enter');
+	assert.equal(hasInAppHistory(), false);
+	noteInAppNavigation('link');
+	assert.equal(hasInAppHistory(), true);
+	noteInAppNavigation('popstate');
+	assert.equal(hasInAppHistory(), false);
+	noteInAppNavigation('goto');
+	assert.equal(hasInAppHistory(), true);
+	noteInAppNavigation('popstate');
+	assert.equal(hasInAppHistory(), false);
+});
+
+test('stacked back controls do not trust the tab session history length', () => {
+	for (const file of [
+		'src/lib/components/SwipeBack.svelte',
+		'src/lib/components/StackHeader.svelte',
+		'src/routes/mail/[id]/+page.svelte'
+	]) {
+		const source = readFileSync(join(root, file), 'utf8');
+		assert.match(source, /hasInAppHistory/, file);
+		assert.doesNotMatch(source, /history\.length/, file);
+	}
 });
 
 test('slides forward into a stacked screen and back out of one', () => {
