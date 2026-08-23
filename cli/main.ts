@@ -337,8 +337,22 @@ async function run(argv: string[]): Promise<number> {
 			return 0;
 		}
 		case 'mcp': {
-			// Lazy-load MCP so curl-installed mail commands never import @modelcontextprotocol/sdk.
-			const { startMcpServer } = await import('./mcp.ts');
+			// Lazy-load MCP so mail commands never import @modelcontextprotocol/sdk.
+			let startMcpServer: typeof import('./mcp.ts').startMcpServer;
+			try {
+				({ startMcpServer } = await import('./mcp.ts'));
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				if (
+					message.includes('Cannot find') &&
+					(message.includes('mcp') || message.includes('@modelcontextprotocol/sdk'))
+				) {
+					throw new Error(
+						'MCP is not installed. Re-run: curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickmail/main/scripts/install.sh | sh'
+					);
+				}
+				throw error;
+			}
 			await startMcpServer();
 			return 0;
 		}

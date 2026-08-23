@@ -241,8 +241,8 @@ The same credentials drive an MCP server for Claude, Cursor, and other agents:
 {
   "mcpServers": {
     "quickmail": {
-      "command": "bunx",
-      "args": ["quickmail", "mcp"],
+      "command": "quickmail",
+      "args": ["mcp"],
       "env": {
         "QUICKMAIL_URL": "https://mail.example.com",
         "QUICKMAIL_TOKEN": "qm_live_…"
@@ -251,6 +251,8 @@ The same credentials drive an MCP server for Claude, Cursor, and other agents:
   }
 }
 ```
+
+`quickmail` is the launcher from the install script (`~/.local/bin/quickmail`). Login once, or set `QUICKMAIL_URL` and `QUICKMAIL_TOKEN` as above.
 
 Tools: `list_threads`, `get_thread`, `search_mail`, `send_message`, `reply`,
 `list_attachments`.

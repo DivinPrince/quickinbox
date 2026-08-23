@@ -169,13 +169,24 @@ fi
 umask 077
 mkdir -p "$CLI_DIR" "$BIN_DIR"
 
-# Mail commands only — mcp.ts pulls in npm deps and is skipped on purpose.
 download "$RAW/cli/main.ts" "$CLI_DIR/main.ts"
 ok "main.ts"
 download "$RAW/cli/client.ts" "$CLI_DIR/client.ts"
 ok "client.ts"
 download "$RAW/cli/config.ts" "$CLI_DIR/config.ts"
 ok "config.ts"
+download "$RAW/cli/mcp.ts" "$CLI_DIR/mcp.ts"
+ok "mcp.ts"
+download "$RAW/cli/package.json" "$CLI_DIR/package.json"
+ok "package.json"
+
+# Install MCP deps here so `quickmail mcp` never auto-installs onto stdio.
+if ! bun_out="$(cd "$CLI_DIR" && bun install --production 2>&1)"; then
+	say "Failed to install MCP dependencies in $CLI_DIR"
+	say "$bun_out"
+	exit 1
+fi
+ok "mcp dependencies"
 
 tmp_launcher="$(mktemp "${TMPDIR:-/tmp}/quickmail.XXXXXX")"
 cat > "$tmp_launcher" <<'EOF'
