@@ -5,12 +5,17 @@
 		html = $bindable(''),
 		placeholder = 'Write your message…',
 		minHeight = 240,
-		embedded = false
+		embedded = false,
+		fill = false,
+		toolbarEnd
 	}: {
 		html?: string;
 		placeholder?: string;
 		minHeight?: number;
 		embedded?: boolean;
+		/** Grow to fill the composer and drop the desktop card chrome. */
+		fill?: boolean;
+		toolbarEnd?: import('svelte').Snippet;
 	} = $props();
 
 	let editor = $state<HTMLDivElement | null>(null);
@@ -50,7 +55,7 @@
 	}
 </script>
 
-<div class="editor-shell" class:editor-shell-embedded={embedded}>
+<div class="editor-shell" class:editor-shell-embedded={embedded} class:editor-shell-fill={fill}>
 	<div class="toolbar">
 		{#each tools as tool (tool.command)}
 			<button
@@ -63,6 +68,11 @@
 				<Icon name={tool.icon} size={16} />
 			</button>
 		{/each}
+		{#if toolbarEnd}
+			<div class="toolbar-end">
+				{@render toolbarEnd()}
+			</div>
+		{/if}
 	</div>
 
 	<div
@@ -71,7 +81,7 @@
 		role="textbox"
 		aria-multiline="true"
 		class="editor prose prose-sm max-w-none px-4 py-3 outline-none"
-		style="min-height: {minHeight}px"
+		style:min-height={fill ? undefined : `${minHeight}px`}
 		data-placeholder={placeholder}
 		oninput={handleInput}
 		onpaste={handlePaste}
@@ -102,6 +112,19 @@
 		padding-right: 0;
 	}
 
+	.editor-shell-fill {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-height: 0;
+	}
+
+	.editor-shell-fill .editor {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+	}
+
 	.toolbar {
 		display: flex;
 		align-items: center;
@@ -109,8 +132,48 @@
 		padding: 0.375rem 0.5rem;
 	}
 
+	.toolbar-end {
+		display: none;
+	}
+
 	.editor {
 		color: var(--color-text);
+	}
+
+	@media (max-width: 900px) {
+		.toolbar .icon-btn {
+			width: var(--touch-target);
+			height: var(--touch-target);
+		}
+
+		.editor {
+			font-size: 16px;
+		}
+
+		.editor-shell-fill {
+			border-radius: 0;
+			box-shadow: none;
+			background: transparent;
+		}
+
+		.editor-shell-fill .toolbar {
+			order: 2;
+			flex-shrink: 0;
+			padding: 0.125rem 0.375rem calc(0.125rem + env(safe-area-inset-bottom));
+			box-shadow: inset 0 1px 0 var(--color-line);
+		}
+
+		.editor-shell-fill .toolbar-end {
+			display: flex;
+			align-items: center;
+			gap: 0.125rem;
+			margin-left: auto;
+		}
+
+		.editor-shell-fill .editor {
+			min-height: 8rem;
+			padding: 0.75rem 1rem 1rem;
+		}
 	}
 
 	.editor:empty::before {

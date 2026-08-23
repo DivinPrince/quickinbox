@@ -58,7 +58,8 @@
 		width: 100%;
 		max-width: 32rem;
 		margin: 0 auto;
-		padding: 3rem 1rem 4rem;
+		padding: max(3rem, calc(2rem + env(safe-area-inset-top))) max(1rem, env(safe-area-inset-right))
+			max(4rem, calc(2rem + env(safe-area-inset-bottom))) max(1rem, env(safe-area-inset-left));
 	}
 
 	.wizard-head {

@@ -5,7 +5,10 @@
 	import Check from './Check.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import DeliveryStatus from './DeliveryStatus.svelte';
+	import SwipeRow from './SwipeRow.svelte';
+	import PullToRefresh from './PullToRefresh.svelte';
 	import { formatRelativeDate } from '$lib/utils/date';
+	import { haptic, isPrimaryTab } from '$lib/app-chrome';
 	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 
 	let {
@@ -35,11 +38,29 @@
 	let filterOpen = $state(false);
 	let moreOpen = $state(false);
 	let selectMenuOpen = $state(false);
+	let selecting = $state(false);
+	let hadSelection = $state(false);
+	let longPressTimer = 0;
+	let longPressFired = false;
+	let pressX = 0;
+	let pressY = 0;
 
 	$effect(() => {
 		items = mailbox.threads;
 		selected = [];
+		selecting = false;
+		hadSelection = false;
 	});
+
+	$effect(() => {
+		if (selected.length > 0) hadSelection = true;
+		if (hadSelection && selected.length === 0) {
+			selecting = false;
+			hadSelection = false;
+		}
+	});
+
+	const hideMailboxTitle = $derived(isPrimaryTab(`/${view}`));
 
 	const allSelected = $derived(items.length > 0 && selected.length === items.length);
 	const someSelected = $derived(selected.length > 0);
@@ -107,6 +128,51 @@
 		}
 	}
 
+	function beginLongPress(thread: ThreadSummary, event: PointerEvent) {
+		longPressFired = false;
+		pressX = event.clientX;
+		pressY = event.clientY;
+		window.clearTimeout(longPressTimer);
+		longPressTimer = window.setTimeout(() => {
+			longPressFired = true;
+			selecting = true;
+			if (!selected.includes(thread.latest_id)) toggle(thread.latest_id);
+			haptic(16);
+		}, 420);
+	}
+
+	function cancelLongPress() {
+		window.clearTimeout(longPressTimer);
+	}
+
+	function moveLongPress(event: PointerEvent) {
+		if (Math.hypot(event.clientX - pressX, event.clientY - pressY) > 8) cancelLongPress();
+	}
+
+	function swipeLeftAction(thread: ThreadSummary) {
+		if (view === 'trash') return { icon: 'delete-bin-2-line', label: 'Delete', tone: 'danger' as const };
+		return { icon: 'delete-bin-line', label: 'Trash', tone: 'danger' as const };
+	}
+
+	function swipeRightAction(thread: ThreadSummary) {
+		if (view === 'trash') return { icon: 'arrow-go-back-line', label: 'Restore', tone: 'good' as const };
+		return {
+			icon: thread.is_starred ? 'star-fill' : 'star-line',
+			label: thread.is_starred ? 'Unstar' : 'Star',
+			tone: 'star' as const
+		};
+	}
+
+	function onSwipeLeft(thread: ThreadSummary) {
+		if (view === 'trash') void run('delete', [thread.latest_id]);
+		else void run('trash', [thread.latest_id]);
+	}
+
+	function onSwipeRight(thread: ThreadSummary) {
+		if (view === 'trash') void run('restore', [thread.latest_id]);
+		else void toggleStar(thread);
+	}
+
 	async function toggleStar(thread: ThreadSummary) {
 		const isStarred = !thread.is_starred;
 		items = items.map((row) =>
@@ -148,7 +214,8 @@
 	const rangeEnd = $derived(Math.min(mailbox.page * mailbox.pageSize, mailbox.total));
 </script>
 
-<section class="mailbox">
+<PullToRefresh onRefresh={invalidateAll}>
+<section class="mailbox" data-view={view} class:selecting class:primary-tab={hideMailboxTitle}>
 	<header class="toolbar">
 		<div class="toolbar-left">
 			<div class="select-all">
@@ -292,6 +359,74 @@
 							onclick={() => (moreOpen = false)}
 						></button>
 						<div class="menu menu-left" role="menu">
+							{#if selecting}
+								<button
+									type="button"
+									class="menu-item"
+									onclick={() => {
+										selected = [];
+										selecting = false;
+										hadSelection = false;
+										moreOpen = false;
+									}}
+								>
+									<Icon name="close-line" size={15} /> Cancel selection
+								</button>
+							{:else}
+								<button
+									type="button"
+									class="menu-item"
+									onclick={() => {
+										selecting = true;
+										moreOpen = false;
+									}}
+								>
+									<Icon name="checkbox-multiple-line" size={15} /> Select
+								</button>
+							{/if}
+							<button
+								type="button"
+								class="menu-item"
+								onclick={() => apply({ unread: filters.unreadOnly ? null : '1' })}
+							>
+								<Icon
+									name={filters.unreadOnly ? 'checkbox-fill' : 'checkbox-blank-line'}
+									size={15}
+								/>
+								Unread only
+							</button>
+							<button
+								type="button"
+								class="menu-item"
+								onclick={() => apply({ starred: filters.starredOnly ? null : '1' })}
+							>
+								<Icon
+									name={filters.starredOnly ? 'checkbox-fill' : 'checkbox-blank-line'}
+									size={15}
+								/>
+								Starred only
+							</button>
+							<button
+								type="button"
+								class="menu-item"
+								onclick={() => apply({ attachments: filters.attachmentsOnly ? null : '1' })}
+							>
+								<Icon
+									name={filters.attachmentsOnly ? 'checkbox-fill' : 'checkbox-blank-line'}
+									size={15}
+								/>
+								Has attachments
+							</button>
+							{#if activeFilterCount > 0 || filters.q}
+								<button
+									type="button"
+									class="menu-item"
+									onclick={() =>
+										apply({ unread: null, starred: null, attachments: null, q: null })}
+								>
+									<Icon name="close-circle-line" size={15} /> Clear filters
+								</button>
+							{/if}
 							<button type="button" class="menu-item" onclick={() => run('read-all', [])}>
 								<Icon name="mail-open-line" size={15} /> Mark all as read
 							</button>
@@ -316,7 +451,7 @@
 		<div class="toolbar-right">
 			<button
 				type="button"
-				class="pill"
+				class="pill unread-pill"
 				class:pill-on={filters.unreadOnly}
 				onclick={() => apply({ unread: filters.unreadOnly ? null : '1' })}
 			>
@@ -328,11 +463,12 @@
 					type="button"
 					class="pill"
 					class:pill-on={activeFilterCount > 0}
+					aria-label="Filter"
 					aria-expanded={filterOpen}
 					onclick={() => (filterOpen = !filterOpen)}
 				>
 					<Icon name="equalizer-line" size={14} />
-					Filter
+					<span class="filter-label">Filter</span>
 					{#if activeFilterCount > 0}<span class="filter-count">{activeFilterCount}</span>{/if}
 				</button>
 
@@ -391,7 +527,7 @@
 				{/if}
 			</div>
 
-			<div class="pager">
+			<div class="pager" class:pager-single={mailbox.pageCount <= 1}>
 				<a
 					class="pager-btn"
 					class:disabled={mailbox.page <= 1}
@@ -412,6 +548,20 @@
 			</div>
 		</div>
 	</header>
+
+	{#if activeFilterCount > 0}
+		<div class="filter-chips" aria-label="Active filters">
+			{#if filters.unreadOnly}
+				<a href={withParams({ unread: null })} class="filter-chip">Unread</a>
+			{/if}
+			{#if filters.starredOnly}
+				<a href={withParams({ starred: null })} class="filter-chip">Starred</a>
+			{/if}
+			{#if filters.attachmentsOnly}
+				<a href={withParams({ attachments: null })} class="filter-chip">Attachments</a>
+			{/if}
+		</div>
+	{/if}
 
 	{#if filters.q}
 		<div class="search-note">
@@ -435,6 +585,13 @@
 						class:unread={!thread.is_read}
 						class:checked={selected.includes(thread.latest_id)}
 					>
+						<SwipeRow
+							disabled={selecting}
+							left={swipeRightAction(thread)}
+							right={swipeLeftAction(thread)}
+							onLeft={() => onSwipeRight(thread)}
+							onRight={() => onSwipeLeft(thread)}
+						>
 						<Check
 							label={`Select conversation with ${people(thread)}`}
 							checked={selected.includes(thread.latest_id)}
@@ -451,7 +608,20 @@
 							<Icon name={thread.is_starred ? 'star-fill' : 'star-line'} size={15} />
 						</button>
 
-						<a class="row-link" href={href(thread)}>
+						<a
+							class="row-link"
+							href={href(thread)}
+							onclick={(event) => {
+								if (longPressFired || selecting) {
+									event.preventDefault();
+									if (selecting) toggle(thread.latest_id);
+								}
+							}}
+							onpointerdown={(event) => beginLongPress(thread, event)}
+							onpointerup={cancelLongPress}
+							onpointercancel={cancelLongPress}
+							onpointermove={moveLongPress}
+						>
 							<span class="avatar">{initial(thread)}</span>
 
 							<span class="sender" title={people(thread)}>
@@ -518,6 +688,7 @@
 								</button>
 							{/if}
 						</span>
+						</SwipeRow>
 					</li>
 				{/each}
 			</ul>
@@ -530,15 +701,21 @@
 		</footer>
 	{/if}
 </section>
+</PullToRefresh>
 
 <style>
 	.mailbox {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		background: var(--color-surface);
 		border-radius: 1rem;
 		box-shadow: var(--shadow-sm);
 		overflow: hidden;
+	}
+
+	.filter-chips {
+		display: none;
 	}
 
 	/* --- toolbar --- */
@@ -780,11 +957,6 @@
 	/* Read rows sit back a shade; unread ones stay bright and bold. */
 	.row {
 		position: relative;
-		display: grid;
-		grid-template-columns: auto auto 1fr;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0 0.875rem;
 		background: var(--color-bg);
 		box-shadow: inset 0 -1px 0 var(--color-line);
 		transition: background 0.12s;
@@ -794,17 +966,26 @@
 		box-shadow: none;
 	}
 
-	.row.unread {
+	.row :global(.swipe-content) {
+		display: grid;
+		grid-template-columns: auto auto 1fr;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0 0.875rem;
+		background: var(--color-bg);
+	}
+
+	.row.unread :global(.swipe-content) {
 		background: var(--color-surface);
 	}
 
-	.row:hover,
-	.row.unread:hover {
+	.row:hover :global(.swipe-content),
+	.row.unread:hover :global(.swipe-content) {
 		background: var(--color-surface-muted);
 	}
 
-	.row.checked,
-	.row.checked:hover {
+	.row.checked :global(.swipe-content),
+	.row.checked:hover :global(.swipe-content) {
 		background: var(--color-accent-soft);
 	}
 
@@ -980,22 +1161,183 @@
 		box-shadow: inset 0 1px 0 var(--color-line);
 	}
 
-	@media (max-width: 780px) {
-		.row-link {
-			grid-template-columns: minmax(0, 1fr) auto;
-			grid-template-areas:
-				'sender date'
-				'body body';
-			gap: 0.25rem 0.5rem;
+	@media (max-width: 900px) {
+		.mailbox {
+			flex: 1;
+			border-radius: 0;
+			box-shadow: none;
+			min-height: 100%;
+			background: var(--color-bg);
 		}
 
-		.avatar,
+		.toolbar {
+			position: sticky;
+			top: 0;
+			z-index: 8;
+			flex-wrap: wrap;
+			padding: 0.5rem 0.75rem;
+			background: var(--color-surface);
+		}
+
+		.mailbox:not(.selecting) .toolbar-right {
+			display: none;
+		}
+
+		.mailbox.primary-tab:not(.selecting) .toolbar {
+			justify-content: flex-end;
+			padding: 0.25rem 0.5rem;
+			background: var(--color-bg);
+			box-shadow: none;
+		}
+
+		.mailbox.primary-tab:not(.selecting) .toolbar-left {
+			margin-left: auto;
+		}
+
+		.mailbox.primary-tab:not(.selecting) .title,
+		.mailbox.primary-tab:not(.selecting) .total {
+			display: none;
+		}
+
+		.filter-chips {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+			padding: 0.5rem 1rem;
+		}
+
+		.filter-chip {
+			display: inline-flex;
+			align-items: center;
+			min-height: 2rem;
+			padding: 0 0.75rem;
+			border-radius: 9999px;
+			font-size: 0.8125rem;
+			font-weight: 500;
+			color: var(--color-accent-text);
+			background: var(--color-accent-soft);
+		}
+
+		.backdrop {
+			background: var(--color-scrim);
+			animation: sheet-fade 180ms ease-out;
+		}
+
+		.menu {
+			position: fixed;
+			top: auto;
+			right: 0;
+			bottom: 0;
+			left: 0;
+			min-width: 0;
+			padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
+			border-radius: 1.25rem 1.25rem 0 0;
+			animation: sheet-up 220ms cubic-bezier(0.32, 0.72, 0, 1);
+		}
+
+		.menu-left,
+		.menu-right {
+			left: 0;
+			right: 0;
+		}
+
+		@keyframes sheet-up {
+			from {
+				transform: translateY(16%);
+			}
+		}
+
+		@keyframes sheet-fade {
+			from {
+				opacity: 0;
+			}
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			.menu,
+			.backdrop {
+				animation: none;
+			}
+		}
+
+		.unread-pill {
+			display: none;
+		}
+
+		.filter-label {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip: rect(0, 0, 0, 0);
+		}
+
+		.filter .pill {
+			position: relative;
+			width: var(--touch-target);
+			padding: 0;
+			justify-content: center;
+		}
+
+		.mailbox:not(.selecting) .select-all {
+			display: none;
+		}
+
+		.tool-btn,
+		.pager-btn,
+		.caret {
+			width: var(--touch-target);
+			height: var(--touch-target);
+		}
+
+		.pill {
+			height: 2.25rem;
+			padding: 0 0.875rem;
+		}
+
+		.row :global(.swipe-content) {
+			grid-template-columns: auto 1fr;
+			gap: 0.625rem;
+			padding: 0.25rem 1rem;
+			min-height: 4.5rem;
+		}
+
+		.mailbox:not(.selecting) .row :global(.swipe-content) {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.mailbox:not(.selecting) .row :global(.check) {
+			display: none;
+		}
+
+		.star {
+			display: none;
+		}
+
+		.row-link {
+			grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+			grid-template-areas:
+				'avatar sender date'
+				'avatar body body';
+			gap: 0.15rem 0.75rem;
+			padding: 0.75rem 0;
+		}
+
+		.avatar {
+			grid-area: avatar;
+			align-self: center;
+			width: 2.5rem;
+			height: 2.5rem;
+			font-size: 0.8125rem;
+		}
+
 		.indicators {
 			display: none;
 		}
 
 		.sender {
 			grid-area: sender;
+			font-size: 0.9375rem;
 		}
 
 		.date {
@@ -1011,6 +1353,20 @@
 		}
 
 		.title {
+			font-size: 1.0625rem;
+		}
+
+		.list-foot {
+			display: none;
+		}
+
+		.pager-single {
+			display: none;
+		}
+
+		.menu-item {
+			min-height: var(--touch-target);
+			padding: 0.75rem 0.875rem;
 			font-size: 0.9375rem;
 		}
 	}

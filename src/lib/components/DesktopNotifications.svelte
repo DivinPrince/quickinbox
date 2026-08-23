@@ -43,7 +43,7 @@
 	);
 
 	function pushErrorMessage(error: unknown): string {
-		return error instanceof Error ? error.message : 'Could not update desktop notifications';
+		return error instanceof Error ? error.message : 'Could not update notifications';
 	}
 
 	async function refreshPushState() {
@@ -132,8 +132,8 @@
 <section class="surface-lg card">
 	<div class="card-head">
 		<div>
-			<h2><Icon name="notification-3-line" size={18} /> Desktop notifications</h2>
-			<p class="section-description">Get an alert when new mail arrives, even after closing this tab.</p>
+			<h2><Icon name="notification-3-line" size={18} /> Notifications</h2>
+			<p class="section-description">Get an alert when new mail arrives, even after closing the app.</p>
 		</div>
 		<span class="badge" class:notification-on={pushState === 'enabled'}>{pushStatusLabel}</span>
 	</div>
@@ -141,7 +141,7 @@
 	{#if pushState === 'unconfigured'}
 		<p class="hint">
 			<Icon name="information-line" size={14} />
-			The server needs VAPID keys before desktop notifications can be enabled.
+			The server needs VAPID keys before notifications can be enabled.
 		</p>
 	{:else if pushState === 'unsupported'}
 		<p class="hint">

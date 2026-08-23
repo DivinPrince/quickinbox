@@ -209,4 +209,18 @@
 		font-size: 0.8125rem;
 		color: var(--color-muted);
 	}
+
+	@media (max-width: 900px) {
+		.switcher-trigger {
+			min-height: var(--touch-target);
+			padding: 0.625rem 0.75rem;
+			font-size: 0.875rem;
+		}
+
+		.switcher-item {
+			min-height: var(--touch-target);
+			padding: 0.75rem;
+			font-size: 0.875rem;
+		}
+	}
 </style>

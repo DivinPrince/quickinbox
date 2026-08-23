@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { goto } from '$app/navigation';
 	import Icon from '$lib/components/Icon.svelte';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
 	import AttachmentPicker from '$lib/components/AttachmentPicker.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
+	import { requestSkipViewTransition } from '$lib/app-chrome';
 	import type { OutboundAttachmentInput } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -34,10 +36,10 @@
 	let savingDraft = $state(false);
 	let savedAt = $state('');
 
-	const isEmpty = $derived(!to.trim() && !subject.trim() && isHtmlEmpty(html));
+	const hasDraftText = $derived(Boolean(to.trim() || subject.trim() || !isHtmlEmpty(html)));
 
-	async function saveDraft() {
-		if (savingDraft || isEmpty) return;
+	async function saveDraft(): Promise<boolean> {
+		if (savingDraft || !hasDraftText) return false;
 		savingDraft = true;
 		error = '';
 
@@ -59,15 +61,27 @@
 			const body = await res.json();
 			if (!res.ok) {
 				error = body.error ?? 'Could not save draft';
-				return;
+				return false;
 			}
 			draftId = body.id;
 			savedAt = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+			return true;
 		} catch {
 			error = 'Network error';
+			return false;
 		} finally {
 			savingDraft = false;
 		}
+	}
+
+	async function closeComposer() {
+		if (hasDraftText && !(await saveDraft())) return;
+		if (attachments.length > 0) {
+			error = 'Attachments are not saved with drafts. Send the message or remove them first.';
+			return;
+		}
+		requestSkipViewTransition();
+		await goto(draftId ? '/drafts' : '/inbox');
 	}
 
 	async function discardDraft() {
@@ -124,6 +138,25 @@
 </svelte:head>
 
 <form class="compose-page" onsubmit={submit}>
+	<header class="compose-mobile-bar">
+		<button
+			type="button"
+			class="icon-btn"
+			aria-label="Close"
+			onpointerdown={(event) => event.stopPropagation()}
+			onclick={closeComposer}
+		>
+			<Icon name="close-line" size={22} />
+		</button>
+		<div class="compose-heading">
+			<h1 class="page-title">{draftId ? 'Draft' : 'New message'}</h1>
+			{#if savedAt}<span class="saved">Saved {savedAt}</span>{/if}
+		</div>
+		<button type="submit" class="btn-primary" disabled={sending}>
+			{sending ? 'Sending…' : 'Send'}
+		</button>
+	</header>
+
 	<header class="compose-header">
 		<div class="compose-heading">
 			<h1 class="page-title">{draftId ? 'Draft' : 'New message'}</h1>
@@ -139,7 +172,7 @@
 			>
 				Cc/Bcc
 			</button>
-			<button type="button" class="btn-ghost" disabled={savingDraft || isEmpty} onclick={saveDraft}>
+			<button type="button" class="btn-ghost" disabled={savingDraft || !hasDraftText} onclick={saveDraft}>
 				<Icon name="save-line" size={15} />
 				{savingDraft ? 'Saving…' : 'Save draft'}
 			</button>
@@ -186,11 +219,21 @@
 			<input
 				id="to"
 				type="text"
+				inputmode="email"
+				autocomplete="email"
 				bind:value={to}
 				required
 				placeholder="recipient@example.com"
 				class="field-input"
 			/>
+			<button
+				type="button"
+				class="copies-toggle"
+				onclick={() => (showCopies = !showCopies)}
+				aria-expanded={showCopies}
+			>
+				Cc/Bcc
+			</button>
 		</div>
 
 		{#if showCopies}
@@ -217,17 +260,46 @@
 		</div>
 	</div>
 
-	<div class="mt-4">
-		<RichTextEditor bind:html minHeight={320} />
-	</div>
+	{#if attachments.length}
+		<div class="compose-chips">
+			<AttachmentPicker bind:attachments mode="chips" />
+		</div>
+	{/if}
 
-	<div class="mt-4 px-1">
-		<AttachmentPicker bind:attachments />
+	<div class="compose-editor">
+		<RichTextEditor bind:html fill minHeight={160}>
+			{#snippet toolbarEnd()}
+				<AttachmentPicker bind:attachments mode="button" />
+				<button
+					type="button"
+					class="icon-btn"
+					disabled={savingDraft || !hasDraftText}
+					aria-label={savingDraft ? 'Saving' : 'Save draft'}
+					onclick={saveDraft}
+				>
+					<Icon name="save-line" size={18} />
+				</button>
+				{#if draftId}
+					<button
+						type="button"
+						class="icon-btn danger"
+						aria-label="Discard draft"
+						onclick={discardDraft}
+					>
+						<Icon name="delete-bin-line" size={18} />
+					</button>
+				{/if}
+			{/snippet}
+		</RichTextEditor>
 	</div>
 
 	{#if error}
-		<p class="mt-3 text-sm text-[var(--color-danger)]">{error}</p>
+		<p class="compose-error">{error}</p>
 	{/if}
+
+	<div class="compose-desktop-foot">
+		<AttachmentPicker bind:attachments />
+	</div>
 </form>
 
 <style>
@@ -264,5 +336,132 @@
 	.field-static {
 		font-size: 0.9375rem;
 		color: var(--color-text-secondary);
+	}
+
+	.copies-toggle {
+		display: none;
+	}
+
+	.compose-editor {
+		margin-top: 1rem;
+	}
+
+	.compose-error {
+		margin-top: 0.75rem;
+		font-size: 0.875rem;
+		color: var(--color-danger);
+	}
+
+	.compose-mobile-bar {
+		display: none;
+	}
+
+	.compose-chips {
+		display: none;
+	}
+
+	.compose-desktop-foot {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 1rem;
+	}
+
+	@media (max-width: 900px) {
+		.compose-page {
+			display: flex;
+			flex-direction: column;
+			flex: 1;
+			width: 100%;
+			min-width: 0;
+			min-height: 0;
+			height: 100%;
+			background: var(--color-surface);
+		}
+
+		.compose-header {
+			display: none;
+		}
+
+		.compose-mobile-bar {
+			position: sticky;
+			top: 0;
+			z-index: 20;
+			display: flex;
+			align-items: center;
+			gap: 0.375rem;
+			flex-shrink: 0;
+			min-height: calc(3.25rem + env(safe-area-inset-top));
+			padding: env(safe-area-inset-top) 0.375rem 0.25rem;
+			background: var(--color-surface);
+			box-shadow: inset 0 -1px 0 var(--color-line);
+		}
+
+		.compose-mobile-bar .compose-heading {
+			flex: 1;
+			min-width: 0;
+			flex-direction: column;
+			align-items: center;
+			gap: 0;
+		}
+
+		.compose-mobile-bar .page-title {
+			font-size: 1.0625rem;
+		}
+
+		.compose-mobile-bar .btn-primary {
+			min-width: 4.5rem;
+		}
+
+		.compose-fields {
+			flex-shrink: 0;
+			border-radius: 0;
+			box-shadow: none;
+			background: var(--color-surface);
+		}
+
+		.compose-fields :global(.field-row) {
+			min-height: var(--touch-target);
+			padding: 0 1rem;
+		}
+
+		.copies-toggle {
+			display: flex;
+			align-items: center;
+			flex-shrink: 0;
+			min-height: var(--touch-target);
+			padding: 0 0.25rem 0 0.5rem;
+			font-size: 0.8125rem;
+			font-weight: 500;
+			color: var(--color-accent-text);
+		}
+
+		.compose-editor {
+			display: flex;
+			flex: 1;
+			flex-direction: column;
+			min-height: 0;
+			margin: 0;
+		}
+
+		.compose-error {
+			margin: 0;
+			padding: 0 1rem 0.5rem;
+		}
+
+		.compose-chips {
+			display: block;
+			flex-shrink: 0;
+			padding: 0.375rem 1rem 0.5rem;
+		}
+
+		.compose-desktop-foot {
+			display: none;
+		}
+
+		.compose-editor :global(.icon-btn.danger) {
+			color: var(--color-danger);
+		}
 	}
 </style>
