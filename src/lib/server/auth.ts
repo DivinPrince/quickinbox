@@ -153,6 +153,48 @@ export async function setUserPassword(
 }
 
 /**
+ * Grant or withdraw admin.
+ *
+ * Promotion needs no guard. Demotion does: the count travels with the UPDATE
+ * rather than being read first, so two admins demoting each other concurrently
+ * cannot both pass a stale check and leave the instance with nobody. Demoting
+ * someone who is already not an admin is a no-op that still reports success.
+ */
+export async function setUserAdmin(
+	db: D1Database,
+	actor: User,
+	targetId: string,
+	isAdmin: boolean
+): Promise<void> {
+	if (actor.id === targetId) {
+		throw new Error('You cannot change your own role');
+	}
+
+	const target = await getUserById(db, targetId);
+	if (!target) {
+		throw new Error('User not found');
+	}
+
+	if (isAdmin) {
+		await db.prepare('UPDATE users SET is_admin = 1 WHERE id = ?').bind(targetId).run();
+		return;
+	}
+
+	const result = await db
+		.prepare(
+			`UPDATE users SET is_admin = 0
+			 WHERE id = ?
+			   AND (is_admin = 0 OR (SELECT COUNT(*) FROM users WHERE is_admin = 1) > 1)`
+		)
+		.bind(targetId)
+		.run();
+
+	if ((result.meta?.changes ?? 0) === 0) {
+		throw new Error('Keep at least one admin');
+	}
+}
+
+/**
  * Removes the account and everything the D1 cascade takes with it — sessions,
  * addresses, mail — plus the R2 objects the mail's attachments point at, which
  * the cascade cannot reach.

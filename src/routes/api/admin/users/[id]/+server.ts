@@ -1,5 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { deleteUser, setUserPassword } from '$lib/server/auth';
+import { deleteUser, setUserAdmin, setUserPassword } from '$lib/server/auth';
 
 export const PATCH: RequestHandler = async ({ params, request, locals, platform }) => {
 	if (!locals.user?.is_admin) {
@@ -9,17 +9,28 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 	const db = platform?.env.DB;
 	if (!db) return json({ error: 'Database unavailable' }, { status: 503 });
 
-	const body = (await request.json()) as { password?: string };
-	if (!body.password) {
-		return json({ error: 'Password is required' }, { status: 400 });
+	const body = (await request.json()) as { password?: string; isAdmin?: boolean };
+
+	if (body.password === undefined && body.isAdmin === undefined) {
+		return json({ error: 'Nothing to update' }, { status: 400 });
 	}
 
 	try {
-		await setUserPassword(db, params.id!, body.password);
+		if (typeof body.isAdmin === 'boolean') {
+			await setUserAdmin(db, locals.user, params.id!, body.isAdmin);
+		}
+
+		if (body.password !== undefined) {
+			if (!body.password) {
+				return json({ error: 'Password is required' }, { status: 400 });
+			}
+			await setUserPassword(db, params.id!, body.password);
+		}
+
 		return json({ ok: true });
 	} catch (error) {
 		return json(
-			{ error: error instanceof Error ? error.message : 'Failed to reset password' },
+			{ error: error instanceof Error ? error.message : 'Failed to update user' },
 			{ status: 400 }
 		);
 	}

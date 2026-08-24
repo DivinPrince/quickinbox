@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { User } from '$lib/types';
-import { deleteUser } from './auth';
+import { deleteUser, setUserAdmin } from './auth';
 
 const actor: User = {
 	id: 'admin-1',
@@ -218,5 +218,83 @@ describe('deleteUser', () => {
 		const { db } = mockDb({ storageKeys: ['att/one'], deleteChanges: 1 });
 
 		await assert.doesNotReject(() => deleteUser(db, undefined, actor, targetRow.id));
+	});
+});
+
+
+/** Records the write statements so the guard can be asserted on. */
+function mockRoleDb(options: { updateChanges: number; target?: unknown }) {
+	const writes: string[] = [];
+
+	const db = {
+		prepare(sql: string) {
+			return {
+				bind(..._args: unknown[]) {
+					return {
+						async first() {
+							if (!sql.includes('FROM users WHERE id = ?')) return null;
+							return 'target' in options ? options.target : targetRow;
+						},
+						async run() {
+							writes.push(sql);
+							return { meta: { changes: options.updateChanges } };
+						}
+					};
+				}
+			};
+		}
+	} as unknown as D1Database;
+
+	return { db, writes };
+}
+
+describe('setUserAdmin', () => {
+	test('refuses to change the role of the account making the request', async () => {
+		const { db, writes } = mockRoleDb({ updateChanges: 1 });
+
+		await assert.rejects(
+			() => setUserAdmin(db, actor, actor.id, false),
+			/cannot change your own role/
+		);
+		assert.deepEqual(writes, []);
+	});
+
+	test('rejects an unknown user', async () => {
+		const { db, writes } = mockRoleDb({ updateChanges: 1, target: null });
+
+		await assert.rejects(() => setUserAdmin(db, actor, 'nobody', true), /User not found/);
+		assert.deepEqual(writes, []);
+	});
+
+	test('promotes without a guard', async () => {
+		const { db, writes } = mockRoleDb({ updateChanges: 1 });
+
+		await setUserAdmin(db, actor, targetRow.id, true);
+
+		assert.equal(writes.length, 1);
+		assert.match(writes[0], /SET is_admin = 1/);
+		assert.doesNotMatch(writes[0], /COUNT\(\*\)/);
+	});
+
+	test('carries the last-admin guard on the demotion itself', async () => {
+		// Reading the count first and updating after lets two admins demote each
+		// other concurrently, both seeing two admins, leaving nobody.
+		const { db, writes } = mockRoleDb({ updateChanges: 1 });
+
+		await setUserAdmin(db, actor, targetRow.id, false);
+
+		assert.equal(writes.length, 1);
+		assert.match(writes[0], /SET is_admin = 0/);
+		assert.match(writes[0], /SELECT COUNT\(\*\) FROM users WHERE is_admin = 1/);
+	});
+
+	test('refuses to demote the last admin', async () => {
+		// The guard matched nothing, so the row was left alone.
+		const { db } = mockRoleDb({ updateChanges: 0 });
+
+		await assert.rejects(
+			() => setUserAdmin(db, actor, targetRow.id, false),
+			/Keep at least one admin/
+		);
 	});
 });

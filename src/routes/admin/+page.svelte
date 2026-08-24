@@ -24,6 +24,9 @@
 	let deleteError = $state('');
 	let deletingUser = $state<string | null>(null);
 
+	let roleError = $state('');
+	let changingRole = $state<string | null>(null);
+
 	let connecting = $state<string | null>(null);
 	let domainError = $state('');
 
@@ -66,6 +69,33 @@
 			userError = 'Network error';
 		} finally {
 			creatingUser = false;
+		}
+	}
+
+	/**
+	 * The server refuses demoting the last admin, so that error surfaces here
+	 * rather than being second-guessed in the UI.
+	 */
+	async function setRole(userId: string, isAdmin: boolean) {
+		roleError = '';
+		changingRole = userId;
+
+		try {
+			const res = await fetch(`/api/admin/users/${userId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ isAdmin })
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				roleError = body.error ?? 'Could not change that role';
+				return;
+			}
+			window.location.reload();
+		} catch {
+			roleError = 'Network error';
+		} finally {
+			changingRole = null;
 		}
 	}
 
@@ -325,8 +355,20 @@
 									.join(', ') || user.email}
 							</p>
 						</div>
-						{#if user.is_admin}
-							<span class="admin-badge">Admin</span>
+						{#if user.id === data.user?.id}
+							{#if user.is_admin}
+								<span class="admin-badge">Admin</span>
+							{/if}
+						{:else}
+							<Check
+								label={user.is_admin
+									? `Remove admin from ${user.name}`
+									: `Make ${user.name} an admin`}
+								caption="Admin"
+								checked={user.is_admin}
+								disabled={changingRole === user.id}
+								onchange={(next) => setRole(user.id, next)}
+							/>
 						{/if}
 						{#if user.id !== data.user?.id}
 							<button
@@ -343,6 +385,7 @@
 					</li>
 				{/each}
 			</ul>
+			{#if roleError}<p class="error">{roleError}</p>{/if}
 			{#if deleteError}<p class="error">{deleteError}</p>{/if}
 		</section>
 	</div>
