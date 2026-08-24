@@ -172,24 +172,13 @@ export async function deleteUser(
 		throw new Error('User not found');
 	}
 
-	// Collect the keys while the rows are still there: deleting the user
-	// cascades the attachment metadata away, and with it any way to find the
-	// objects it pointed at.
-	const storageKeys = bucket
-		? (
-				await db
-					.prepare(
-						`SELECT storage_key FROM email_attachments
-						 WHERE storage_key IS NOT NULL
-						   AND email_id IN (SELECT id FROM emails WHERE user_id = ?)`
-					)
-					.bind(targetId)
-					.all<{ storage_key: string }>()
-			).results.map((row) => row.storage_key)
-		: [];
-
 	// One transaction: D1 rolls a batch back entirely if any statement fails, so
 	// the account can never be gone while its mail, sessions and tokens survive.
+	//
+	// The key read is the batch's first statement rather than a preceding query.
+	// Reading outside the transaction leaves a window in which inbound delivery
+	// commits an attachment whose metadata this then deletes without ever having
+	// collected its object.
 	//
 	// The last-admin rule rides on the DELETE rather than a preceding read —
 	// counting first and deleting after lets two admins delete each other
@@ -201,7 +190,14 @@ export async function deleteUser(
 	// the children are cleared explicitly; where the cascade ran they are no-ops.
 	// email_attachments is reachable only through emails, so it goes first.
 	const gone = 'NOT EXISTS (SELECT 1 FROM users WHERE id = ?)';
-	const [deletion] = await db.batch([
+	const [keys, deletion] = await db.batch<{ storage_key: string }>([
+		db
+			.prepare(
+				`SELECT storage_key FROM email_attachments
+				 WHERE storage_key IS NOT NULL
+				   AND email_id IN (SELECT id FROM emails WHERE user_id = ?)`
+			)
+			.bind(targetId),
 		db
 			.prepare(
 				`DELETE FROM users
@@ -233,13 +229,15 @@ export async function deleteUser(
 		throw new Error('Keep at least one admin');
 	}
 
+	const storageKeys = (keys.results ?? []).map((row) => row.storage_key);
+
 	// Purged only after the row is gone, so a refused delete never strands mail
 	// without the files it references. Best-effort from here: the account is
 	// already deleted, so a storage hiccup must not report failure — the caller
 	// would retry and be told the user does not exist, with the strays no longer
 	// reachable from any metadata. Log them instead.
-	if (storageKeys.length > 0) {
-		const purged = await Promise.allSettled(storageKeys.map((key) => bucket!.delete(key)));
+	if (bucket && storageKeys.length > 0) {
+		const purged = await Promise.allSettled(storageKeys.map((key) => bucket.delete(key)));
 		purged.forEach((outcome, index) => {
 			if (outcome.status === 'rejected') {
 				console.error('Failed to delete attachment object', storageKeys[index], outcome.reason);

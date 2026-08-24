@@ -33,14 +33,6 @@ function mockDb(options: { storageKeys?: string[]; deleteChanges: number }) {
 						async first() {
 							return sql.includes('FROM users WHERE id = ?') ? targetRow : null;
 						},
-						async all() {
-							if (sql.includes('FROM email_attachments')) {
-								return {
-									results: (options.storageKeys ?? []).map((storage_key) => ({ storage_key }))
-								};
-							}
-							return { results: [] };
-						},
 						async run() {
 							return { meta: { changes: 0 } };
 						}
@@ -50,8 +42,13 @@ function mockDb(options: { storageKeys?: string[]; deleteChanges: number }) {
 		},
 		async batch(statements: { sql: string }[]) {
 			batches.push(statements.map((statement) => statement.sql));
-			return statements.map((_, index) => ({
-				meta: { changes: index === 0 ? options.deleteChanges : 0 }
+			return statements.map((statement) => ({
+				results: statement.sql.includes('SELECT storage_key')
+					? (options.storageKeys ?? []).map((storage_key) => ({ storage_key }))
+					: [],
+				meta: {
+					changes: statement.sql.includes('DELETE FROM users') ? options.deleteChanges : 0
+				}
 			}));
 		}
 	} as unknown as D1Database;
@@ -142,8 +139,9 @@ describe('deleteUser', () => {
 
 		await deleteUser(db, bucket, actor, targetRow.id);
 
-		assert.match(batches[0][0], /DELETE FROM users/);
-		assert.match(batches[0][0], /SELECT COUNT\(\*\) FROM users WHERE is_admin = 1/);
+		const userDelete = batches[0].find((sql) => sql.includes('DELETE FROM users'));
+		assert.ok(userDelete);
+		assert.match(userDelete, /SELECT COUNT\(\*\) FROM users WHERE is_admin = 1/);
 	});
 
 	test('clears every child table, for databases without cascade enforcement', async () => {
@@ -190,9 +188,30 @@ describe('deleteUser', () => {
 
 		await deleteUser(db, bucket, actor, targetRow.id);
 
-		for (const sql of batches[0].slice(1)) {
+		const userDeleteAt = batches[0].findIndex((sql) => sql.includes('DELETE FROM users'));
+		const children = batches[0].slice(userDeleteAt + 1);
+		assert.ok(children.length > 0);
+		for (const sql of children) {
 			assert.match(sql, /NOT EXISTS \(SELECT 1 FROM users WHERE id = \?\)/);
 		}
+	});
+
+	test('reads the attachment keys inside the deletion transaction', async () => {
+		// Reading them beforehand leaves a window where inbound delivery commits an
+		// attachment whose metadata this deletes without collecting its object.
+		const { db, batches } = mockDb({ storageKeys: ['att/one'], deleteChanges: 1 });
+		const { bucket, deleted } = mockBucket();
+
+		await deleteUser(db, bucket, actor, targetRow.id);
+
+		assert.equal(batches.length, 1);
+		assert.match(batches[0][0], /SELECT storage_key FROM email_attachments/);
+		assert.ok(
+			batches[0].findIndex((sql) => sql.includes('SELECT storage_key')) <
+				batches[0].findIndex((sql) => sql.includes('DELETE FROM users')),
+			'the key read must precede the delete inside the transaction'
+		);
+		assert.deepEqual(deleted, ['att/one']);
 	});
 
 	test('works without a bucket configured', async () => {
