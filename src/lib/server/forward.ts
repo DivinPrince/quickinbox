@@ -43,6 +43,11 @@ export function formatForwardDate(createdAt: string): string {
 	return Number.isNaN(date.getTime()) ? createdAt : date.toUTCString();
 }
 
+/** Plain text as a paragraph, for the HTML part of a message that lacks one. */
+function asHtmlParagraph(text: string): string {
+	return `<p>${escapeHtml(text).replaceAll('\n', '<br>\n')}</p>`;
+}
+
 /** What the sender writes above the forwarded message, in both forms. */
 export type ForwardNote = {
 	text?: string | null;
@@ -63,8 +68,11 @@ export function buildForwardedMessage(
 
 	if (original.cc_addr?.trim()) headers.push(['Cc', original.cc_addr.trim()]);
 
-	const noteHtml = options.note?.html?.trim() || null;
-	const noteText = options.note?.text?.trim() || (noteHtml ? stripHtml(noteHtml) : '');
+	// The two forms fill in for each other: a note written in one still reaches a
+	// recipient whose client shows the other.
+	const writtenHtml = options.note?.html?.trim() || null;
+	const noteText = options.note?.text?.trim() || (writtenHtml ? stripHtml(writtenHtml) : '');
+	const noteHtml = writtenHtml ?? (noteText ? asHtmlParagraph(noteText) : '');
 	const originalText = original.body_text?.trim() || stripHtml(original.body_html ?? '');
 	const originalHtml = original.body_html?.trim() || null;
 
@@ -79,14 +87,14 @@ export function buildForwardedMessage(
 	// `gmail_quote` is what mail clients — this one included — fold a forwarded
 	// message behind, so the reader sees the note first rather than the history.
 	const html = [
-		noteHtml ?? '',
+		noteHtml,
 		'<div class="gmail_quote">',
 		'<div class="gmail_attr">---------- Forwarded message ----------<br>',
 		headers
 			.map(([label, value]) => `<b>${label}:</b> ${escapeHtml(value)}`)
 			.join('<br>'),
 		'</div><br>',
-		originalHtml ?? `<p>${escapeHtml(originalText).replaceAll('\n', '<br>\n')}</p>`,
+		originalHtml ?? asHtmlParagraph(originalText),
 		'</div>'
 	].join('');
 

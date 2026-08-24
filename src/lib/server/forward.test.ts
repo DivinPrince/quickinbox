@@ -61,6 +61,38 @@ describe('forwarding a message', () => {
 		assert.match(html, /^<p>See below\.<\/p><div class="gmail_quote">/);
 	});
 
+	test('a note written only as text still reaches the HTML part', () => {
+		const { text, html } = buildForwardedMessage(original, {
+			note: { text: 'See below.\nThanks.' }
+		});
+
+		assert.match(text, /^See below\.\nThanks\.\n\n---------- Forwarded message/);
+		assert.match(html, /^<p>See below\.<br>\nThanks\.<\/p><div class="gmail_quote">/);
+	});
+
+	test('a note written only as HTML still reaches the text part', () => {
+		const { text, html } = buildForwardedMessage(original, {
+			note: { html: '<p>See below.</p>' }
+		});
+
+		assert.match(text, /^See below\.\n\n---------- Forwarded message/);
+		assert.match(html, /^<p>See below\.<\/p><div class="gmail_quote">/);
+	});
+
+	test('a text note is escaped rather than treated as markup', () => {
+		const { html } = buildForwardedMessage(original, {
+			note: { text: '<img src=x onerror="alert(1)">' }
+		});
+
+		assert.equal(html.includes('<img src=x'), false);
+		assert.match(html, /&lt;img src=x/);
+	});
+
+	test('no note leaves the forwarded message at the top', () => {
+		const { html } = buildForwardedMessage(original);
+		assert.match(html, /^<div class="gmail_quote">/);
+	});
+
 	test('the forwarded part is wrapped so a reader can fold it', () => {
 		const { html } = buildForwardedMessage(original);
 		assert.match(html, /<div class="gmail_quote">/);
