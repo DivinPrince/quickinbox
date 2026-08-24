@@ -34,7 +34,7 @@ export const DELETE: RequestHandler = async ({ params, locals, platform }) => {
 	if (!db) return json({ error: 'Database unavailable' }, { status: 503 });
 
 	try {
-		await deleteUser(db, locals.user, params.id!);
+		await deleteUser(db, platform?.env.ATTACHMENTS, locals.user, params.id!);
 		return json({ ok: true });
 	} catch (error) {
 		return json(

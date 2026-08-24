@@ -1,4 +1,4 @@
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import { SESSION_COOKIE, SESSION_DAYS } from './constants';
 import { createSessionToken, hashPassword, hashToken, verifyPassword } from './crypto';
 import type { User } from '$lib/types';
@@ -152,7 +152,17 @@ export async function setUserPassword(
 	]);
 }
 
-export async function deleteUser(db: D1Database, actor: User, targetId: string): Promise<void> {
+/**
+ * Removes the account and everything the D1 cascade takes with it — sessions,
+ * addresses, mail — plus the R2 objects the mail's attachments point at, which
+ * the cascade cannot reach.
+ */
+export async function deleteUser(
+	db: D1Database,
+	bucket: R2Bucket | undefined,
+	actor: User,
+	targetId: string
+): Promise<void> {
 	if (actor.id === targetId) {
 		throw new Error('You cannot delete your own account');
 	}
@@ -162,14 +172,43 @@ export async function deleteUser(db: D1Database, actor: User, targetId: string):
 		throw new Error('User not found');
 	}
 
-	if (target.is_admin) {
-		const admins = (await listUsers(db)).filter((user) => user.is_admin);
-		if (admins.length <= 1) {
-			throw new Error('Keep at least one admin');
-		}
+	// Collect the keys while the rows are still there: deleting the user
+	// cascades the attachment metadata away, and with it any way to find the
+	// objects it pointed at.
+	const storageKeys = bucket
+		? (
+				await db
+					.prepare(
+						`SELECT storage_key FROM email_attachments
+						 WHERE storage_key IS NOT NULL
+						   AND email_id IN (SELECT id FROM emails WHERE user_id = ?)`
+					)
+					.bind(targetId)
+					.all<{ storage_key: string }>()
+			).results.map((row) => row.storage_key)
+		: [];
+
+	// The last-admin rule is enforced by the DELETE itself. Counting first and
+	// deleting after lets two admins delete each other concurrently — both
+	// reads see two admins, both deletes succeed, and nobody is left.
+	const result = await db
+		.prepare(
+			`DELETE FROM users
+			 WHERE id = ?
+			   AND (is_admin = 0 OR (SELECT COUNT(*) FROM users WHERE is_admin = 1) > 1)`
+		)
+		.bind(targetId)
+		.run();
+
+	if ((result.meta?.changes ?? 0) === 0) {
+		throw new Error('Keep at least one admin');
 	}
 
-	await db.prepare('DELETE FROM users WHERE id = ?').bind(targetId).run();
+	// Purged only after the row is gone, so a refused delete never strands mail
+	// without the files it references.
+	if (storageKeys.length > 0) {
+		await Promise.all(storageKeys.map((key) => bucket!.delete(key)));
+	}
 }
 
 export async function getUserFromSession(db: D1Database, token: string | undefined): Promise<User | null> {
