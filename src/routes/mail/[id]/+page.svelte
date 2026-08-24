@@ -210,6 +210,7 @@
 			{#each messages as message (message.id)}
 				<ThreadMessage
 					{message}
+					receivedLabel={message.received_label}
 					expanded={opened.has(message.id)}
 					onToggle={() => toggleMessage(message.id)}
 				/>

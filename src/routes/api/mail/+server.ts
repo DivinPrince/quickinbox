@@ -55,6 +55,7 @@ export const GET: RequestHandler = async ({ locals, platform, url }) => {
 	const mailbox = await listMailbox(db, locals.user.id, {
 		view: mailboxView(url),
 		domainId: locals.activeDomainId,
+		addressId: url.searchParams.get('address'),
 		q: url.searchParams.get('q'),
 		unreadOnly: url.searchParams.get('unread') === '1',
 		starredOnly: url.searchParams.get('starred') === '1',

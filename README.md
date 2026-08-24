@@ -10,10 +10,10 @@ no servers to maintain.
 ## Features
 
 - **Real mail in and out** — the provider delivers straight into the Worker, nothing is polled
-- **Threads** — replies group into conversations, quoted history collapses
+- **Threads** — replies group into conversations, quoted history collapses; conversations never mix messages from different domains
 - **Attachments** — inbound files land in R2, outbound files upload from the composer
 - **Safe HTML** — received HTML renders in a sandboxed iframe
-- **Multiple domains and users** — per-user addresses, admin catch-all, unrouted-mail view
+- **Multiple domains and users** — per-user addresses, admin catch-all, unrouted-mail view; the combined inbox tags each conversation with the address it arrived on and can filter by it
 - **Delivery status** — delivered / bounced / complained tracking
 - **REST API, CLI, and MCP server** — send and read mail from scripts, the terminal, or AI agents
 - Light and dark themes
