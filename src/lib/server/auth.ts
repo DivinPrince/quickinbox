@@ -204,6 +204,26 @@ export async function deleteUser(
 		throw new Error('Keep at least one admin');
 	}
 
+	// Older D1 databases were created without ON DELETE CASCADE enforcement, so
+	// clear the children explicitly — no-ops wherever the cascade already ran.
+	// email_attachments hangs off emails, so it has to go before those rows do.
+	await db.batch([
+		db
+			.prepare(
+				`DELETE FROM email_attachments
+				 WHERE email_id IN (SELECT id FROM emails WHERE user_id = ?)`
+			)
+			.bind(targetId),
+		db.prepare('DELETE FROM emails WHERE user_id = ?').bind(targetId),
+		db.prepare('DELETE FROM addresses WHERE user_id = ?').bind(targetId),
+		db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(targetId),
+		db.prepare('DELETE FROM api_tokens WHERE user_id = ?').bind(targetId),
+		db.prepare('DELETE FROM push_subscriptions WHERE user_id = ?').bind(targetId),
+		db
+			.prepare('UPDATE domains SET catchall_user_id = NULL WHERE catchall_user_id = ?')
+			.bind(targetId)
+	]);
+
 	// Purged only after the row is gone, so a refused delete never strands mail
 	// without the files it references. Best-effort from here: the account is
 	// already deleted, so a storage hiccup must not report failure — the caller

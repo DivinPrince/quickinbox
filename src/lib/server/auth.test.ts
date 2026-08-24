@@ -22,12 +22,14 @@ const targetRow = {
 
 function mockDb(options: { storageKeys?: string[]; deleteChanges: number }) {
 	const deleteStatements: string[] = [];
+	const batched: string[] = [];
 
 	const db = {
 		prepare(sql: string) {
 			return {
 				bind(..._args: unknown[]) {
 					return {
+						sql,
 						async first() {
 							return sql.includes('FROM users WHERE id = ?') ? targetRow : null;
 						},
@@ -49,10 +51,14 @@ function mockDb(options: { storageKeys?: string[]; deleteChanges: number }) {
 					};
 				}
 			};
+		},
+		async batch(statements: { sql: string }[]) {
+			batched.push(...statements.map((statement) => statement.sql));
+			return statements.map(() => ({ meta: { changes: 0 } }));
 		}
 	} as unknown as D1Database;
 
-	return { db, deleteStatements };
+	return { db, deleteStatements, batched };
 }
 
 function mockBucket(options: { failOn?: string } = {}) {
@@ -122,6 +128,50 @@ describe('deleteUser', () => {
 
 		await assert.doesNotReject(() => deleteUser(db, bucket, actor, targetRow.id));
 		assert.deepEqual(deleted, ['att/two']);
+	});
+
+	test('clears child rows explicitly, for databases without cascade enforcement', async () => {
+		// Older D1 databases were created without ON DELETE CASCADE enforced, so
+		// the user row going away is not enough — mail, addresses, sessions,
+		// tokens and push subscriptions would all be left behind.
+		const { db, batched } = mockDb({ deleteChanges: 1 });
+		const { bucket } = mockBucket();
+
+		await deleteUser(db, bucket, actor, targetRow.id);
+
+		for (const table of [
+			'email_attachments',
+			'emails',
+			'addresses',
+			'sessions',
+			'api_tokens',
+			'push_subscriptions'
+		]) {
+			assert.ok(
+				batched.some((sql) => sql.includes(`DELETE FROM ${table}`)),
+				`expected the cleanup batch to delete from ${table}`
+			);
+		}
+
+		assert.ok(
+			batched.some((sql) => sql.includes('UPDATE domains SET catchall_user_id = NULL')),
+			'expected the catch-all reference to be cleared'
+		);
+
+		// Attachment metadata is reachable only through emails, so it has to go first.
+		assert.ok(
+			batched.findIndex((sql) => sql.includes('DELETE FROM email_attachments')) <
+				batched.findIndex((sql) => sql.includes('DELETE FROM emails WHERE')),
+			'email_attachments must be cleared before the emails it hangs off'
+		);
+	});
+
+	test('leaves child rows alone when the delete is refused', async () => {
+		const { db, batched } = mockDb({ deleteChanges: 0 });
+		const { bucket } = mockBucket();
+
+		await assert.rejects(() => deleteUser(db, bucket, actor, targetRow.id));
+		assert.deepEqual(batched, []);
 	});
 
 	test('works without a bucket configured', async () => {
