@@ -136,6 +136,12 @@ export type DeviceSession = {
 	is_current: boolean;
 };
 
+export type AdminDeviceSession = Omit<DeviceSession, 'is_current'> & {
+	user_id: string;
+	user_name: string;
+	user_email: string;
+};
+
 type DeviceSessionRow = Omit<DeviceSession, 'is_current'>;
 
 function toIsoTimestamp(value: string): string {
@@ -195,6 +201,30 @@ export async function listDeviceSessions(
 		last_seen_at: session.last_seen_at ? toIsoTimestamp(session.last_seen_at) : null,
 		expires_at: toIsoTimestamp(session.expires_at),
 		is_current: session.id === currentSessionId
+	}));
+}
+
+/** Admin-only inventory of paired mobile sessions across every account. */
+export async function listAllMobileDeviceSessions(
+	db: D1Database
+): Promise<AdminDeviceSession[]> {
+	const { results } = await db
+		.prepare(
+			`SELECT s.id, s.user_id, u.name AS user_name, u.email AS user_email,
+			        s.device_name, s.device_platform, s.created_at, s.last_seen_at, s.expires_at
+			 FROM sessions s
+			 JOIN users u ON u.id = s.user_id
+			 WHERE s.device_platform IS NOT NULL
+			   AND datetime(s.expires_at) > datetime('now')
+			 ORDER BY s.last_seen_at DESC, s.created_at DESC`
+		)
+		.all<Omit<AdminDeviceSession, 'is_current'>>();
+
+	return results.map((session) => ({
+		...session,
+		created_at: toIsoTimestamp(session.created_at),
+		last_seen_at: session.last_seen_at ? toIsoTimestamp(session.last_seen_at) : null,
+		expires_at: toIsoTimestamp(session.expires_at)
 	}));
 }
 
