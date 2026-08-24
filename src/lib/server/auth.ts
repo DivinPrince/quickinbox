@@ -205,9 +205,17 @@ export async function deleteUser(
 	}
 
 	// Purged only after the row is gone, so a refused delete never strands mail
-	// without the files it references.
+	// without the files it references. Best-effort from here: the account is
+	// already deleted, so a storage hiccup must not report failure — the caller
+	// would retry and be told the user does not exist, with the strays no longer
+	// reachable from any metadata. Log them instead.
 	if (storageKeys.length > 0) {
-		await Promise.all(storageKeys.map((key) => bucket!.delete(key)));
+		const purged = await Promise.allSettled(storageKeys.map((key) => bucket!.delete(key)));
+		purged.forEach((outcome, index) => {
+			if (outcome.status === 'rejected') {
+				console.error('Failed to delete attachment object', storageKeys[index], outcome.reason);
+			}
+		});
 	}
 }
 

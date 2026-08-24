@@ -55,10 +55,11 @@ function mockDb(options: { storageKeys?: string[]; deleteChanges: number }) {
 	return { db, deleteStatements };
 }
 
-function mockBucket() {
+function mockBucket(options: { failOn?: string } = {}) {
 	const deleted: string[] = [];
 	const bucket = {
 		async delete(key: string) {
+			if (options.failOn === key) throw new Error('R2 unavailable');
 			deleted.push(key);
 		}
 	} as unknown as R2Bucket;
@@ -110,6 +111,17 @@ describe('deleteUser', () => {
 
 		assert.equal(deleteStatements.length, 1);
 		assert.match(deleteStatements[0], /SELECT COUNT\(\*\) FROM users WHERE is_admin = 1/);
+	});
+
+	test('still succeeds when an R2 delete fails, and purges the rest', async () => {
+		// The D1 delete has already committed by this point. Throwing here would
+		// report failure for a deletion that happened, and the retry would say
+		// the user no longer exists.
+		const { db } = mockDb({ storageKeys: ['att/one', 'att/two'], deleteChanges: 1 });
+		const { bucket, deleted } = mockBucket({ failOn: 'att/one' });
+
+		await assert.doesNotReject(() => deleteUser(db, bucket, actor, targetRow.id));
+		assert.deepEqual(deleted, ['att/two']);
 	});
 
 	test('works without a bucket configured', async () => {
