@@ -31,6 +31,7 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		domainId?: string;
 		localPart?: string;
 		password?: string;
+		isAdmin?: boolean;
 	};
 
 	if (!body.name?.trim() || !body.localPart?.trim() || !body.domainId) {
@@ -52,7 +53,8 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		const user = await createUser(db, {
 			email: `${localPart}@${domain.name}`,
 			name: body.name,
-			password: body.password
+			password: body.password,
+			isAdmin: body.isAdmin === true
 		});
 
 		const address = await createAddress(db, {
