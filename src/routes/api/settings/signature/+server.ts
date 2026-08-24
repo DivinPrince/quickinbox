@@ -1,6 +1,15 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { MAX_EMAIL_SIGNATURE_LENGTH } from '$lib/email-signature';
-import { updateEmailSignature } from '$lib/server/email-signature';
+import { getEmailSignature, updateEmailSignature } from '$lib/server/email-signature';
+
+export const GET: RequestHandler = async ({ locals, platform }) => {
+	const db = platform?.env.DB;
+	if (!db || !locals.user) {
+		return json({ error: 'Unauthorized' }, { status: 401 });
+	}
+
+	return json({ signature: await getEmailSignature(db, locals.user.id) });
+};
 
 export const PATCH: RequestHandler = async ({ request, locals, platform }) => {
 	const db = platform?.env.DB;

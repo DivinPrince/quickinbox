@@ -5,6 +5,7 @@ import type { MailboxCounts } from '$lib/types';
 const EMPTY_COUNTS: MailboxCounts = {
 	inbox: 0,
 	inbox_unread: 0,
+	archive: 0,
 	starred: 0,
 	drafts: 0,
 	sent: 0,

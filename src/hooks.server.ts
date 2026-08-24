@@ -12,7 +12,8 @@ import { listAddressesForUser, listDomains } from '$lib/server/domains';
 const PUBLIC_PREFIXES = [
 	'/login',
 	'/setup',
-	'/api/auth',
+	'/api/auth/login',
+	'/api/auth/pair',
 	'/api/setup',
 	'/api/webhooks',
 	'/install.sh'

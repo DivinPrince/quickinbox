@@ -125,6 +125,7 @@ const BEARER_ROUTES: RouteRule[] = [
 
 const MOBILE_SESSION_ROUTES: Array<Pick<RouteRule, 'method' | 'match'>> = [
 	{ method: 'GET', match: (pathname) => pathname === '/api/auth/me' },
+	{ method: 'DELETE', match: (pathname) => pathname === '/api/auth/session' },
 	{ method: 'GET', match: (pathname) => pathname === '/api/mail' },
 	{ method: 'POST', match: (pathname) => pathname === '/api/mail' },
 	{ method: 'POST', match: (pathname) => pathname === '/api/mail/actions' },
@@ -139,6 +140,7 @@ const MOBILE_SESSION_ROUTES: Array<Pick<RouteRule, 'method' | 'match'>> = [
 	{ method: 'GET', match: (pathname) => pathname === '/api/addresses' },
 	{ method: 'GET', match: (pathname) => pathname === '/api/devices' },
 	{ method: 'DELETE', match: (pathname) => /^\/api\/devices\/[^/]+$/.test(pathname) },
+	{ method: 'GET', match: (pathname) => pathname === '/api/settings/signature' },
 	{ method: 'PATCH', match: (pathname) => pathname === '/api/settings/signature' }
 ];
 
@@ -148,6 +150,8 @@ export const MAIL_ACTIONS = [
 	'unread',
 	'star',
 	'unstar',
+	'archive',
+	'unarchive',
 	'trash',
 	'restore',
 	'delete',
@@ -188,6 +192,8 @@ export function authorizeMailAction(input: {
 		case 'unread':
 		case 'star':
 		case 'unstar':
+		case 'archive':
+		case 'unarchive':
 			if (!input.scopes.includes('mail:read')) {
 				return { ok: false, status: 403, error: 'This API key needs mail:read.' };
 			}

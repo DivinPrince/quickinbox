@@ -65,6 +65,12 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		case 'unstar':
 			affected = await setEmailFlags(db, locals.user.id, ids, { isStarred: false });
 			break;
+		case 'archive':
+			affected = await setEmailFlags(db, locals.user.id, ids, { archived: true });
+			break;
+		case 'unarchive':
+			affected = await setEmailFlags(db, locals.user.id, ids, { archived: false });
+			break;
 		case 'trash':
 			affected = await setEmailFlags(db, locals.user.id, ids, { trashed: true });
 			break;
