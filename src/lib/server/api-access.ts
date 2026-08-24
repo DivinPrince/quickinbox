@@ -1,7 +1,7 @@
 import { API_SCOPES, type ApiScope } from './api-tokens';
 
 export type { ApiScope };
-export type AuthMethod = 'session' | 'api_token';
+export type AuthMethod = 'session' | 'api_token' | 'mobile_session';
 
 export type ApiAuthDecision = { ok: true } | { ok: false; status: number; error: string };
 
@@ -123,6 +123,25 @@ const BEARER_ROUTES: RouteRule[] = [
 	}
 ];
 
+const MOBILE_SESSION_ROUTES: Array<Pick<RouteRule, 'method' | 'match'>> = [
+	{ method: 'GET', match: (pathname) => pathname === '/api/auth/me' },
+	{ method: 'GET', match: (pathname) => pathname === '/api/mail' },
+	{ method: 'POST', match: (pathname) => pathname === '/api/mail' },
+	{ method: 'POST', match: (pathname) => pathname === '/api/mail/actions' },
+	{
+		method: 'GET',
+		match: (pathname) => /^\/api\/mail\/[^/]+\/attachments\/[^/]+$/.test(pathname)
+	},
+	{ method: 'GET', match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname) },
+	{ method: 'POST', match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname) },
+	{ method: 'PATCH', match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname) },
+	{ method: 'DELETE', match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname) },
+	{ method: 'GET', match: (pathname) => pathname === '/api/addresses' },
+	{ method: 'GET', match: (pathname) => pathname === '/api/devices' },
+	{ method: 'DELETE', match: (pathname) => /^\/api\/devices\/[^/]+$/.test(pathname) },
+	{ method: 'PATCH', match: (pathname) => pathname === '/api/settings/signature' }
+];
+
 /** Bulk mailbox actions. Per-action scopes are enforced in `authorizeMailAction`. */
 export const MAIL_ACTIONS = [
 	'read',
@@ -160,7 +179,7 @@ export function authorizeMailAction(input: {
 	authMethod: AuthMethod;
 	scopes: readonly ApiScope[];
 }): ApiAuthDecision {
-	if (input.authMethod === 'session') {
+	if (input.authMethod === 'session' || input.authMethod === 'mobile_session') {
 		return { ok: true };
 	}
 
@@ -206,6 +225,16 @@ export function authorizeApiRequest(input: {
 }): ApiAuthDecision {
 	if (input.authMethod === 'session') {
 		return { ok: true };
+	}
+
+	if (input.authMethod === 'mobile_session') {
+		const method = input.method.toUpperCase();
+		const allowed = MOBILE_SESSION_ROUTES.some(
+			(route) => route.method === method && route.match(input.pathname)
+		);
+		return allowed
+			? { ok: true }
+			: { ok: false, status: 403, error: 'This mobile session cannot access that endpoint.' };
 	}
 
 	if (isPrefix(input.pathname, '/api/apikeys')) {

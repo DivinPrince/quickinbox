@@ -41,6 +41,8 @@ declare global {
 			addresses: MailAddress[];
 			/** Active domain filter, or null for the combined inbox. */
 			activeDomainId: string | null;
+			/** Server-only id of the session credential used for this request. */
+			currentSessionId: string | null;
 		}
 	}
 }

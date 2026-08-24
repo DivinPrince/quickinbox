@@ -1,5 +1,10 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { SESSION_COOKIE, SESSION_DAYS } from './constants';
+import {
+	PAIRING_CODE_TTL_MINUTES,
+	MOBILE_SESSION_DAYS,
+	SESSION_COOKIE,
+	SESSION_DAYS
+} from './constants';
 import { createSessionToken, hashPassword, hashToken, verifyPassword } from './crypto';
 import type { User } from '$lib/types';
 
@@ -121,6 +126,216 @@ export async function login(
 	return { user: safeUser, token };
 }
 
+export type DeviceSession = {
+	id: string;
+	device_name: string | null;
+	device_platform: string | null;
+	created_at: string;
+	last_seen_at: string | null;
+	expires_at: string;
+	is_current: boolean;
+};
+
+type DeviceSessionRow = Omit<DeviceSession, 'is_current'>;
+
+function toIsoTimestamp(value: string): string {
+	const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+	const parsed = new Date(hasZone ? value : `${value.replace(' ', 'T')}Z`);
+	return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+}
+
+/** Create a long-lived bearer session for a paired mobile device. */
+export async function createMobileSession(
+	db: D1Database,
+	input: { userId: string; deviceName: string; devicePlatform?: string }
+): Promise<{ token: string; expiresAt: string }> {
+	const token = createSessionToken();
+	const token_hash = await hashToken(token);
+	const sessionId = crypto.randomUUID();
+	const expiresAt = new Date(
+		Date.now() + MOBILE_SESSION_DAYS * 24 * 60 * 60 * 1000
+	).toISOString();
+
+	await db
+		.prepare(
+			`INSERT INTO sessions (id, user_id, token_hash, expires_at, device_name, device_platform, last_seen_at)
+			 VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+		)
+		.bind(
+			sessionId,
+			input.userId,
+			token_hash,
+			expiresAt,
+			input.deviceName,
+			input.devicePlatform ?? 'ios'
+		)
+		.run();
+
+	return { token, expiresAt };
+}
+
+export async function listDeviceSessions(
+	db: D1Database,
+	userId: string,
+	currentSessionId: string | null = null
+): Promise<DeviceSession[]> {
+	const { results } = await db
+		.prepare(
+			`SELECT id, device_name, device_platform, created_at, last_seen_at, expires_at
+			 FROM sessions
+			 WHERE user_id = ? AND datetime(expires_at) > datetime('now')
+			 ORDER BY created_at DESC`
+		)
+		.bind(userId)
+		.all<DeviceSessionRow>();
+
+	return results.map((session) => ({
+		...session,
+		created_at: toIsoTimestamp(session.created_at),
+		last_seen_at: session.last_seen_at ? toIsoTimestamp(session.last_seen_at) : null,
+		expires_at: toIsoTimestamp(session.expires_at),
+		is_current: session.id === currentSessionId
+	}));
+}
+
+/** Revoke one device session. Returns false when it did not belong to the user. */
+export async function revokeSession(db: D1Database, userId: string, sessionId: string): Promise<boolean> {
+	const result = await db
+		.prepare('DELETE FROM sessions WHERE id = ? AND user_id = ?')
+		.bind(sessionId, userId)
+		.run();
+	return (result.meta.changes ?? 0) > 0;
+}
+
+// ---- Pairing codes -------------------------------------------------------
+
+export async function createPairingCode(
+	db: D1Database,
+	userId: string
+): Promise<{ code: string; expiresAt: string }> {
+	// 128 bits of entropy, shown as a compact base64url string inside the QR.
+	const bytes = crypto.getRandomValues(new Uint8Array(16));
+	const code = toBase64Url(bytes);
+	const code_hash = await hashToken(code);
+	const id = crypto.randomUUID();
+	const expiresAt = new Date(Date.now() + PAIRING_CODE_TTL_MINUTES * 60 * 1000).toISOString();
+
+	// Clean up on generation as well as redemption so abandoned panels do not
+	// grow the table indefinitely. Separate tabs may each keep their own valid
+	// code; opening one tab must not silently invalidate the QR shown in another.
+	await deleteExpiredPairingCodes(db);
+	await db
+		.prepare('INSERT INTO pairing_codes (id, user_id, code_hash, expires_at) VALUES (?, ?, ?, ?)')
+		.bind(id, userId, code_hash, expiresAt)
+		.run();
+
+	return { code, expiresAt };
+}
+
+/**
+ * Exchange a one-time code for a mobile session. Single-use and expiry-checked
+ * in one transactional D1 batch.
+ */
+export async function redeemPairingCode(
+	db: D1Database,
+	code: string,
+	device: { name: string; platform?: string }
+): Promise<{ token: string; expiresAt: string } | null> {
+	const code_hash = await hashToken(code);
+	const token = createSessionToken();
+	const token_hash = await hashToken(token);
+	const sessionId = crypto.randomUUID();
+	const expiresAt = new Date(
+		Date.now() + MOBILE_SESSION_DAYS * 24 * 60 * 60 * 1000
+	).toISOString();
+	const deviceName = device.name.slice(0, 64).trim() || 'Mobile device';
+	const devicePlatform = device.platform === 'android' ? 'android' : 'ios';
+
+	// D1 batches are transactional. Inserting directly from the still-valid code
+	// makes the code-to-session exchange a single-winner operation, and a failed
+	// session insert cannot burn the code. The second statement removes the code
+	// only when this batch actually created its session.
+	const [inserted] = await db.batch([
+		db
+			.prepare(
+				`INSERT INTO sessions
+					(id, user_id, token_hash, expires_at, device_name, device_platform, last_seen_at)
+				 SELECT ?, user_id, ?, ?, ?, ?, datetime('now')
+				 FROM pairing_codes
+				 WHERE code_hash = ?
+				   AND used_at IS NULL
+				   AND datetime(expires_at) > datetime('now')`
+			)
+			.bind(sessionId, token_hash, expiresAt, deviceName, devicePlatform, code_hash),
+		db
+			.prepare(
+				`DELETE FROM pairing_codes
+				 WHERE code_hash = ?
+				   AND EXISTS (SELECT 1 FROM sessions WHERE id = ?)`
+			)
+			.bind(code_hash, sessionId)
+	]);
+
+	if ((inserted.meta.changes ?? 0) === 0) return null;
+	return { token, expiresAt };
+}
+
+export async function deleteExpiredPairingCodes(db: D1Database): Promise<void> {
+	await db
+		.prepare(
+			`DELETE FROM pairing_codes
+			 WHERE datetime(expires_at) <= datetime('now')
+			    OR (used_at IS NOT NULL AND datetime(used_at) <= datetime('now', '-1 hour'))`
+		)
+		.run();
+}
+
+function toBase64Url(bytes: Uint8Array): string {
+	let binary = '';
+	for (const byte of bytes) binary += String.fromCharCode(byte);
+	return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+
+// ---- Rate limiting -------------------------------------------------------
+
+/**
+ * Fixed-window counter. Returns true when allowed (and increments), false when
+ * the caller has exhausted this window's budget.
+ */
+export async function checkRateLimit(
+	db: D1Database,
+	key: string,
+	max: number,
+	windowSeconds: number
+): Promise<boolean> {
+	const now = Math.floor(Date.now() / 1000);
+	const windowStart = now - (now % windowSeconds);
+
+	const row = await db
+		.prepare(
+			`INSERT INTO rate_limits (key, count, window_start) VALUES (?, 1, ?)
+			 ON CONFLICT(key) DO UPDATE SET
+				count = CASE
+					WHEN rate_limits.window_start = excluded.window_start
+						THEN min(rate_limits.count + 1, ?)
+					ELSE 1
+				END,
+				window_start = excluded.window_start
+			 RETURNING count`
+		)
+		.bind(key, windowStart, max + 1)
+		.first<{ count: number }>();
+
+	// Keep one day of counters for short-window abuse visibility without
+	// retaining a permanent row for every observed client address.
+	await db
+		.prepare('DELETE FROM rate_limits WHERE window_start < ?')
+		.bind(windowStart - 24 * 60 * 60)
+		.run();
+
+	return Boolean(row && row.count <= max);
+}
+
 export async function logout(db: D1Database, token: string): Promise<void> {
 	const token_hash = await hashToken(token);
 	await db.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(token_hash).run();
@@ -172,21 +387,56 @@ export async function deleteUser(db: D1Database, actor: User, targetId: string):
 	await db.prepare('DELETE FROM users WHERE id = ?').bind(targetId).run();
 }
 
-export async function getUserFromSession(db: D1Database, token: string | undefined): Promise<User | null> {
+export type AuthenticatedSession = {
+	user: User;
+	sessionId: string;
+	isMobile: boolean;
+};
+
+/**
+ * Resolve a raw credential to its user and opaque database session id. The raw
+ * token and its hash remain server-only; callers can safely use `sessionId` to
+ * identify the active row in a list that already exposes revocable row ids.
+ */
+export async function getAuthenticatedSession(
+	db: D1Database,
+	token: string | undefined
+): Promise<AuthenticatedSession | null> {
 	if (!token) return null;
 
 	const token_hash = await hashToken(token);
 	const row = await db
 		.prepare(
-			`SELECT u.id, u.email, u.name, u.is_admin, u.created_at
+			`SELECT s.id AS session_id, s.device_platform, u.id, u.email, u.name, u.is_admin, u.created_at
 			 FROM sessions s
 			 JOIN users u ON u.id = s.user_id
-			 WHERE s.token_hash = ? AND s.expires_at > datetime('now')`
+			 WHERE s.token_hash = ? AND datetime(s.expires_at) > datetime('now')`
 		)
 		.bind(token_hash)
-		.first<UserRow>();
+		.first<UserRow & { session_id: string; device_platform: string | null }>();
 
-	return row ? mapUser(row) : null;
+	if (!row) return null;
+
+	if (row.device_platform) {
+		await db
+			.prepare(
+				`UPDATE sessions SET last_seen_at = datetime('now')
+				 WHERE id = ?
+				   AND (last_seen_at IS NULL OR datetime(last_seen_at) <= datetime('now', '-5 minutes'))`
+			)
+			.bind(row.session_id)
+			.run();
+	}
+
+	return {
+		user: mapUser(row),
+		sessionId: row.session_id,
+		isMobile: Boolean(row.device_platform)
+	};
+}
+
+export async function getUserFromSession(db: D1Database, token: string | undefined): Promise<User | null> {
+	return (await getAuthenticatedSession(db, token))?.user ?? null;
 }
 
 export function sessionCookieOptions(maxAgeSeconds: number) {
