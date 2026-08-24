@@ -63,6 +63,7 @@ export async function insertEmail(
 		inReplyTo: input.inReplyTo,
 		references: input.references,
 		replyToEmailId: input.replyToEmailId,
+		domainId: input.domainId,
 		subjectMatch: input.status !== 'draft'
 	});
 
