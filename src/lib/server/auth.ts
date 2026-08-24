@@ -188,41 +188,50 @@ export async function deleteUser(
 			).results.map((row) => row.storage_key)
 		: [];
 
-	// The last-admin rule is enforced by the DELETE itself. Counting first and
-	// deleting after lets two admins delete each other concurrently — both
-	// reads see two admins, both deletes succeed, and nobody is left.
-	const result = await db
-		.prepare(
-			`DELETE FROM users
-			 WHERE id = ?
-			   AND (is_admin = 0 OR (SELECT COUNT(*) FROM users WHERE is_admin = 1) > 1)`
-		)
-		.bind(targetId)
-		.run();
-
-	if ((result.meta?.changes ?? 0) === 0) {
-		throw new Error('Keep at least one admin');
-	}
-
+	// One transaction: D1 rolls a batch back entirely if any statement fails, so
+	// the account can never be gone while its mail, sessions and tokens survive.
+	//
+	// The last-admin rule rides on the DELETE rather than a preceding read —
+	// counting first and deleting after lets two admins delete each other
+	// concurrently, both seeing two admins, leaving nobody. The child statements
+	// are then gated on the user actually having gone, so a refused delete
+	// leaves the account whole instead of stripping it inside the same batch.
+	//
 	// Older D1 databases were created without ON DELETE CASCADE enforcement, so
-	// clear the children explicitly — no-ops wherever the cascade already ran.
-	// email_attachments hangs off emails, so it has to go before those rows do.
-	await db.batch([
+	// the children are cleared explicitly; where the cascade ran they are no-ops.
+	// email_attachments is reachable only through emails, so it goes first.
+	const gone = 'NOT EXISTS (SELECT 1 FROM users WHERE id = ?)';
+	const [deletion] = await db.batch([
+		db
+			.prepare(
+				`DELETE FROM users
+				 WHERE id = ?
+				   AND (is_admin = 0 OR (SELECT COUNT(*) FROM users WHERE is_admin = 1) > 1)`
+			)
+			.bind(targetId),
 		db
 			.prepare(
 				`DELETE FROM email_attachments
-				 WHERE email_id IN (SELECT id FROM emails WHERE user_id = ?)`
+				 WHERE email_id IN (SELECT id FROM emails WHERE user_id = ?) AND ${gone}`
 			)
-			.bind(targetId),
-		db.prepare('DELETE FROM emails WHERE user_id = ?').bind(targetId),
-		db.prepare('DELETE FROM addresses WHERE user_id = ?').bind(targetId),
-		db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(targetId),
-		db.prepare('DELETE FROM api_tokens WHERE user_id = ?').bind(targetId),
-		db.prepare('DELETE FROM push_subscriptions WHERE user_id = ?').bind(targetId),
+			.bind(targetId, targetId),
+		db.prepare(`DELETE FROM emails WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM addresses WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM sessions WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM api_tokens WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db
-			.prepare('UPDATE domains SET catchall_user_id = NULL WHERE catchall_user_id = ?')
-			.bind(targetId)
+			.prepare(`DELETE FROM push_subscriptions WHERE user_id = ? AND ${gone}`)
+			.bind(targetId, targetId),
+		db
+			.prepare(
+				`UPDATE domains SET catchall_user_id = NULL WHERE catchall_user_id = ? AND ${gone}`
+			)
+			.bind(targetId, targetId)
 	]);
+
+	if ((deletion.meta?.changes ?? 0) === 0) {
+		throw new Error('Keep at least one admin');
+	}
 
 	// Purged only after the row is gone, so a refused delete never strands mail
 	// without the files it references. Best-effort from here: the account is

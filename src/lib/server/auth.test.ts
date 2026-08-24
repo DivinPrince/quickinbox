@@ -20,9 +20,9 @@ const targetRow = {
 	created_at: '2026-01-02T00:00:00.000Z'
 };
 
+/** `deleteChanges` stands in for what the guarded DELETE reports: 0 means refused. */
 function mockDb(options: { storageKeys?: string[]; deleteChanges: number }) {
-	const deleteStatements: string[] = [];
-	const batched: string[] = [];
+	const batches: string[][] = [];
 
 	const db = {
 		prepare(sql: string) {
@@ -42,10 +42,6 @@ function mockDb(options: { storageKeys?: string[]; deleteChanges: number }) {
 							return { results: [] };
 						},
 						async run() {
-							if (sql.includes('DELETE FROM users')) {
-								deleteStatements.push(sql);
-								return { meta: { changes: options.deleteChanges } };
-							}
 							return { meta: { changes: 0 } };
 						}
 					};
@@ -53,12 +49,14 @@ function mockDb(options: { storageKeys?: string[]; deleteChanges: number }) {
 			};
 		},
 		async batch(statements: { sql: string }[]) {
-			batched.push(...statements.map((statement) => statement.sql));
-			return statements.map(() => ({ meta: { changes: 0 } }));
+			batches.push(statements.map((statement) => statement.sql));
+			return statements.map((_, index) => ({
+				meta: { changes: index === 0 ? options.deleteChanges : 0 }
+			}));
 		}
 	} as unknown as D1Database;
 
-	return { db, deleteStatements, batched };
+	return { db, batches };
 }
 
 function mockBucket(options: { failOn?: string } = {}) {
@@ -74,15 +72,25 @@ function mockBucket(options: { failOn?: string } = {}) {
 
 describe('deleteUser', () => {
 	test('refuses to delete the account making the request', async () => {
-		const { db, deleteStatements } = mockDb({ deleteChanges: 1 });
+		const { db, batches } = mockDb({ deleteChanges: 1 });
 		const { bucket, deleted } = mockBucket();
 
 		await assert.rejects(
 			() => deleteUser(db, bucket, actor, actor.id),
 			/cannot delete your own account/
 		);
-		assert.deepEqual(deleteStatements, []);
+		assert.deepEqual(batches, []);
 		assert.deepEqual(deleted, []);
+	});
+
+	test('reports the last-admin refusal', async () => {
+		const { db } = mockDb({ deleteChanges: 0 });
+		const { bucket } = mockBucket();
+
+		await assert.rejects(
+			() => deleteUser(db, bucket, actor, targetRow.id),
+			/Keep at least one admin/
+		);
 	});
 
 	test('removes the R2 objects the deleted mail referenced', async () => {
@@ -95,34 +103,16 @@ describe('deleteUser', () => {
 	});
 
 	test('leaves R2 untouched when the delete is refused', async () => {
-		// changes = 0 means the last-admin guard in the statement rejected it.
 		const { db } = mockDb({ storageKeys: ['att/one'], deleteChanges: 0 });
 		const { bucket, deleted } = mockBucket();
 
-		await assert.rejects(
-			() => deleteUser(db, bucket, actor, targetRow.id),
-			/Keep at least one admin/
-		);
+		await assert.rejects(() => deleteUser(db, bucket, actor, targetRow.id));
 		assert.deepEqual(deleted, []);
 	});
 
-	test('enforces the last-admin rule inside the DELETE, not a preceding read', async () => {
-		// A count read followed by an unconditional DELETE lets two admins delete
-		// each other concurrently and leave the instance with none. The guard has
-		// to travel with the statement, so assert it is actually there.
-		const { db, deleteStatements } = mockDb({ deleteChanges: 1 });
-		const { bucket } = mockBucket();
-
-		await deleteUser(db, bucket, actor, targetRow.id);
-
-		assert.equal(deleteStatements.length, 1);
-		assert.match(deleteStatements[0], /SELECT COUNT\(\*\) FROM users WHERE is_admin = 1/);
-	});
-
 	test('still succeeds when an R2 delete fails, and purges the rest', async () => {
-		// The D1 delete has already committed by this point. Throwing here would
-		// report failure for a deletion that happened, and the retry would say
-		// the user no longer exists.
+		// The row is already gone by this point. Throwing would report failure for
+		// a deletion that happened, and the retry would say the user is missing.
 		const { db } = mockDb({ storageKeys: ['att/one', 'att/two'], deleteChanges: 1 });
 		const { bucket, deleted } = mockBucket({ failOn: 'att/one' });
 
@@ -130,11 +120,37 @@ describe('deleteUser', () => {
 		assert.deepEqual(deleted, ['att/two']);
 	});
 
-	test('clears child rows explicitly, for databases without cascade enforcement', async () => {
+	test('deletes the account and its children in a single batch', async () => {
+		// D1 rolls a batch back as a unit. Splitting these leaves the account gone
+		// with its mail, sessions and tokens behind if the second call fails.
+		const { db, batches } = mockDb({ deleteChanges: 1 });
+		const { bucket } = mockBucket();
+
+		await deleteUser(db, bucket, actor, targetRow.id);
+
+		assert.equal(batches.length, 1);
+		assert.ok(batches[0].some((sql) => sql.includes('DELETE FROM users')));
+		assert.ok(batches[0].some((sql) => sql.includes('DELETE FROM emails')));
+	});
+
+	test('enforces the last-admin rule inside the DELETE, not a preceding read', async () => {
+		// A count read followed by an unconditional DELETE lets two admins delete
+		// each other concurrently and leave the instance with none, so the guard
+		// has to travel with the statement.
+		const { db, batches } = mockDb({ deleteChanges: 1 });
+		const { bucket } = mockBucket();
+
+		await deleteUser(db, bucket, actor, targetRow.id);
+
+		assert.match(batches[0][0], /DELETE FROM users/);
+		assert.match(batches[0][0], /SELECT COUNT\(\*\) FROM users WHERE is_admin = 1/);
+	});
+
+	test('clears every child table, for databases without cascade enforcement', async () => {
 		// Older D1 databases were created without ON DELETE CASCADE enforced, so
 		// the user row going away is not enough — mail, addresses, sessions,
-		// tokens and push subscriptions would all be left behind.
-		const { db, batched } = mockDb({ deleteChanges: 1 });
+		// tokens and push subscriptions would all survive it.
+		const { db, batches } = mockDb({ deleteChanges: 1 });
 		const { bucket } = mockBucket();
 
 		await deleteUser(db, bucket, actor, targetRow.id);
@@ -148,30 +164,35 @@ describe('deleteUser', () => {
 			'push_subscriptions'
 		]) {
 			assert.ok(
-				batched.some((sql) => sql.includes(`DELETE FROM ${table}`)),
-				`expected the cleanup batch to delete from ${table}`
+				batches[0].some((sql) => sql.includes(`DELETE FROM ${table}`)),
+				`expected the batch to delete from ${table}`
 			);
 		}
 
 		assert.ok(
-			batched.some((sql) => sql.includes('UPDATE domains SET catchall_user_id = NULL')),
+			batches[0].some((sql) => sql.includes('UPDATE domains SET catchall_user_id = NULL')),
 			'expected the catch-all reference to be cleared'
 		);
 
-		// Attachment metadata is reachable only through emails, so it has to go first.
+		// Attachment metadata is reachable only through emails, so it must go first.
 		assert.ok(
-			batched.findIndex((sql) => sql.includes('DELETE FROM email_attachments')) <
-				batched.findIndex((sql) => sql.includes('DELETE FROM emails WHERE')),
+			batches[0].findIndex((sql) => sql.includes('DELETE FROM email_attachments')) <
+				batches[0].findIndex((sql) => sql.includes('DELETE FROM emails WHERE')),
 			'email_attachments must be cleared before the emails it hangs off'
 		);
 	});
 
-	test('leaves child rows alone when the delete is refused', async () => {
-		const { db, batched } = mockDb({ deleteChanges: 0 });
+	test('gates child cleanup on the account actually being gone', async () => {
+		// The child statements share a transaction with the guarded delete, so
+		// without this gate a refused delete would strip an account that survives.
+		const { db, batches } = mockDb({ deleteChanges: 1 });
 		const { bucket } = mockBucket();
 
-		await assert.rejects(() => deleteUser(db, bucket, actor, targetRow.id));
-		assert.deepEqual(batched, []);
+		await deleteUser(db, bucket, actor, targetRow.id);
+
+		for (const sql of batches[0].slice(1)) {
+			assert.match(sql, /NOT EXISTS \(SELECT 1 FROM users WHERE id = \?\)/);
+		}
 	});
 
 	test('works without a bucket configured', async () => {
