@@ -6,7 +6,7 @@
 </script>
 
 <svelte:head>
-	<title>Inbox — Mail</title>
+	<title>{data.view === 'archive' ? 'Archive' : 'Inbox'} — Mail</title>
 </svelte:head>
 
 <MailboxView view={data.view} mailbox={data.mailbox} filters={data.filters} />

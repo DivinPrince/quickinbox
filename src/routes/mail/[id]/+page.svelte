@@ -22,7 +22,13 @@
 	const starred = $derived(messages.some((message) => message.is_starred));
 
 	const backHref = $derived(
-		data.trashed ? '/trash' : latest?.direction === 'outbound' ? '/sent' : '/inbox'
+		data.trashed
+			? '/trash'
+			: data.archived
+				? '/inbox?view=archive'
+				: latest?.direction === 'outbound'
+					? '/sent'
+					: '/inbox'
 	);
 
 	/**
@@ -70,6 +76,11 @@
 	async function markUnread() {
 		await patch({ isRead: false });
 		goto(backHref);
+	}
+
+	async function toggleArchive() {
+		await patch({ archived: !data.archived });
+		goto(data.archived ? '/inbox?view=archive' : '/inbox');
 	}
 
 	async function trash() {
@@ -179,6 +190,14 @@
 			{:else}
 				<button type="button" class="icon-btn" aria-label="Mark as unread" onclick={markUnread}>
 					<Icon name="mail-line" size={16} />
+				</button>
+				<button
+					type="button"
+					class="icon-btn"
+					aria-label={data.archived ? 'Move to inbox' : 'Archive'}
+					onclick={toggleArchive}
+				>
+					<Icon name={data.archived ? 'inbox-line' : 'archive-line'} size={16} />
 				</button>
 				<button type="button" class="icon-btn" aria-label="Move to trash" onclick={trash}>
 					<Icon name="delete-bin-line" size={16} />

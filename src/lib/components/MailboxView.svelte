@@ -23,6 +23,7 @@
 
 	const META: Record<MailboxView, { title: string; icon: string; empty: string }> = {
 		inbox: { title: 'Inbox', icon: 'inbox-line', empty: 'Your inbox is empty' },
+		archive: { title: 'Archive', icon: 'archive-line', empty: 'No archived messages' },
 		starred: { title: 'Starred', icon: 'star-line', empty: 'No starred messages' },
 		drafts: { title: 'Drafts', icon: 'draft-line', empty: 'No drafts saved' },
 		sent: { title: 'Sent', icon: 'send-plane-line', empty: 'Nothing sent yet' },
@@ -302,6 +303,27 @@
 					>
 						<Icon name="star-off-line" size={16} />
 					</button>
+					{#if view === 'archive'}
+						<button
+							type="button"
+							class="tool-btn"
+							title="Move to inbox"
+							disabled={busy}
+							onclick={() => run('unarchive')}
+						>
+							<Icon name="inbox-line" size={16} />
+						</button>
+					{:else if view !== 'drafts' && view !== 'trash'}
+						<button
+							type="button"
+							class="tool-btn"
+							title="Archive"
+							disabled={busy}
+							onclick={() => run('archive')}
+						>
+							<Icon name="archive-line" size={16} />
+						</button>
+					{/if}
 
 					{#if view === 'trash'}
 						<button
@@ -678,6 +700,25 @@
 								>
 									<Icon name={thread.is_read ? 'mail-line' : 'mail-open-line'} size={15} />
 								</button>
+								{#if view === 'archive'}
+									<button
+										type="button"
+										class="tool-btn"
+										title="Move to inbox"
+										onclick={() => run('unarchive', [thread.latest_id])}
+									>
+										<Icon name="inbox-line" size={15} />
+									</button>
+								{:else if view !== 'drafts'}
+									<button
+										type="button"
+										class="tool-btn"
+										title="Archive"
+										onclick={() => run('archive', [thread.latest_id])}
+									>
+										<Icon name="archive-line" size={15} />
+									</button>
+								{/if}
 								<button
 									type="button"
 									class="tool-btn"
