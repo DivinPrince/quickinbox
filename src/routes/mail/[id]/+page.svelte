@@ -17,9 +17,17 @@
 	let sending = $state(false);
 	let error = $state('');
 
+	let forwardOpen = $state(false);
+	let forwardTo = $state('');
+	let forwardHtml = $state('');
+	let includeAttachments = $state(true);
+
 	const messages = $derived(data.messages);
 	const latest = $derived(messages[messages.length - 1]);
 	const starred = $derived(messages.some((message) => message.is_starred));
+
+	/** A forward carries the files of the message it copies. */
+	const forwardFiles = $derived(latest?.attachments.length ?? 0);
 
 	const backHref = $derived(
 		data.trashed ? '/trash' : latest?.direction === 'outbound' ? '/sent' : '/inbox'
@@ -95,6 +103,56 @@
 		if (!latest) return;
 		await fetch(`/api/mail/${latest.id}`, { method: 'DELETE' });
 		goto('/trash');
+	}
+
+	/** Reply and forward share the space below the thread, so only one is open. */
+	function openReply() {
+		forwardOpen = false;
+		replyOpen = !replyOpen;
+		error = '';
+	}
+
+	function openForward() {
+		replyOpen = false;
+		forwardOpen = !forwardOpen;
+		error = '';
+	}
+
+	/** Forwards the newest message in the conversation, files included. */
+	async function sendForward(event: SubmitEvent) {
+		event.preventDefault();
+		if (!latest || !forwardTo.trim()) return;
+
+		sending = true;
+		error = '';
+
+		try {
+			const res = await fetch(`/api/mail/${latest.id}/forward`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					to: forwardTo,
+					html: isHtmlEmpty(forwardHtml) ? undefined : forwardHtml,
+					text: isHtmlEmpty(forwardHtml) ? undefined : htmlToPlainText(forwardHtml),
+					includeAttachments
+				})
+			});
+			const body = await res.json();
+			if (!res.ok) {
+				error = body.error ?? 'Failed to forward';
+				return;
+			}
+
+			forwardTo = '';
+			forwardHtml = '';
+			forwardOpen = false;
+			// The forward is our own message now, so the mailbox has changed.
+			await invalidateAll();
+		} catch {
+			error = 'Network error';
+		} finally {
+			sending = false;
+		}
 	}
 
 	/** Replies continue from the newest message, so the chain stays intact. */
@@ -185,7 +243,17 @@
 				</button>
 			{/if}
 
-			<button type="button" class="btn-primary reply-launch" onclick={() => (replyOpen = !replyOpen)}>
+			<button
+				type="button"
+				class="icon-btn"
+				class:active={forwardOpen}
+				aria-label="Forward"
+				onclick={openForward}
+			>
+				<Icon name="share-forward-line" size={16} />
+			</button>
+
+			<button type="button" class="btn-primary reply-launch" onclick={openReply}>
 				<Icon name="reply-line" size={16} />
 				{replyOpen ? 'Close' : 'Reply'}
 			</button>
@@ -218,7 +286,62 @@
 		</div>
 	</article>
 
-	{#if replyOpen}
+	{#if forwardOpen}
+		<form class="reply-section" onsubmit={sendForward}>
+			<div class="forward-row">
+				<label class="field-label" for="forward-to">To</label>
+				<input
+					id="forward-to"
+					type="text"
+					bind:value={forwardTo}
+					placeholder="recipient@example.com"
+					autocomplete="off"
+					autocapitalize="none"
+					spellcheck="false"
+					required
+					class="field-input"
+				/>
+			</div>
+			{#if data.replyFrom}
+				<p class="reply-from">
+					From
+					<strong>
+						{#if data.replyFromName}{data.replyFromName} · {/if}{data.replyFrom}
+					</strong>
+				</p>
+			{/if}
+
+			<RichTextEditor
+				bind:html={forwardHtml}
+				embedded
+				minHeight={140}
+				placeholder="Add a note…"
+			/>
+
+			{#if forwardFiles > 0}
+				<label class="forward-files">
+					<input type="checkbox" bind:checked={includeAttachments} />
+					Include {forwardFiles === 1 ? 'the attachment' : `all ${forwardFiles} attachments`}
+				</label>
+			{/if}
+
+			<div class="reply-footer forward-footer">
+				<div class="reply-actions">
+					<button type="button" class="btn-ghost" onclick={() => (forwardOpen = false)}>
+						Cancel
+					</button>
+					<button type="submit" class="btn-primary" disabled={sending}>
+						<Icon name="share-forward-line" size={16} />
+						{sending ? 'Sending…' : 'Forward'}
+					</button>
+				</div>
+			</div>
+
+			{#if error}
+				<p class="reply-status">{error}</p>
+			{/if}
+		</form>
+	{:else if replyOpen}
 		<form class="reply-section" onsubmit={sendReply}>
 			<p class="reply-to">
 				Replying to
@@ -255,7 +378,7 @@
 			{/if}
 		</form>
 	{:else}
-		<button type="button" class="reply-prompt" onclick={() => (replyOpen = true)}>
+		<button type="button" class="reply-prompt" onclick={openReply}>
 			<Icon name="reply-line" size={15} />
 			Reply
 		</button>
@@ -278,6 +401,11 @@
 
 	.toolbar-actions :global(.icon-btn.starred) {
 		color: var(--color-star);
+	}
+
+	.toolbar-actions :global(.icon-btn.active) {
+		background: var(--color-accent-soft);
+		color: var(--color-accent-text);
 	}
 
 	.toolbar-actions :global(.icon-btn.danger:hover) {
@@ -345,6 +473,32 @@
 	.reply-from strong {
 		font-weight: 500;
 		color: var(--color-text-secondary);
+	}
+
+	.forward-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 0.625rem;
+		box-shadow: inset 0 -1px 0 var(--color-line);
+	}
+
+	.forward-row .field-label {
+		width: 2.5rem;
+	}
+
+	.forward-footer {
+		justify-content: flex-end;
+	}
+
+	.forward-files {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 0.625rem;
+		font-size: 0.8125rem;
+		color: var(--color-muted);
+		cursor: pointer;
 	}
 
 	.reply-footer {

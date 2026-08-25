@@ -39,7 +39,7 @@ export async function handleCloudflareInbound(
 		bcc: mailboxAddresses(parsed.bcc)
 	});
 
-	const from = parseEmailAddress(message.from || mailboxAddresses(parsed.from)[0] || '');
+	const from = inboundSender(mailboxAddresses(parsed.from)[0], message.from);
 	const subject = parsed.subject?.trim() || message.headers.get('subject')?.trim() || '(no subject)';
 	const messageId =
 		normalizeMessageId(parsed.messageId ?? message.headers.get('message-id')) ?? null;
@@ -117,6 +117,30 @@ async function storeInboundAttachments(
 			console.error('Failed to store inbound Cloudflare attachment', attachment.filename, error);
 		}
 	}
+}
+
+/**
+ * Who the mail is *from*, for display, replies and search.
+ *
+ * `message.from` is the envelope sender — SMTP `MAIL FROM` — which providers
+ * routinely point at a bounce mailbox rather than the author. Cloudflare Email
+ * Sending uses `bounces@cf-bounce.<domain>`, and VERP senders behave the same
+ * way, so preferring the envelope attributes mail to the bounce address and
+ * sends replies there. The `From:` header carries the author, so it wins; the
+ * envelope is only a fallback for mail that arrives without a usable header.
+ */
+export function inboundSender(
+	headerFrom: string | undefined,
+	envelopeFrom: string | undefined
+): string {
+	// Choose on whether the header actually yielded an address, not on whether it
+	// was present: a blank or malformed `From:` is still a truthy string, and
+	// picking it on that alone would skip the fallback entirely.
+	const header = parseEmailAddress(headerFrom ?? '');
+	if (header.includes('@')) return header;
+
+	const envelope = parseEmailAddress(envelopeFrom ?? '');
+	return envelope || header;
 }
 
 function mailboxAddresses(value: Address | Address[] | undefined): string[] {

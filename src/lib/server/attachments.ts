@@ -81,6 +81,48 @@ export async function insertAttachmentBytes(
 		.run();
 }
 
+/**
+ * The stored parts of a message in the shape an outbound send takes.
+ *
+ * Forwarding carries the original's files with it, and those already live in
+ * R2 — so they are read back here rather than being uploaded again from the
+ * browser. A part whose bytes have gone missing is skipped: losing one file is
+ * better than failing the forward.
+ */
+export async function readOutboundAttachments(
+	db: D1Database,
+	bucket: R2Bucket,
+	userId: string,
+	emailId: string
+): Promise<OutboundAttachmentInput[]> {
+	const { results } = await db
+		.prepare(
+			`SELECT a.id, a.email_id, a.filename, a.content_type, a.size_bytes,
+			        a.storage_key, a.content_base64, a.created_at
+			 FROM email_attachments a
+			 JOIN emails e ON e.id = a.email_id
+			 WHERE a.email_id = ? AND e.user_id = ?
+			 ORDER BY a.created_at ASC`
+		)
+		.bind(emailId, userId)
+		.all<StoredAttachmentRow>();
+
+	const attachments: OutboundAttachmentInput[] = [];
+
+	for (const row of results.slice(0, MAX_ATTACHMENTS_PER_EMAIL)) {
+		const bytes = await readAttachmentBytes(bucket, row);
+		if (!bytes) continue;
+
+		attachments.push({
+			filename: row.filename,
+			type: row.content_type,
+			content: bytesToBase64(bytes)
+		});
+	}
+
+	return attachments;
+}
+
 export async function listAttachments(
 	db: D1Database,
 	emailId: string
@@ -143,9 +185,24 @@ function base64ToBytes(base64: string): Uint8Array {
 	return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
 }
 
+/**
+ * Providers take attachments as base64. Converted in chunks because spreading a
+ * whole file into `fromCharCode` overruns the call stack once it is big enough.
+ */
+function bytesToBase64(bytes: Uint8Array): string {
+	const CHUNK = 0x8000;
+	let binary = '';
+
+	for (let offset = 0; offset < bytes.length; offset += CHUNK) {
+		binary += String.fromCharCode(...bytes.subarray(offset, offset + CHUNK));
+	}
+
+	return btoa(binary);
+}
+
 function base64ByteLength(base64: string): number {
 	const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
 	return Math.floor((base64.length * 3) / 4) - padding;
 }
 
-export { base64ToBytes, base64ByteLength };
+export { base64ToBytes, base64ByteLength, bytesToBase64 };
