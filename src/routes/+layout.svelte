@@ -139,6 +139,7 @@
 				domains={data.domains}
 				activeDomainId={data.activeDomainId}
 				isAdmin={data.user!.is_admin}
+				onLogout={logout}
 			/>
 		{/if}
 	</div>

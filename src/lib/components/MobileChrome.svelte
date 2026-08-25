@@ -9,12 +9,14 @@
 		counts,
 		domains,
 		activeDomainId,
-		isAdmin
+		isAdmin,
+		onLogout
 	}: {
 		counts: MailboxCounts;
 		domains: Domain[];
 		activeDomainId: string | null;
 		isAdmin: boolean;
+		onLogout: () => void;
 	} = $props();
 
 	let moreOpen = $state(false);
@@ -158,6 +160,18 @@
 				<DomainSwitcher {domains} {activeDomainId} block />
 			</div>
 		{/if}
+
+		<!--
+			The topbar's account menu is the only other way out, and it is hidden on
+			phones for stacked and utility pages — so on Settings and Admin, where
+			people go looking for it, there was no way to sign out at all.
+		-->
+		<div class="sheet-section">
+			<button type="button" class="sheet-link sheet-logout" onclick={onLogout}>
+				<Icon name="logout-box-r-line" size={20} />
+				<span>Log out</span>
+			</button>
+		</div>
 	</div>
 {/if}
 
@@ -333,6 +347,15 @@
 			margin-top: 0.875rem;
 			padding-top: 0.875rem;
 			box-shadow: inset 0 1px 0 var(--color-line);
+		}
+
+		.sheet-logout {
+			width: 100%;
+			border: none;
+			background: transparent;
+			font: inherit;
+			text-align: left;
+			cursor: pointer;
 		}
 
 		.sheet-title {
