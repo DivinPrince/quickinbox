@@ -106,6 +106,25 @@ test('phone gestures follow the 900px shell, not desktop pointer type', () => {
 	}
 });
 
+test('stacked swipe wrapper does not become a phone column on desktop', () => {
+	const source = readFileSync(join(root, 'src/lib/components/SwipeBack.svelte'), 'utf8');
+	assert.match(source, /@media \(min-width:\s*901px\)[\s\S]*display:\s*contents/);
+});
+
+test('compose is not a centred reading column on desktop', () => {
+	const source = readFileSync(join(root, 'src/routes/+layout.svelte'), 'utf8');
+	assert.match(source, /const NARROW = \['\/mail', '\/settings'\]/);
+	assert.doesNotMatch(source, /NARROW = \[[^\]]*\/compose/);
+});
+
+test('composer fill layout is phone-only', () => {
+	const source = readFileSync(join(root, 'src/lib/components/RichTextEditor.svelte'), 'utf8');
+	const style = source.split('<style>')[1] ?? '';
+	const desktop = style.split('@media (max-width: 900px)')[0] ?? '';
+	assert.doesNotMatch(desktop, /\.editor-shell-fill\s*\{/);
+	assert.match(style, /@media \(max-width: 900px\)[\s\S]*\.editor-shell-fill/);
+});
+
 test('service worker is a classic worker, not a Vite module', () => {
 	const source = readFileSync(join(root, 'src/service-worker.ts'), 'utf8');
 	assert.match(source, /addEventListener\('install'/);

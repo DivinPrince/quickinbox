@@ -153,14 +153,10 @@
 	}
 
 	@media (min-width: 901px) {
+		/* Phone stacked-screen chrome only. A real box here becomes a centred
+		   surface column on desktop and squeezes compose/thread into a phone. */
 		.swipe-back {
-			touch-action: auto;
-		}
-
-		.swipe-back.dragging,
-		.swipe-back:not(.dragging) {
-			transform: none;
-			transition: none;
+			display: contents;
 		}
 	}
 
