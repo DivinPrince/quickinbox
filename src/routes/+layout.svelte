@@ -26,8 +26,9 @@
 	// Onboarding runs before the user has an address, so the shell would be empty.
 	const showShell = $derived(Boolean(data.user) && $page.url.pathname !== '/onboarding');
 
-	// Pages that read better centred than full-bleed.
-	const NARROW = ['/compose', '/mail', '/settings'];
+	// Thread and settings read better as a centred column. Compose needs the
+	// full desktop pane — a 48rem cap makes it look like a phone form.
+	const NARROW = ['/mail', '/settings'];
 	const narrow = $derived(NARROW.some((path) => $page.url.pathname.startsWith(path)));
 	const stacked = $derived(isStackedPath($page.url.pathname));
 	const mailbox = $derived(isMailboxPath($page.url.pathname));

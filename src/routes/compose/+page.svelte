@@ -267,7 +267,7 @@
 	{/if}
 
 	<div class="compose-editor">
-		<RichTextEditor bind:html fill minHeight={160}>
+		<RichTextEditor bind:html fill minHeight={320}>
 			{#snippet toolbarEnd()}
 				<AttachmentPicker bind:attachments mode="button" />
 				<button
@@ -303,6 +303,10 @@
 </form>
 
 <style>
+	.compose-page {
+		width: 100%;
+	}
+
 	.compose-header {
 		display: flex;
 		align-items: center;
