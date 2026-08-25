@@ -9,22 +9,29 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 	const db = platform?.env.DB;
 	if (!db) return json({ error: 'Database unavailable' }, { status: 503 });
 
-	const body = (await request.json()) as { password?: string; isAdmin?: boolean };
+	const body = (await request.json()) as { password?: unknown; isAdmin?: unknown };
+	const hasPassword = body.password !== undefined;
+	const hasRole = body.isAdmin !== undefined;
 
-	if (body.password === undefined && body.isAdmin === undefined) {
+	if (!hasPassword && !hasRole) {
 		return json({ error: 'Nothing to update' }, { status: 400 });
 	}
 
+	if (hasRole && typeof body.isAdmin !== 'boolean') {
+		return json({ error: 'isAdmin must be a boolean' }, { status: 400 });
+	}
+
+	if (hasPassword && (typeof body.password !== 'string' || !body.password)) {
+		return json({ error: 'Password is required' }, { status: 400 });
+	}
+
 	try {
-		if (typeof body.isAdmin === 'boolean') {
-			await setUserAdmin(db, locals.user, params.id!, body.isAdmin);
+		if (hasRole) {
+			await setUserAdmin(db, locals.user, params.id!, body.isAdmin as boolean);
 		}
 
-		if (body.password !== undefined) {
-			if (!body.password) {
-				return json({ error: 'Password is required' }, { status: 400 });
-			}
-			await setUserPassword(db, params.id!, body.password);
+		if (hasPassword) {
+			await setUserPassword(db, params.id!, body.password as string);
 		}
 
 		return json({ ok: true });
