@@ -303,6 +303,8 @@ export async function deleteAddress(
 export type InboundRoute = {
 	userId: string;
 	domainId: string | null;
+	/** The registered address row that claimed the message; null via catch-all. */
+	addressId: string | null;
 	address: string;
 	viaCatchall: boolean;
 };
@@ -326,10 +328,10 @@ export async function resolveInboundRoute(
 	const placeholders = candidates.map(() => '?').join(', ');
 	const { results } = await db
 		.prepare(
-			`SELECT user_id, domain_id, address FROM addresses WHERE address IN (${placeholders})`
+			`SELECT id, user_id, domain_id, address FROM addresses WHERE address IN (${placeholders})`
 		)
 		.bind(...candidates)
-		.all<{ user_id: string; domain_id: string; address: string }>();
+		.all<{ id: string; user_id: string; domain_id: string; address: string }>();
 
 	if (results.length > 0) {
 		// Honour the order the recipients arrived in, not SQLite's row order.
@@ -339,6 +341,7 @@ export async function resolveInboundRoute(
 				return {
 					userId: match.user_id,
 					domainId: match.domain_id,
+					addressId: match.id,
 					address: match.address,
 					viaCatchall: false
 				};
@@ -359,6 +362,7 @@ export async function resolveInboundRoute(
 			return {
 				userId: domain.catchall_user_id,
 				domainId: domain.id,
+				addressId: null,
 				address: candidate,
 				viaCatchall: true
 			};

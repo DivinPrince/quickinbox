@@ -129,6 +129,7 @@ async function handleInboundEmail(
 		// chain still carries the message that started the conversation.
 		references: received.headers?.['references'] ?? null,
 		domainId: route.domainId,
+		addressId: route.addressId,
 		providerId
 	});
 

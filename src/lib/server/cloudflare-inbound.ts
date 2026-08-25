@@ -83,6 +83,7 @@ export async function handleCloudflareInbound(
 		inReplyTo,
 		references,
 		domainId: route.domainId,
+		addressId: route.addressId,
 		providerId
 	});
 

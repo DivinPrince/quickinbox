@@ -43,6 +43,7 @@ export async function insertEmail(
 		references?: string | null;
 		replyToEmailId?: string | null;
 		domainId?: string | null;
+		addressId?: string | null;
 		providerId?: string | null;
 		status?: MailStatus | null;
 		isRead?: boolean;
@@ -63,6 +64,7 @@ export async function insertEmail(
 		inReplyTo: input.inReplyTo,
 		references: input.references,
 		replyToEmailId: input.replyToEmailId,
+		domainId: input.domainId,
 		subjectMatch: input.status !== 'draft'
 	});
 
@@ -72,8 +74,8 @@ export async function insertEmail(
 				id, user_id, direction, from_addr, to_addr, cc_addr, bcc_addr, subject,
 				body_text, body_html, message_id, in_reply_to, references_header,
 				reply_to_email_id, thread_id, thread_key,
-				domain_id, provider_id, status, status_at, is_read
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
+				domain_id, address_id, provider_id, status, status_at, is_read
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
 		)
 		.bind(
 			id,
@@ -93,6 +95,7 @@ export async function insertEmail(
 			threadId,
 			normalizeSubject(input.subject),
 			input.domainId ?? null,
+			input.addressId ?? null,
 			input.providerId ?? null,
 			input.status ?? null,
 			input.isRead ? 1 : 0
@@ -170,6 +173,8 @@ export type MailboxQuery = {
 	view: MailboxView;
 	/** Restrict to one connected domain; omit for the combined view. */
 	domainId?: string | null;
+	/** Restrict to one registered address, for users with several mailboxes. */
+	addressId?: string | null;
 	/** Free text matched against participants, subject and body. */
 	q?: string | null;
 	unreadOnly?: boolean;
@@ -191,6 +196,7 @@ type ThreadMessageRow = {
 	is_starred: number;
 	has_attachments: number;
 	domain_id: string | null;
+	address_id: string | null;
 	status: MailStatus | null;
 	created_at: string;
 };
@@ -203,6 +209,11 @@ function buildScope(userId: string, query: MailboxQuery): { where: string; bindi
 	if (query.domainId) {
 		filters.push('e.domain_id = ?');
 		bindings.push(query.domainId);
+	}
+
+	if (query.addressId) {
+		filters.push('e.address_id = ?');
+		bindings.push(query.addressId);
 	}
 
 	const term = query.q?.trim();
@@ -278,7 +289,7 @@ export async function listMailbox(
 	const { results: messages } = await db
 		.prepare(
 			`SELECT m.id, COALESCE(m.thread_id, m.id) AS thread_id, m.direction, m.from_addr, m.to_addr,
-			        m.subject, m.is_read, m.is_starred, m.created_at, m.domain_id, m.status,
+			        m.subject, m.is_read, m.is_starred, m.created_at, m.domain_id, m.address_id, m.status,
 			        substr(COALESCE(m.body_text, ''), 1, 4000) AS body_head,
 			        EXISTS(SELECT 1 FROM email_attachments a WHERE a.email_id = m.id) AS has_attachments
 			 FROM emails m
@@ -341,6 +352,7 @@ function toThreadSummary(messages: ThreadMessageRow[]): ThreadSummary {
 		is_draft: latest.status === 'draft',
 		has_attachments: messages.some((message) => message.has_attachments === 1),
 		domain_id: latest.domain_id,
+		address_id: latest.address_id,
 		status: latest.status === 'draft' ? null : latest.status,
 		created_at: latest.created_at
 	};
@@ -375,7 +387,7 @@ export async function listEmails(
 	const { results } = await db
 		.prepare(
 			`SELECT e.id, e.direction, e.from_addr, e.to_addr, e.subject, e.is_read, e.is_starred,
-			        e.created_at, e.domain_id, e.status,
+			        e.created_at, e.domain_id, e.address_id, e.status,
 			        substr(COALESCE(e.body_text, ''), 1, 4000) AS body_head,
 			        EXISTS(SELECT 1 FROM email_attachments a WHERE a.email_id = e.id) AS has_attachments
 			 FROM emails e
@@ -398,6 +410,7 @@ export async function listEmails(
 		is_draft: row.status === 'draft',
 		has_attachments: row.has_attachments === 1,
 		domain_id: row.domain_id,
+		address_id: row.address_id,
 		status: row.status === 'draft' ? null : row.status,
 		created_at: row.created_at
 	}));
@@ -621,6 +634,7 @@ export type DraftInput = {
 	bodyText?: string | null;
 	bodyHtml?: string | null;
 	domainId?: string | null;
+	addressId?: string | null;
 };
 
 /** Creates or updates a draft; drafts are outbound rows Resend never saw. */
@@ -639,7 +653,8 @@ export async function saveDraft(
 			await db
 				.prepare(
 					`UPDATE emails SET from_addr = ?, to_addr = ?, cc_addr = ?, bcc_addr = ?,
-					        subject = ?, thread_key = ?, body_text = ?, body_html = ?, domain_id = ?,
+					        subject = ?, thread_key = ?, body_text = ?, body_html = ?,
+					        domain_id = ?, address_id = ?,
 					        created_at = datetime('now'), deleted_at = NULL
 					 WHERE id = ? AND user_id = ?`
 				)
@@ -653,6 +668,7 @@ export async function saveDraft(
 					input.bodyText ?? null,
 					input.bodyHtml ?? null,
 					input.domainId ?? null,
+					input.addressId ?? null,
 					input.id,
 					userId
 				)
@@ -673,6 +689,7 @@ export async function saveDraft(
 		bodyText: input.bodyText ?? null,
 		bodyHtml: input.bodyHtml ?? null,
 		domainId: input.domainId ?? null,
+		addressId: input.addressId ?? null,
 		status: 'draft',
 		isRead: true
 	});

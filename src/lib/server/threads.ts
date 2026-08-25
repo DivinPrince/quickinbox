@@ -98,6 +98,8 @@ export type ThreadLookup = {
 	inReplyTo?: string | null;
 	references?: string | null;
 	replyToEmailId?: string | null;
+	/** Mailbox domain boundary; conversations never cross it when present. */
+	domainId?: string | null;
 	/** Drafts start their own conversation instead of joining one by subject. */
 	subjectMatch?: boolean;
 };
@@ -112,10 +114,13 @@ export async function resolveThreadId(
 	userId: string,
 	input: ThreadLookup
 ): Promise<string> {
+	const domainClause = input.domainId ? ' AND domain_id = ?' : '';
+	const domainBindings = input.domainId ? [input.domainId] : [];
+
 	if (input.replyToEmailId) {
 		const parent = await db
-			.prepare('SELECT thread_id, id FROM emails WHERE id = ? AND user_id = ?')
-			.bind(input.replyToEmailId, userId)
+			.prepare(`SELECT thread_id, id FROM emails WHERE id = ? AND user_id = ?${domainClause}`)
+			.bind(input.replyToEmailId, userId, ...domainBindings)
 			.first<{ thread_id: string | null; id: string }>();
 
 		if (parent) return parent.thread_id ?? parent.id;
@@ -130,11 +135,12 @@ export async function resolveThreadId(
 			.prepare(
 				`SELECT thread_id, id FROM emails
 				 WHERE user_id = ?
+				 ${domainClause}
 				 AND message_id IS NOT NULL
 				 AND replace(replace(message_id, '<', ''), '>', '') IN (${placeholders})
 				 ORDER BY datetime(created_at) DESC LIMIT 1`
 			)
-			.bind(userId, ...referenced)
+			.bind(userId, ...domainBindings, ...referenced)
 			.first<{ thread_id: string | null; id: string }>();
 
 		if (match) return match.thread_id ?? match.id;
@@ -163,12 +169,13 @@ export async function resolveThreadId(
 					`SELECT thread_id, id FROM emails
 					 WHERE user_id = ?
 					 AND thread_key = ?
+					 ${domainClause}
 					 AND (status IS NULL OR status <> 'draft')
 					 AND datetime(created_at) > datetime('now', ?)
 					 AND (${overlap})
 					 ORDER BY datetime(created_at) DESC LIMIT 1`
 				)
-				.bind(userId, threadKey, `-${SUBJECT_MATCH_DAYS} day`, ...participants)
+				.bind(userId, threadKey, ...domainBindings, `-${SUBJECT_MATCH_DAYS} day`, ...participants)
 				.first<{ thread_id: string | null; id: string }>();
 
 			if (match) return match.thread_id ?? match.id;

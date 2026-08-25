@@ -9,7 +9,13 @@
 	import PullToRefresh from './PullToRefresh.svelte';
 	import { formatRelativeDate } from '$lib/utils/date';
 	import { haptic, isPrimaryTab } from '$lib/app-chrome';
-	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
+	import type {
+		MailAddress,
+		MailboxFilters,
+		MailboxPage,
+		MailboxView,
+		ThreadSummary
+	} from '$lib/types';
 
 	let {
 		view,
@@ -30,6 +36,14 @@
 	};
 
 	const meta = $derived(META[view]);
+	const addresses = $derived(($currentPage.data.addresses ?? []) as MailAddress[]);
+
+	/** The identity a conversation arrived on — shown only when it disambiguates. */
+	function identity(thread: ThreadSummary): MailAddress | null {
+		if (addresses.length < 2) return null;
+		// Catch-all deliveries have no address_id on purpose; do not guess from domain.
+		return addresses.find((address) => address.id === thread.address_id) ?? null;
+	}
 
 	// Local copy so stars and reads can flip before the server round trip lands.
 	let items = $state<ThreadSummary[]>([]);
@@ -65,7 +79,9 @@
 	const allSelected = $derived(items.length > 0 && selected.length === items.length);
 	const someSelected = $derived(selected.length > 0);
 	const activeFilterCount = $derived(
-		[filters.unreadOnly, filters.starredOnly, filters.attachmentsOnly].filter(Boolean).length
+		[filters.unreadOnly, filters.starredOnly, filters.attachmentsOnly, filters.addressId].filter(
+			Boolean
+		).length
 	);
 
 	/**
@@ -384,6 +400,24 @@
 									<Icon name="checkbox-multiple-line" size={15} /> Select
 								</button>
 							{/if}
+							{#if addresses.length > 1}
+								{#each addresses as address (address.id)}
+									<button
+										type="button"
+										class="menu-item"
+										onclick={() =>
+											apply({ address: filters.addressId === address.id ? null : address.id })}
+									>
+										<Icon
+											name={filters.addressId === address.id
+												? 'radio-button-line'
+												: 'checkbox-blank-circle-line'}
+											size={15}
+										/>
+										{address.label || address.address}
+									</button>
+								{/each}
+							{/if}
 							<button
 								type="button"
 								class="menu-item"
@@ -422,7 +456,13 @@
 									type="button"
 									class="menu-item"
 									onclick={() =>
-										apply({ unread: null, starred: null, attachments: null, q: null })}
+										apply({
+											unread: null,
+											starred: null,
+											attachments: null,
+											address: null,
+											q: null
+										})}
 								>
 									<Icon name="close-circle-line" size={15} /> Clear filters
 								</button>
@@ -480,6 +520,24 @@
 						onclick={() => (filterOpen = false)}
 					></button>
 					<div class="menu menu-right" role="menu">
+						{#if addresses.length > 1}
+							{#each addresses as address (address.id)}
+								<button
+									type="button"
+									class="menu-item"
+									onclick={() =>
+										apply({ address: filters.addressId === address.id ? null : address.id })}
+								>
+									<Icon
+										name={filters.addressId === address.id
+											? 'radio-button-line'
+											: 'checkbox-blank-circle-line'}
+										size={15}
+									/>
+									{address.label || address.address}
+								</button>
+							{/each}
+						{/if}
 						<button
 							type="button"
 							class="menu-item"
@@ -518,7 +576,7 @@
 								type="button"
 								class="menu-item"
 								onclick={() =>
-									apply({ unread: null, starred: null, attachments: null, q: null })}
+									apply({ unread: null, starred: null, attachments: null, address: null, q: null })}
 							>
 								<Icon name="close-circle-line" size={15} /> Clear all
 							</button>
@@ -559,6 +617,12 @@
 			{/if}
 			{#if filters.attachmentsOnly}
 				<a href={withParams({ attachments: null })} class="filter-chip">Attachments</a>
+			{/if}
+			{#if filters.addressId}
+				{@const filtered = addresses.find((address) => address.id === filters.addressId)}
+				<a href={withParams({ address: null })} class="filter-chip">
+					{filtered?.label || filtered?.address || 'Address'}
+				</a>
 			{/if}
 		</div>
 	{/if}
@@ -630,6 +694,9 @@
 									<span class="count">{thread.message_count}</span>
 								{/if}
 								{#if thread.is_draft}<span class="tag tag-draft">Draft</span>{/if}
+								{#if identity(thread)}
+									<span class="tag">{identity(thread)?.label || identity(thread)?.address}</span>
+								{/if}
 							</span>
 
 							<span class="body">

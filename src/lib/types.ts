@@ -101,6 +101,8 @@ export type EmailRow = {
 	/** Subject with Re:/Fwd: stripped — backs subject-based thread matching. */
 	thread_key: string | null;
 	domain_id: string | null;
+	/** The registered address that received the message; null for catch-all. */
+	address_id: string | null;
 	provider_id: string | null;
 	status: MailStatus | null;
 	status_at: string | null;
@@ -124,6 +126,7 @@ export type EmailSummary = {
 	is_draft: boolean;
 	has_attachments: boolean;
 	domain_id: string | null;
+	address_id: string | null;
 	status: DeliveryStatus | null;
 	created_at: string;
 };
@@ -152,6 +155,8 @@ export type ThreadSummary = {
 	is_draft: boolean;
 	has_attachments: boolean;
 	domain_id: string | null;
+	/** Which registered address the newest message arrived on, when known. */
+	address_id: string | null;
 	/** Delivery state of the newest message, when we sent it. */
 	status: DeliveryStatus | null;
 	created_at: string;
@@ -162,6 +167,8 @@ export type MailboxFilters = {
 	unreadOnly: boolean;
 	starredOnly: boolean;
 	attachmentsOnly: boolean;
+	/** Registered address to narrow the list to; empty for all addresses. */
+	addressId: string;
 };
 
 export type MailboxPage = {
