@@ -41,11 +41,8 @@
 	/** The identity a conversation arrived on — shown only when it disambiguates. */
 	function identity(thread: ThreadSummary): MailAddress | null {
 		if (addresses.length < 2) return null;
-		return (
-			addresses.find((address) => address.id === thread.address_id) ??
-			addresses.find((address) => address.domain_id === thread.domain_id) ??
-			null
-		);
+		// Catch-all deliveries have no address_id on purpose; do not guess from domain.
+		return addresses.find((address) => address.id === thread.address_id) ?? null;
 	}
 
 	// Local copy so stars and reads can flip before the server round trip lands.

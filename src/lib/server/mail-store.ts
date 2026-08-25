@@ -634,6 +634,7 @@ export type DraftInput = {
 	bodyText?: string | null;
 	bodyHtml?: string | null;
 	domainId?: string | null;
+	addressId?: string | null;
 };
 
 /** Creates or updates a draft; drafts are outbound rows Resend never saw. */
@@ -652,7 +653,8 @@ export async function saveDraft(
 			await db
 				.prepare(
 					`UPDATE emails SET from_addr = ?, to_addr = ?, cc_addr = ?, bcc_addr = ?,
-					        subject = ?, thread_key = ?, body_text = ?, body_html = ?, domain_id = ?,
+					        subject = ?, thread_key = ?, body_text = ?, body_html = ?,
+					        domain_id = ?, address_id = ?,
 					        created_at = datetime('now'), deleted_at = NULL
 					 WHERE id = ? AND user_id = ?`
 				)
@@ -666,6 +668,7 @@ export async function saveDraft(
 					input.bodyText ?? null,
 					input.bodyHtml ?? null,
 					input.domainId ?? null,
+					input.addressId ?? null,
 					input.id,
 					userId
 				)
@@ -686,6 +689,7 @@ export async function saveDraft(
 		bodyText: input.bodyText ?? null,
 		bodyHtml: input.bodyHtml ?? null,
 		domainId: input.domainId ?? null,
+		addressId: input.addressId ?? null,
 		status: 'draft',
 		isRead: true
 	});

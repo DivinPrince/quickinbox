@@ -12,3 +12,12 @@ SET address_id = (
 	  AND a.user_id = emails.user_id
 )
 WHERE direction = 'inbound' AND address_id IS NULL;
+
+-- Outbound and drafts store the sending mailbox in from_addr.
+UPDATE emails
+SET address_id = (
+	SELECT a.id FROM addresses a
+	WHERE a.address = emails.from_addr COLLATE NOCASE
+	  AND a.user_id = emails.user_id
+)
+WHERE direction = 'outbound' AND address_id IS NULL;
