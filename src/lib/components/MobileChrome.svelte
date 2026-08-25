@@ -299,6 +299,13 @@
 			bottom: 0;
 			left: 0;
 			z-index: 50;
+			/* Landscape phones are short enough that the sheet can outgrow the
+			   viewport once a domain switcher and Log out are both present. It is
+			   anchored to the bottom, so without this the top is clipped off-screen
+			   with no way to reach it. */
+			max-height: calc(100dvh - 1rem);
+			overflow-y: auto;
+			overscroll-behavior: contain;
 			padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
 			background: var(--color-surface);
 			border-radius: 1.25rem 1.25rem 0 0;
