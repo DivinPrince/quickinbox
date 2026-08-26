@@ -3,6 +3,7 @@
 	import StackHeader from '$lib/components/StackHeader.svelte';
 	import AddressField from '$lib/components/AddressField.svelte';
 	import Check from '$lib/components/Check.svelte';
+	import { APP_NAME } from '$lib/constants';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -179,7 +180,7 @@
 </script>
 
 <svelte:head>
-	<title>Admin — Mail</title>
+	<title>Admin — {APP_NAME}</title>
 </svelte:head>
 
 <div class="admin-page">

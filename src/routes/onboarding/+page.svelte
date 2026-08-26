@@ -10,6 +10,7 @@
 		onboardingSubtitle,
 		providerName
 	} from '$lib/provider-copy';
+	import { APP_NAME } from '$lib/constants';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -89,7 +90,7 @@
 </script>
 
 <svelte:head>
-	<title>Get started — Mail</title>
+	<title>Get started — {APP_NAME}</title>
 </svelte:head>
 
 <WizardShell
@@ -99,7 +100,7 @@
 		: "Choose the address you'll send and receive mail from."}
 	partner={needsDomain}
 	partnerKind={data.providerKind}
-	partnerCaption={`Mail + ${providerName(data.providerKind)}`}
+	partnerCaption={`${APP_NAME} + ${providerName(data.providerKind)}`}
 >
 	{#if needsDomain}
 		{#if !data.isAdmin}

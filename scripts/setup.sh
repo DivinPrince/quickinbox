@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap QuickMail setup: install bun if needed, install deps, run the wizard.
+# Bootstrap Quickinbox setup: install bun if needed, install deps, run the wizard.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,12 +36,12 @@ ask_yes() {
 }
 
 say ""
-say "QuickMail setup"
+say "Quickinbox setup"
 say "  Installing anything that's missing, then the domain wizard."
 say ""
 
 if ! has_bun; then
-	warn "Bun is not installed. QuickMail's build and deploy scripts use bun."
+	warn "Bun is not installed. Quickinbox's build and deploy scripts use bun."
 	if ask_yes "Install bun now?"; then
 		if [[ "$(uname -s)" == "MINGW"* || "$(uname -s)" == "MSYS"* || "$(uname -s)" == "CYGWIN"* ]]; then
 			say "  Install bun from https://bun.sh on Windows, then re-run: bash scripts/setup.sh"
