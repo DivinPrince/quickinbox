@@ -5,6 +5,7 @@ import { getUserByApiToken, previewFor, readBearerToken } from './api-tokens';
 
 describe('API token preview', () => {
 	test('skips the shared prefix so keys are distinguishable', () => {
+		assert.equal(previewFor('qi_live_abcdEFGHxxxxxxxxwXYZ'), 'abcd…wXYZ');
 		assert.equal(previewFor('qm_live_abcdEFGHxxxxxxxxwXYZ'), 'abcd…wXYZ');
 	});
 
@@ -21,7 +22,7 @@ describe('API token parsing', () => {
 	} as unknown as D1Database;
 
 	test('readBearerToken extracts a Bearer value and rejects oversized tokens', () => {
-		const token = 'qm_live_abcdefghijklmnopqrstuvwxyz012345';
+		const token = 'qi_live_abcdefghijklmnopqrstuvwxyz012345';
 		const request = new Request('https://mail.example.com', {
 			headers: { authorization: `Bearer ${token}` }
 		});
@@ -35,8 +36,25 @@ describe('API token parsing', () => {
 	});
 
 	test('getUserByApiToken rejects missing prefix and oversized tokens before hashing', async () => {
-		assert.equal(await getUserByApiToken(unusedDb, 'not-a-quickmail-token'), null);
+		assert.equal(await getUserByApiToken(unusedDb, 'not-a-quickinbox-token'), null);
+		assert.equal(await getUserByApiToken(unusedDb, 'qi_live_'), null);
+		assert.equal(await getUserByApiToken(unusedDb, `qi_live_${'x'.repeat(300)}`), null);
 		assert.equal(await getUserByApiToken(unusedDb, 'qm_live_'), null);
 		assert.equal(await getUserByApiToken(unusedDb, `qm_live_${'x'.repeat(300)}`), null);
+	});
+
+	test('getUserByApiToken hashes legacy qm_live_ keys instead of rejecting them', async () => {
+		let prepared = 0;
+		const db = {
+			prepare() {
+				prepared += 1;
+				throw new Error('hashed');
+			}
+		} as unknown as D1Database;
+		await assert.rejects(
+			() => getUserByApiToken(db, 'qm_live_abcdefghijklmnopqrstuvwxyz012345'),
+			/hashed/
+		);
+		assert.equal(prepared, 1);
 	});
 });

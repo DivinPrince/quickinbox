@@ -13,6 +13,7 @@
 		type ThemePreference
 	} from '$lib/theme';
 	import { MAX_EMAIL_SIGNATURE_LENGTH } from '$lib/email-signature';
+	import { APP_NAME } from '$lib/constants';
 	import type { ApiTokenSummary, MailAddress } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -91,7 +92,7 @@
 	let copied = $state(false);
 	let installCopied = $state(false);
 	const installCommand =
-		'curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickmail/main/scripts/install.sh | sh';
+		'curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickinbox/main/scripts/install.sh | sh';
 
 	const canCreateKey = $derived(
 		Boolean(keyName.trim()) && (sendScope || readScope || (data.isAdmin && adminScope))
@@ -292,7 +293,7 @@
 </script>
 
 <svelte:head>
-	<title>Settings — Mail</title>
+	<title>Settings — {APP_NAME}</title>
 </svelte:head>
 
 <svelte:window onkeydown={handleWindowKeydown} />

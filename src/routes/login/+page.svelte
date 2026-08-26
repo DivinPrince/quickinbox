@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Logo from '$lib/components/Logo.svelte';
+	import { APP_NAME } from '$lib/constants';
 	import { discardPushSubscriptionFromAnotherAccount } from '$lib/push-client';
 
 	let email = $state('');
@@ -38,7 +39,7 @@
 </script>
 
 <svelte:head>
-	<title>Sign in — Mail</title>
+	<title>Sign in — {APP_NAME}</title>
 </svelte:head>
 
 <div class="auth-shell">

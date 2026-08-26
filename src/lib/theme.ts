@@ -1,6 +1,7 @@
 export type ThemePreference = 'light' | 'dark' | 'system';
 
-export const THEME_STORAGE_KEY = 'mail:theme';
+export const THEME_STORAGE_KEY = 'quickinbox:theme';
+const LEGACY_THEME_STORAGE_KEY = 'mail:theme';
 
 export const THEME_OPTIONS: { value: ThemePreference; label: string; icon: string }[] = [
 	{ value: 'light', label: 'Light', icon: 'sun-line' },
@@ -13,7 +14,8 @@ function isPreference(value: string | null): value is ThemePreference {
 }
 
 export function readThemePreference(): ThemePreference {
-	const stored = localStorage.getItem(THEME_STORAGE_KEY);
+	const stored =
+		localStorage.getItem(THEME_STORAGE_KEY) ?? localStorage.getItem(LEGACY_THEME_STORAGE_KEY);
 	return isPreference(stored) ? stored : 'system';
 }
 

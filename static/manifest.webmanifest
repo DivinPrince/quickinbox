@@ -1,8 +1,8 @@
 {
 	"id": "/",
-	"name": "Mail",
-	"short_name": "Mail",
-	"description": "Your mail.",
+	"name": "Quickinbox",
+	"short_name": "Quickinbox",
+	"description": "Your inbox.",
 	"start_url": "/inbox",
 	"scope": "/",
 	"display": "standalone",

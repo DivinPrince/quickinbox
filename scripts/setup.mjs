@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Interactive first-run setup for QuickMail.
+ * Interactive first-run setup for Quickinbox.
  *
  * Installs tools, logs into Cloudflare, creates D1/R2, writes env and
  * wrangler config, and onboards a mail domain (Resend or Cloudflare Email).
@@ -57,7 +57,7 @@ if (args.help) {
 let rl = null;
 
 function printHelp() {
-	console.log(`QuickMail setup
+	console.log(`Quickinbox setup
 
 Installs tools, logs you into Cloudflare, creates D1/R2, writes env and
 wrangler config, and onboards your mail domain.
@@ -345,7 +345,7 @@ function readMutedLine() {
 
 function readWrangler() {
 	if (!existsSync(wranglerFile)) {
-		throw new Error('wrangler.jsonc is missing. Run this from the QuickMail repo root.');
+		throw new Error('wrangler.jsonc is missing. Run this from the Quickinbox repo root.');
 	}
 	return readFileSync(wranglerFile, 'utf8');
 }
@@ -461,7 +461,7 @@ async function ensureRuntime() {
 		return;
 	}
 
-	warn('Bun is not installed. QuickMail scripts (build, deploy, migrate) expect bun.');
+	warn('Bun is not installed. Quickinbox scripts (build, deploy, migrate) expect bun.');
 	if (await confirm('Install bun now?', true)) {
 		if (process.platform === 'win32') {
 			throw new Error('Install bun from https://bun.sh on Windows, then re-run setup.');
@@ -697,7 +697,7 @@ function listD1() {
 	for (const line of text.split('\n')) {
 		const id = line.match(/\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i)?.[1];
 		if (!id) continue;
-		const name = line.match(/\b(quickmail|[a-z0-9][a-z0-9-]{1,62})\b/i)?.[1];
+		const name = line.match(/\b(quickmail|quickinbox|[a-z0-9][a-z0-9-]{1,62})\b/i)?.[1];
 		if (name) found.push({ name, id });
 	}
 	return found;
@@ -1055,7 +1055,7 @@ async function main() {
 		throw new Error('--yes requires --domain.');
 	}
 
-	log(`\n${c.bold('QuickMail setup')}`);
+	log(`\n${c.bold('Quickinbox setup')}`);
 	log(c.dim('  A mailbox on your domain, on Cloudflare.\n'));
 
 	const total = 8;

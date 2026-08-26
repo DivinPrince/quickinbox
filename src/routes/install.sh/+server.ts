@@ -1,7 +1,7 @@
 import type { RequestHandler } from '@sveltejs/kit';
 
-const GITHUB_REPO = 'DivinPrince/quickmail';
-/** Public installer lives on main; set QUICKMAIL_REF in the script to use another ref. */
+const GITHUB_REPO = 'DivinPrince/quickinbox';
+/** Public installer lives on main; set QUICKINBOX_REF in the script to use another ref. */
 const GITHUB_REF = 'main';
 
 function isSafeOrigin(origin: string): boolean {
@@ -27,7 +27,7 @@ export const GET: RequestHandler = ({ url }) => {
 	const origin = isSafeOrigin(url.origin) ? url.origin : '';
 	const installUrl = `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_REF}/scripts/install.sh`;
 	const exportLine = origin
-		? `export QUICKMAIL_URL="\${QUICKMAIL_URL:-${shellSingleQuote(origin)}}"\n`
+		? `export QUICKINBOX_URL="\${QUICKINBOX_URL:-${shellSingleQuote(origin)}}"\n`
 		: '';
 
 	const body = `#!/usr/bin/env bash

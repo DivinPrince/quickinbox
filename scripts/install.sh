@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Install the QuickMail CLI from GitHub (no npm).
-#   curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickmail/main/scripts/install.sh | sh
-# Default QUICKMAIL_REF is main; override to install from another ref.
+# Install the Quickinbox CLI from GitHub (no npm).
+#   curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickinbox/main/scripts/install.sh | sh
+# Default QUICKINBOX_REF is main; QUICKMAIL_REF still works from before the rename.
 # Piped `sh` is often dash; re-exec with bash before any bash-only syntax.
 if [ -z "${BASH_VERSION:-}" ]; then
 	command -v bash >/dev/null 2>&1 || { printf '%s\n' "Need bash."; exit 1; }
@@ -16,26 +16,26 @@ say() { printf '%s\n' "$*"; }
 ok() { printf '  ✓ %s\n' "$*"; }
 warn() { printf '  ! %s\n' "$*"; }
 
-REPO="DivinPrince/quickmail"
-REF="${QUICKMAIL_REF:-main}"
+REPO="DivinPrince/quickinbox"
+REF="${QUICKINBOX_REF:-${QUICKMAIL_REF:-main}}"
 
 case "$REF" in
 	''|*..*|*[[:space:]]*|*@*|*'?'*|*#*|*'\\'*|*://*|/*)
-		say "Invalid QUICKMAIL_REF: $REF"
+		say "Invalid install ref: $REF"
 		exit 1
 		;;
 esac
 case "$REF" in
 	[A-Za-z0-9]*) ;;
 	*)
-		say "Invalid QUICKMAIL_REF: $REF"
+		say "Invalid install ref: $REF"
 		exit 1
 		;;
 esac
 
 RAW="https://raw.githubusercontent.com/${REPO}/${REF}"
 
-ORIGIN="${QUICKMAIL_URL:-}"
+ORIGIN="${QUICKINBOX_URL:-${QUICKMAIL_URL:-}}"
 while [ -n "$ORIGIN" ] && [ "$ORIGIN" != "${ORIGIN%/}" ]; do
 	ORIGIN="${ORIGIN%/}"
 done
@@ -43,14 +43,14 @@ done
 if [ -n "$ORIGIN" ]; then
 	case "$ORIGIN" in
 		*[[:space:]]*|*@*|*'?'*|*#*|*://*/*)
-			say "Invalid QUICKMAIL_URL: $ORIGIN"
+			say "Invalid install URL: $ORIGIN"
 			exit 1
 			;;
 	esac
 
 	host="${ORIGIN#*://}"
 	if [ -z "$host" ]; then
-		say "Invalid QUICKMAIL_URL: $ORIGIN"
+		say "Invalid install URL: $ORIGIN"
 		exit 1
 	fi
 
@@ -62,7 +62,7 @@ if [ -n "$ORIGIN" ]; then
 			exit 1
 			;;
 		*)
-			say "QUICKMAIL_URL must be http or https."
+			say "Install URL must be http or https."
 			exit 1
 			;;
 	esac
@@ -86,9 +86,10 @@ if [ "$(id -u)" -eq 0 ] && [ "$HOME" = "/" ]; then
 	exit 1
 fi
 
-CLI_DIR="$HOME/.quickmail/cli"
+CLI_DIR="$HOME/.quickinbox/cli"
 BIN_DIR="$HOME/.local/bin"
-LAUNCHER="$BIN_DIR/quickmail"
+LAUNCHER="$BIN_DIR/quickinbox"
+LEGACY_LAUNCHER="$BIN_DIR/quickmail"
 
 case "$CLI_DIR" in
 	"$HOME"/*) ;;
@@ -99,6 +100,14 @@ case "$CLI_DIR" in
 esac
 
 case "$LAUNCHER" in
+	"$HOME"/*) ;;
+	*)
+		say "Refusing to install outside \$HOME"
+		exit 1
+		;;
+esac
+
+case "$LEGACY_LAUNCHER" in
 	"$HOME"/*) ;;
 	*)
 		say "Refusing to install outside \$HOME"
@@ -122,7 +131,7 @@ download() {
 	local url="$1"
 	local dest="$2"
 	local tmp
-	tmp="$(mktemp "${TMPDIR:-/tmp}/quickmail.XXXXXX")"
+	tmp="$(mktemp "${TMPDIR:-/tmp}/quickinbox.XXXXXX")"
 	if command -v curl >/dev/null 2>&1; then
 		if ! curl -fsSL "$url" -o "$tmp"; then
 			rm -f "$tmp"
@@ -148,7 +157,7 @@ download() {
 }
 
 say ""
-say "QuickMail CLI"
+say "Quickinbox CLI"
 say "  Installing from github.com/${REPO} @ ${REF}"
 say ""
 
@@ -180,7 +189,7 @@ ok "mcp.ts"
 download "$RAW/cli/package.json" "$CLI_DIR/package.json"
 ok "package.json"
 
-# Install MCP deps here so `quickmail mcp` never auto-installs onto stdio.
+# Install MCP deps here so `quickinbox mcp` never auto-installs onto stdio.
 if ! bun_out="$(cd "$CLI_DIR" && bun install --production 2>&1)"; then
 	say "Failed to install MCP dependencies in $CLI_DIR"
 	say "$bun_out"
@@ -188,16 +197,18 @@ if ! bun_out="$(cd "$CLI_DIR" && bun install --production 2>&1)"; then
 fi
 ok "mcp dependencies"
 
-tmp_launcher="$(mktemp "${TMPDIR:-/tmp}/quickmail.XXXXXX")"
+tmp_launcher="$(mktemp "${TMPDIR:-/tmp}/quickinbox.XXXXXX")"
 cat > "$tmp_launcher" <<'EOF'
 #!/usr/bin/env bash
 export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
 export PATH="$BUN_INSTALL/bin:$PATH"
-exec bun "$HOME/.quickmail/cli/main.ts" "$@"
+exec bun "$HOME/.quickinbox/cli/main.ts" "$@"
 EOF
 chmod +x "$tmp_launcher"
+cp "$tmp_launcher" "$LEGACY_LAUNCHER"
 mv "$tmp_launcher" "$LAUNCHER"
 ok "$LAUNCHER"
+ok "$LEGACY_LAUNCHER (alias)"
 
 case ":$PATH:" in
 	*":$BIN_DIR:"*) ;;
@@ -210,8 +221,10 @@ esac
 say ""
 say "Next:"
 if [ -n "$ORIGIN" ]; then
-	say "  quickmail login --url $ORIGIN --token <key from Settings>"
+	say "  quickinbox login --url $ORIGIN --token <key from Settings>"
+	say "  (quickmail still works as the same command)"
 else
-	say "  quickmail login --url <https://your-instance> --token <key from Settings>"
+	say "  quickinbox login --url <https://your-instance> --token <key from Settings>"
+	say "  (quickmail still works as the same command)"
 fi
 say ""

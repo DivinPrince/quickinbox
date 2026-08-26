@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { APP_NAME } from '$lib/constants';
 	import {
 		clearInstallPrompt,
 		isIOS,
@@ -39,8 +40,8 @@
 			<h2><Icon name="smartphone-line" size={18} /> Home screen</h2>
 			<p class="section-description">
 				{standalone
-					? 'Mail is installed on this device.'
-					: 'Open Mail like a normal app, without browser chrome.'}
+					? `${APP_NAME} is installed on this device.`
+					: `Open ${APP_NAME} like a normal app, without browser chrome.`}
 			</p>
 		</div>
 		<span class="badge" class:on={standalone}>{standalone ? 'Installed' : 'Optional'}</span>
@@ -55,7 +56,7 @@
 		</p>
 	{:else if deferred}
 		<div class="actions">
-			<p class="hint flush">Adds Mail to the home screen or app drawer.</p>
+			<p class="hint flush">Adds {APP_NAME} to the home screen or app drawer.</p>
 			<button type="button" class="btn-primary" disabled={busy} onclick={install}>
 				{busy ? 'Installing…' : 'Install'}
 			</button>
@@ -63,7 +64,7 @@
 	{:else}
 		<p class="hint">
 			<Icon name="information-line" size={14} />
-			Use the browser menu to install Mail or add it to the home screen.
+			Use the browser menu to install {APP_NAME} or add it to the home screen.
 		</p>
 	{/if}
 </section>

@@ -6,6 +6,7 @@
 	import ThreadMessage from '$lib/components/ThreadMessage.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { hasInAppHistory, requestSkipViewTransition } from '$lib/app-chrome';
+	import { APP_NAME } from '$lib/constants';
 	import type { OutboundAttachmentInput } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -193,7 +194,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.subject} — Mail</title>
+	<title>{data.subject} — {APP_NAME}</title>
 </svelte:head>
 
 <div class="mail-page">

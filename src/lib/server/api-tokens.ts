@@ -28,16 +28,23 @@ export type ApiTokenAuth = {
 	scopes: ApiScope[];
 };
 
-const TOKEN_PREFIX = 'qm_live_';
+/** New keys use `qi_live_`. Existing `qm_live_` keys from before the rename still authenticate. */
+const TOKEN_PREFIX = 'qi_live_';
+const LEGACY_TOKEN_PREFIX = 'qm_live_';
+const TOKEN_PREFIXES = [TOKEN_PREFIX, LEGACY_TOKEN_PREFIX] as const;
 const MAX_TOKEN_LENGTH = 256;
 const LAST_USED_THROTTLE_MS = 5 * 60 * 1000;
 
+function tokenPrefix(token: string): string | null {
+	for (const prefix of TOKEN_PREFIXES) {
+		if (token.startsWith(prefix)) return prefix;
+	}
+	return null;
+}
+
 function isPlausibleApiToken(token: string): boolean {
-	return (
-		token.startsWith(TOKEN_PREFIX) &&
-		token.length > TOKEN_PREFIX.length &&
-		token.length <= MAX_TOKEN_LENGTH
-	);
+	const prefix = tokenPrefix(token);
+	return Boolean(prefix && token.length > prefix.length && token.length <= MAX_TOKEN_LENGTH);
 }
 
 export function isApiScope(value: unknown): value is ApiScope {
@@ -68,15 +75,16 @@ function toBase64Url(bytes: Uint8Array): string {
 	return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-/** `qm_live_<32 random bytes, base64url>` — recognizable and collision-resistant. */
+/** `qi_live_<32 random bytes, base64url>` — recognizable and collision-resistant. */
 function generateToken(): string {
 	const bytes = crypto.getRandomValues(new Uint8Array(32));
 	return `${TOKEN_PREFIX}${toBase64Url(bytes)}`;
 }
 
-/** Preview the random part, not the shared `qm_live_` prefix. */
+/** Preview the random part, not the shared `qi_live_` / `qm_live_` prefix. */
 export function previewFor(token: string): string {
-	const random = token.startsWith(TOKEN_PREFIX) ? token.slice(TOKEN_PREFIX.length) : token;
+	const prefix = tokenPrefix(token);
+	const random = prefix ? token.slice(prefix.length) : token;
 	if (random.length < 8) return random;
 	return `${random.slice(0, 4)}…${random.slice(-4)}`;
 }

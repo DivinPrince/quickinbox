@@ -126,7 +126,7 @@ describe('new-mail push payloads', () => {
 		assert.deepEqual(payload, {
 			title: 'Project update',
 			body: 'From Ada <ada@example.com>',
-			tag: 'quickmail-mail/id',
+			tag: 'quickinbox-mail/id',
 			url: '/mail/mail%2Fid'
 		});
 		assert.equal(JSON.stringify(payload).includes('message body'), false);

@@ -1,47 +1,49 @@
 import { writeFile } from 'node:fs/promises';
 import { stdin as stdinStream } from 'node:process';
 import {
-	QuickMailClient,
-	QuickMailError,
+	QuickInboxClient,
+	QuickInboxError,
 	safeDownloadName,
 	type MailboxView,
 	type ThreadSummary
 } from './client.ts';
-import { clearConfig, loadConfig, saveConfig } from './config.ts';
+import { clearConfig, envFlag, loadConfig, saveConfig } from './config.ts';
 
-const HELP = `quickmail — operate a QuickMail instance from the terminal
+const HELP = `quickinbox — operate a Quickinbox instance from the terminal
 
 Usage:
-  quickmail login --url <https://mail.example.com> --token <qm_live_…>
-  quickmail logout
-  quickmail whoami
+  quickinbox login --url <https://mail.example.com> --token <qi_live_…>
+  quickinbox logout
+  quickinbox whoami
 
 Mail:
-  quickmail inbox [--page N] [--unread] [--domain ID]
-  quickmail search <query> [--view inbox|sent|drafts|starred|trash]
-  quickmail read <thread-or-message-id>
-  quickmail send --to <addr> --subject <text> [--body <text>] [--from <address-id>]
-  quickmail reply <id> [--body <text>]
-  quickmail attachments <id>
-  quickmail download <email-id> <attachment-id> [--out file]
+  quickinbox inbox [--page N] [--unread] [--domain ID]
+  quickinbox search <query> [--view inbox|sent|drafts|starred|trash]
+  quickinbox read <thread-or-message-id>
+  quickinbox send --to <addr> --subject <text> [--body <text>] [--from <address-id>]
+  quickinbox reply <id> [--body <text>]
+  quickinbox attachments <id>
+  quickinbox download <email-id> <attachment-id> [--out file]
 
 Admin:
-  quickmail users list
-  quickmail users create --name <name> --local <part> --domain <id> --password <pw>
-  quickmail users delete <id>
-  quickmail users passwd <id-or-email> --password <pw>
-  quickmail domains list
-  quickmail domains connect <id>
-  quickmail domains disconnect <id>
-  quickmail addresses list [--all]
-  quickmail addresses create --local <part> --domain <id> [--user <id>]
-  quickmail unrouted
+  quickinbox users list
+  quickinbox users create --name <name> --local <part> --domain <id> --password <pw>
+  quickinbox users delete <id>
+  quickinbox users passwd <id-or-email> --password <pw>
+  quickinbox domains list
+  quickinbox domains connect <id>
+  quickinbox domains disconnect <id>
+  quickinbox addresses list [--all]
+  quickinbox addresses create --local <part> --domain <id> [--user <id>]
+  quickinbox unrouted
 
 MCP:
-  quickmail mcp
+  quickinbox mcp
 
-Auth is a Settings → API keys bearer token. QUICKMAIL_URL and QUICKMAIL_TOKEN
-override the saved config. Use --json on mail/admin commands for raw output.
+Auth is a Settings → API keys bearer token. QUICKINBOX_URL and QUICKINBOX_TOKEN
+override the saved config (`QUICKMAIL_URL` / `QUICKMAIL_TOKEN` still work).
+The `quickmail` command is an alias for `quickinbox`. Use --json on mail/admin
+commands for raw output.
 `;
 
 type Flags = Record<string, string | boolean>;
@@ -145,12 +147,12 @@ function printThreads(page: { threads: ThreadSummary[]; total: number; page: num
 	console.log(`\n${page.total} conversation${page.total === 1 ? '' : 's'}  page ${page.page}/${page.pageCount}`);
 }
 
-async function clientFromConfig(): Promise<QuickMailClient> {
+async function clientFromConfig(): Promise<QuickInboxClient> {
 	const config = await loadConfig();
-	return new QuickMailClient(config.url, config.token);
+	return new QuickInboxClient(config.url, config.token);
 }
 
-async function resolveUserId(client: QuickMailClient, idOrEmail: string): Promise<string> {
+async function resolveUserId(client: QuickInboxClient, idOrEmail: string): Promise<string> {
 	if (!idOrEmail.includes('@')) return idOrEmail;
 	const { users } = await client.listUsers();
 	const user = users.find((entry) => entry.email.toLowerCase() === idOrEmail.toLowerCase());
@@ -186,14 +188,16 @@ async function run(argv: string[]): Promise<number> {
 	switch (head) {
 		case 'login': {
 			const url = flagString(flags, 'url');
-			const token = flagString(flags, 'token') ?? process.env.QUICKMAIL_TOKEN;
+			const token = flagString(flags, 'token') ?? envFlag('QUICKINBOX_TOKEN', 'QUICKMAIL_TOKEN');
 			if (!url) {
 				throw new Error('login requires --url');
 			}
 			if (!token) {
-				throw new Error('login requires --token or QUICKMAIL_TOKEN (create a key in Settings → API keys)');
+				throw new Error(
+					'login requires --token or QUICKINBOX_TOKEN (create a key in Settings → API keys)'
+				);
 			}
-			const client = new QuickMailClient(url, token);
+			const client = new QuickInboxClient(url, token);
 			const user = await client.whoami();
 			const path = await saveConfig({ url, token });
 			console.log(`Logged in as ${user.email} (${path})`);
@@ -348,7 +352,7 @@ async function run(argv: string[]): Promise<number> {
 					(message.includes('mcp') || message.includes('@modelcontextprotocol/sdk'))
 				) {
 					throw new Error(
-						'MCP is not installed. Re-run: curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickmail/main/scripts/install.sh | sh'
+						'MCP is not installed. Re-run: curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickinbox/main/scripts/install.sh | sh'
 					);
 				}
 				throw error;
@@ -357,7 +361,7 @@ async function run(argv: string[]): Promise<number> {
 			return 0;
 		}
 		default:
-			throw new Error(`Unknown command "${head}". Run quickmail --help.`);
+			throw new Error(`Unknown command "${head}". Run quickinbox --help.`);
 	}
 }
 
@@ -494,7 +498,7 @@ async function addressesCommand(sub: string | undefined, rest: string[], flags: 
 }
 
 const code = await run(process.argv.slice(2)).catch((error) => {
-	const message = error instanceof QuickMailError ? `${error.status} ${error.message}` : error.message;
+	const message = error instanceof QuickInboxError ? `${error.status} ${error.message}` : error.message;
 	console.error(message);
 	return 1;
 });
