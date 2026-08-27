@@ -13,7 +13,7 @@
 		placeholder?: string;
 		minHeight?: number;
 		embedded?: boolean;
-		/** Grow to fill the composer and drop the desktop card chrome. */
+		/** On phones, grow to fill the composer and drop the card chrome. */
 		fill?: boolean;
 		toolbarEnd?: import('svelte').Snippet;
 	} = $props();
@@ -81,7 +81,7 @@
 		role="textbox"
 		aria-multiline="true"
 		class="editor prose prose-sm max-w-none px-4 py-3 outline-none"
-		style:min-height={fill ? undefined : `${minHeight}px`}
+		style:--editor-min-height="{minHeight}px"
 		data-placeholder={placeholder}
 		oninput={handleInput}
 		onpaste={handlePaste}
@@ -112,19 +112,6 @@
 		padding-right: 0;
 	}
 
-	.editor-shell-fill {
-		display: flex;
-		flex-direction: column;
-		flex: 1;
-		min-height: 0;
-	}
-
-	.editor-shell-fill .editor {
-		flex: 1;
-		min-height: 0;
-		overflow-y: auto;
-	}
-
 	.toolbar {
 		display: flex;
 		align-items: center;
@@ -137,6 +124,7 @@
 	}
 
 	.editor {
+		min-height: var(--editor-min-height, 240px);
 		color: var(--color-text);
 	}
 
@@ -151,6 +139,10 @@
 		}
 
 		.editor-shell-fill {
+			display: flex;
+			flex-direction: column;
+			flex: 1;
+			min-height: 0;
 			border-radius: 0;
 			box-shadow: none;
 			background: transparent;
@@ -171,7 +163,9 @@
 		}
 
 		.editor-shell-fill .editor {
+			flex: 1;
 			min-height: 8rem;
+			overflow-y: auto;
 			padding: 0.75rem 1rem 1rem;
 		}
 	}

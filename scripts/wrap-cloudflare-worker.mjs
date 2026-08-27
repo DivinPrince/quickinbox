@@ -9,7 +9,8 @@ import { existsSync } from 'node:fs';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const MARKER = '__QUICKMAIL_EMAIL_WRAPPER__';
+const MARKER = '__QUICKINBOX_EMAIL_WRAPPER__';
+const LEGACY_MARKER = '__QUICKMAIL_EMAIL_WRAPPER__';
 const generated = path.resolve('.svelte-kit/cloudflare/_worker.js');
 const sveltekit = path.resolve('.svelte-kit/cloudflare/_sveltekit.js');
 
@@ -18,7 +19,7 @@ if (!existsSync(generated)) {
 }
 
 const current = await readFile(generated, 'utf8');
-if (current.includes(MARKER)) {
+if (current.includes(MARKER) || current.includes(LEGACY_MARKER)) {
 	process.exit(0);
 }
 

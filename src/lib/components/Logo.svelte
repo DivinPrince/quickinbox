@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { APP_NAME } from '$lib/constants';
+
 	// The app mark: a sage tile with a mail-check glyph. Kept inline so it stays
 	// crisp at any size and can be dropped straight into a flex row.
 	let {
@@ -17,7 +19,7 @@
 	viewBox="0 0 64 64"
 	xmlns="http://www.w3.org/2000/svg"
 	role="img"
-	aria-label="Mail"
+	aria-label={APP_NAME}
 >
 	<rect width="64" height="64" rx="16.5" fill="#90ac9a" />
 	<g

@@ -2,6 +2,8 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import StackHeader from '$lib/components/StackHeader.svelte';
 	import AddressField from '$lib/components/AddressField.svelte';
+	import Check from '$lib/components/Check.svelte';
+	import { APP_NAME } from '$lib/constants';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -10,6 +12,7 @@
 	let newUserDomainId = $state('');
 	let name = $state('');
 	let password = $state('');
+	let makeAdmin = $state(false);
 
 	$effect(() => {
 		if (!newUserDomainId && data.domains[0]) {
@@ -18,6 +21,12 @@
 	});
 	let userError = $state('');
 	let creatingUser = $state(false);
+
+	let deleteError = $state('');
+	let deletingUser = $state<string | null>(null);
+
+	let roleError = $state('');
+	let changingRole = $state<string | null>(null);
 
 	let connecting = $state<string | null>(null);
 	let domainError = $state('');
@@ -58,7 +67,13 @@
 			const res = await fetch('/api/admin/users', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name, localPart, domainId: newUserDomainId, password })
+				body: JSON.stringify({
+					name,
+					localPart,
+					domainId: newUserDomainId,
+					password,
+					isAdmin: makeAdmin
+				})
 			});
 			const body = await res.json();
 			if (!res.ok) {
@@ -70,6 +85,64 @@
 			userError = 'Network error';
 		} finally {
 			creatingUser = false;
+		}
+	}
+
+	/**
+	 * The server refuses demoting the last admin, so that error surfaces here
+	 * rather than being second-guessed in the UI.
+	 */
+	async function setRole(userId: string, isAdmin: boolean) {
+		roleError = '';
+		changingRole = userId;
+
+		try {
+			const res = await fetch(`/api/admin/users/${userId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ isAdmin })
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				roleError = body.error ?? 'Could not change that role';
+				return;
+			}
+			window.location.reload();
+		} catch {
+			roleError = 'Network error';
+		} finally {
+			changingRole = null;
+		}
+	}
+
+	/**
+	 * The server refuses self-deletion and the last remaining admin, so those
+	 * errors surface here rather than being pre-empted in the UI.
+	 */
+	async function removeUser(userId: string, label: string) {
+		if (
+			!confirm(
+				`Delete ${label}? Their addresses and stored mail go too, and any domain they catch mail for falls back to unrouted.`
+			)
+		) {
+			return;
+		}
+
+		deleteError = '';
+		deletingUser = userId;
+
+		try {
+			const res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				deleteError = body.error ?? 'Failed to delete user';
+				return;
+			}
+			window.location.reload();
+		} catch {
+			deleteError = 'Network error';
+		} finally {
+			deletingUser = null;
 		}
 	}
 
@@ -122,7 +195,7 @@
 </script>
 
 <svelte:head>
-	<title>Admin — Mail</title>
+	<title>Admin — {APP_NAME}</title>
 </svelte:head>
 
 <div class="admin-page">
@@ -265,6 +338,16 @@
 					class="admin-input"
 				/>
 
+				<div class="role-row">
+					<Check
+						label="Make this user an admin"
+						caption="Admin"
+						checked={makeAdmin}
+						onchange={(next) => (makeAdmin = next)}
+					/>
+					<span class="role-hint">Can manage users, domains, and unrouted mail.</span>
+				</div>
+
 				{#if userError}<p class="error">{userError}</p>{/if}
 
 				<button type="submit" disabled={creatingUser} class="btn-primary">
@@ -288,12 +371,38 @@
 									.join(', ') || user.email}
 							</p>
 						</div>
-						{#if user.is_admin}
-							<span class="admin-badge">Admin</span>
+						{#if user.id === data.user?.id}
+							{#if user.is_admin}
+								<span class="admin-badge">Admin</span>
+							{/if}
+						{:else}
+							<Check
+								label={user.is_admin
+									? `Remove admin from ${user.name}`
+									: `Make ${user.name} an admin`}
+								caption="Admin"
+								checked={user.is_admin}
+								disabled={changingRole === user.id}
+								onchange={(next) => setRole(user.id, next)}
+							/>
+						{/if}
+						{#if user.id !== data.user?.id}
+							<button
+								type="button"
+								class="user-delete"
+								title="Delete {user.name}"
+								aria-label="Delete {user.name}"
+								disabled={deletingUser === user.id}
+								onclick={() => removeUser(user.id, user.name)}
+							>
+								<Icon name="delete-bin-line" size={16} />
+							</button>
 						{/if}
 					</li>
 				{/each}
 			</ul>
+			{#if roleError}<p class="error">{roleError}</p>{/if}
+			{#if deleteError}<p class="error">{deleteError}</p>{/if}
 		</section>
 	</div>
 
@@ -633,6 +742,56 @@
 		font-weight: 500;
 		color: var(--color-text);
 		background: var(--color-surface-muted);
+	}
+
+	.role-row {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		flex-wrap: wrap;
+	}
+
+	.role-hint {
+		font-size: 0.75rem;
+		color: var(--color-muted);
+	}
+
+	.user-delete {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		width: 2rem;
+		height: 2rem;
+		padding: 0;
+		border: none;
+		border-radius: 0.5rem;
+		color: var(--color-muted);
+		background: transparent;
+		cursor: pointer;
+		transition: color 0.15s, background 0.15s;
+	}
+
+	.user-delete:hover:not(:disabled) {
+		color: var(--color-danger);
+		background: var(--color-surface-muted);
+	}
+
+	.user-delete:focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 3px var(--color-focus-halo);
+	}
+
+	.user-delete:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+
+	@media (max-width: 900px) {
+		.user-delete {
+			width: var(--touch-target);
+			height: var(--touch-target);
+		}
 	}
 
 	.error {

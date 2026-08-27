@@ -7,7 +7,8 @@ export function readFilters(url: URL): MailboxFilters {
 		q: url.searchParams.get('q')?.trim() ?? '',
 		unreadOnly: url.searchParams.get('unread') === '1',
 		starredOnly: url.searchParams.get('starred') === '1',
-		attachmentsOnly: url.searchParams.get('attachments') === '1'
+		attachmentsOnly: url.searchParams.get('attachments') === '1',
+		addressId: url.searchParams.get('address')?.trim() ?? ''
 	};
 }
 
@@ -30,6 +31,7 @@ export async function loadMailbox(
 	const mailbox = await listMailbox(db, userId, {
 		view,
 		domainId,
+		addressId: filters.addressId || null,
 		q: filters.q,
 		unreadOnly: filters.unreadOnly,
 		starredOnly: filters.starredOnly,

@@ -6,6 +6,7 @@
 	import AttachmentPicker from '$lib/components/AttachmentPicker.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { requestSkipViewTransition } from '$lib/app-chrome';
+	import { APP_NAME } from '$lib/constants';
 	import type { OutboundAttachmentInput } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -134,7 +135,7 @@
 </script>
 
 <svelte:head>
-	<title>{draftId ? 'Draft' : 'Compose'} — Mail</title>
+	<title>{draftId ? 'Draft' : 'Compose'} — {APP_NAME}</title>
 </svelte:head>
 
 <form class="compose-page" onsubmit={submit}>
@@ -267,7 +268,7 @@
 	{/if}
 
 	<div class="compose-editor">
-		<RichTextEditor bind:html fill minHeight={160}>
+		<RichTextEditor bind:html fill minHeight={320}>
 			{#snippet toolbarEnd()}
 				<AttachmentPicker bind:attachments mode="button" />
 				<button
@@ -303,6 +304,10 @@
 </form>
 
 <style>
+	.compose-page {
+		width: 100%;
+	}
+
 	.compose-header {
 		display: flex;
 		align-items: center;

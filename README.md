@@ -1,6 +1,6 @@
-# QuickMail
+# Quickinbox
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/DivinPrince/quickmail)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/DivinPrince/quickinbox)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 
 Self-hosted email for your own domain, running on Cloudflare Workers.
@@ -10,10 +10,10 @@ no servers to maintain.
 ## Features
 
 - **Real mail in and out** — the provider delivers straight into the Worker, nothing is polled
-- **Threads** — replies group into conversations, quoted history collapses
+- **Threads** — replies group into conversations, quoted history collapses; conversations never mix messages from different domains
 - **Attachments** — inbound files land in R2, outbound files upload from the composer
 - **Safe HTML** — received HTML renders in a sandboxed iframe
-- **Multiple domains and users** — per-user addresses, admin catch-all, unrouted-mail view
+- **Multiple domains and users** — per-user addresses, admin catch-all, unrouted-mail view; the combined inbox tags each conversation with the address it arrived on and can filter by it
 - **Delivery status** — delivered / bounced / complained tracking
 - **REST API, CLI, and MCP server** — send and read mail from scripts, the terminal, or AI agents
 - Light and dark themes
@@ -36,6 +36,10 @@ You need:
 1. A domain you control
 2. A [Cloudflare](https://dash.cloudflare.com) account
 3. Either a [Resend](https://resend.com) account, **or** the domain on Cloudflare DNS plus a Workers paid plan
+
+## Updating an existing install
+
+If you already deployed from this repo, pulling updates only changes the product name in the UI and docs. It does **not** rename your Worker, D1 database, or R2 bucket — leave those as they are (often `quickmail` / `quickmail-attachments`). Existing `qm_live_` API keys keep working, and `quickmail` remains a CLI alias.
 
 ## Choosing a mail provider
 
@@ -167,7 +171,7 @@ Send yourself a message from another account — it should land within seconds.
 
 ### Desktop notifications (optional)
 
-QuickMail can push-notify users about new mail even with no tab open:
+Quickinbox can push-notify users about new mail even with no tab open:
 
 ```bash
 bunx web-push generate-vapid-keys
@@ -217,22 +221,23 @@ as a bearer token:
 
 ```sh
 curl https://your-worker/api/mail \
-  -H "Authorization: Bearer qm_live_..." \
+  -H "Authorization: Bearer qi_live_..." \
   -H "Content-Type: application/json" \
   -d '{"to": "you@example.com", "subject": "hello", "text": "hi"}'
 ```
 
 `GET /api/mail?view=inbox` lists conversations. Keys are scoped (`mail:read`,
 `mail:send`, admin) and only the SHA-256 hash is stored — the raw value is
-shown once. Revoking a key takes effect immediately.
+shown once. Revoking a key takes effect immediately. New keys start with
+`qi_live_`; existing `qm_live_` keys keep working after you pull this update.
 
 ## CLI and MCP
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickmail/main/scripts/install.sh | sh
-quickmail login --url https://<your-instance> --token <key from Settings>
-quickmail inbox
-quickmail send --to someone@example.com --subject "Hi" --body "Hello"
+curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickinbox/main/scripts/install.sh | sh
+quickinbox login --url https://<your-instance> --token <key from Settings>
+quickinbox inbox
+quickinbox send --to someone@example.com --subject "Hi" --body "Hello"
 ```
 
 The same credentials drive an MCP server for Claude, Cursor, and other agents:
@@ -240,19 +245,21 @@ The same credentials drive an MCP server for Claude, Cursor, and other agents:
 ```json
 {
   "mcpServers": {
-    "quickmail": {
-      "command": "quickmail",
+    "quickinbox": {
+      "command": "quickinbox",
       "args": ["mcp"],
       "env": {
-        "QUICKMAIL_URL": "https://mail.example.com",
-        "QUICKMAIL_TOKEN": "qm_live_…"
+        "QUICKINBOX_URL": "https://mail.example.com",
+        "QUICKINBOX_TOKEN": "qi_live_…"
       }
     }
   }
 }
 ```
 
-`quickmail` is the launcher from the install script (`~/.local/bin/quickmail`). Login once, or set `QUICKMAIL_URL` and `QUICKMAIL_TOKEN` as above.
+`quickinbox` is the launcher from the install script (`~/.local/bin/quickinbox`).
+`quickmail` is the same binary. Login once, or set `QUICKINBOX_URL` and
+`QUICKINBOX_TOKEN` as above (`QUICKMAIL_URL` / `QUICKMAIL_TOKEN` still work).
 
 Tools: `list_threads`, `get_thread`, `search_mail`, `send_message`, `reply`,
 `list_attachments`.
@@ -277,7 +284,7 @@ src/
 scripts/
   setup.sh / setup.mjs         first-run wizard
   wrap-cloudflare-worker.mjs   attach email() after the SvelteKit build
-cli/                 quickmail CLI + MCP server
+cli/                 quickinbox CLI + MCP server
 migrations/          D1 schema, applied in order
 ```
 

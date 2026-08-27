@@ -26,8 +26,9 @@
 	// Onboarding runs before the user has an address, so the shell would be empty.
 	const showShell = $derived(Boolean(data.user) && $page.url.pathname !== '/onboarding');
 
-	// Pages that read better centred than full-bleed.
-	const NARROW = ['/compose', '/mail', '/settings'];
+	// Thread and settings read better as a centred column. Compose needs the
+	// full desktop pane — a 48rem cap makes it look like a phone form.
+	const NARROW = ['/mail', '/settings'];
 	const narrow = $derived(NARROW.some((path) => $page.url.pathname.startsWith(path)));
 	const stacked = $derived(isStackedPath($page.url.pathname));
 	const mailbox = $derived(isMailboxPath($page.url.pathname));
@@ -66,11 +67,14 @@
 
 	// Remember the collapsed sidebar between visits.
 	$effect(() => {
-		collapsed = localStorage.getItem('mail:sidebar-collapsed') === '1';
+		const stored =
+			localStorage.getItem('quickinbox:sidebar-collapsed') ??
+			localStorage.getItem('mail:sidebar-collapsed');
+		collapsed = stored === '1';
 	});
 
 	function toggleCollapsed(next: boolean) {
-		localStorage.setItem('mail:sidebar-collapsed', next ? '1' : '0');
+		localStorage.setItem('quickinbox:sidebar-collapsed', next ? '1' : '0');
 	}
 
 	$effect(() => {
@@ -139,6 +143,7 @@
 				domains={data.domains}
 				activeDomainId={data.activeDomainId}
 				isAdmin={data.user!.is_admin}
+				onLogout={logout}
 			/>
 		{/if}
 	</div>

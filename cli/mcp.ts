@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { QuickMailClient, QuickMailError, type MailboxView } from './client.ts';
+import { QuickInboxClient, QuickInboxError, type MailboxView } from './client.ts';
 import { loadConfig } from './config.ts';
 
 const views = ['inbox', 'starred', 'drafts', 'sent', 'trash'] as const;
@@ -14,7 +14,7 @@ function textResult(value: unknown, isError = false) {
 }
 
 function fail(error: unknown) {
-	if (error instanceof QuickMailError) {
+	if (error instanceof QuickInboxError) {
 		return textResult(`${error.status} ${error.message}`, true);
 	}
 	return textResult(error instanceof Error ? error.message : 'Request failed', true);
@@ -22,14 +22,14 @@ function fail(error: unknown) {
 
 export async function startMcpServer(): Promise<void> {
 	const config = await loadConfig();
-	const client = new QuickMailClient(config.url, config.token);
+	const client = new QuickInboxClient(config.url, config.token);
 
-	const server = new McpServer({ name: 'quickmail', version: '1.0.0' });
+	const server = new McpServer({ name: 'quickinbox', version: '1.0.0' });
 
 	server.registerTool(
 		'list_threads',
 		{
-			description: 'List mailbox conversations for the authenticated QuickMail user.',
+			description: 'List mailbox conversations for the authenticated Quickinbox user.',
 			inputSchema: {
 				view: z.enum(views).optional().describe('Mailbox to list. Defaults to inbox.'),
 				q: z.string().optional().describe('Search participants, subject, and body.'),

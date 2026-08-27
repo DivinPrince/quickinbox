@@ -1,4 +1,4 @@
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import {
 	PAIRING_CODE_TTL_MINUTES,
 	MOBILE_SESSION_DAYS,
@@ -397,7 +397,59 @@ export async function setUserPassword(
 	]);
 }
 
-export async function deleteUser(db: D1Database, actor: User, targetId: string): Promise<void> {
+/**
+ * Grant or withdraw admin.
+ *
+ * Promotion needs no guard. Demotion does: the count travels with the UPDATE
+ * rather than being read first, so two admins demoting each other concurrently
+ * cannot both pass a stale check and leave the instance with nobody. Demoting
+ * someone who is already not an admin is a no-op that still reports success.
+ */
+export async function setUserAdmin(
+	db: D1Database,
+	actor: User,
+	targetId: string,
+	isAdmin: boolean
+): Promise<void> {
+	if (actor.id === targetId) {
+		throw new Error('You cannot change your own role');
+	}
+
+	const target = await getUserById(db, targetId);
+	if (!target) {
+		throw new Error('User not found');
+	}
+
+	if (isAdmin) {
+		await db.prepare('UPDATE users SET is_admin = 1 WHERE id = ?').bind(targetId).run();
+		return;
+	}
+
+	const result = await db
+		.prepare(
+			`UPDATE users SET is_admin = 0
+			 WHERE id = ?
+			   AND (is_admin = 0 OR (SELECT COUNT(*) FROM users WHERE is_admin = 1) > 1)`
+		)
+		.bind(targetId)
+		.run();
+
+	if ((result.meta?.changes ?? 0) === 0) {
+		throw new Error('Keep at least one admin');
+	}
+}
+
+/**
+ * Removes the account and everything the D1 cascade takes with it — sessions,
+ * addresses, mail — plus the R2 objects the mail's attachments point at, which
+ * the cascade cannot reach.
+ */
+export async function deleteUser(
+	db: D1Database,
+	bucket: R2Bucket | undefined,
+	actor: User,
+	targetId: string
+): Promise<void> {
 	if (actor.id === targetId) {
 		throw new Error('You cannot delete your own account');
 	}
@@ -407,14 +459,78 @@ export async function deleteUser(db: D1Database, actor: User, targetId: string):
 		throw new Error('User not found');
 	}
 
-	if (target.is_admin) {
-		const admins = (await listUsers(db)).filter((user) => user.is_admin);
-		if (admins.length <= 1) {
-			throw new Error('Keep at least one admin');
-		}
+	// One transaction: D1 rolls a batch back entirely if any statement fails, so
+	// the account can never be gone while its mail, sessions and tokens survive.
+	//
+	// The key read is the batch's first statement rather than a preceding query.
+	// Reading outside the transaction leaves a window in which inbound delivery
+	// commits an attachment whose metadata this then deletes without ever having
+	// collected its object.
+	//
+	// The last-admin rule rides on the DELETE rather than a preceding read —
+	// counting first and deleting after lets two admins delete each other
+	// concurrently, both seeing two admins, leaving nobody. The child statements
+	// are then gated on the user actually having gone, so a refused delete
+	// leaves the account whole instead of stripping it inside the same batch.
+	//
+	// Older D1 databases were created without ON DELETE CASCADE enforcement, so
+	// the children are cleared explicitly; where the cascade ran they are no-ops.
+	// email_attachments is reachable only through emails, so it goes first.
+	const gone = 'NOT EXISTS (SELECT 1 FROM users WHERE id = ?)';
+	const [keys, deletion] = await db.batch<{ storage_key: string }>([
+		db
+			.prepare(
+				`SELECT storage_key FROM email_attachments
+				 WHERE storage_key IS NOT NULL
+				   AND email_id IN (SELECT id FROM emails WHERE user_id = ?)`
+			)
+			.bind(targetId),
+		db
+			.prepare(
+				`DELETE FROM users
+				 WHERE id = ?
+				   AND (is_admin = 0 OR (SELECT COUNT(*) FROM users WHERE is_admin = 1) > 1)`
+			)
+			.bind(targetId),
+		db
+			.prepare(
+				`DELETE FROM email_attachments
+				 WHERE email_id IN (SELECT id FROM emails WHERE user_id = ?) AND ${gone}`
+			)
+			.bind(targetId, targetId),
+		db.prepare(`DELETE FROM emails WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM addresses WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM sessions WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM api_tokens WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db
+			.prepare(`DELETE FROM push_subscriptions WHERE user_id = ? AND ${gone}`)
+			.bind(targetId, targetId),
+		db
+			.prepare(
+				`UPDATE domains SET catchall_user_id = NULL WHERE catchall_user_id = ? AND ${gone}`
+			)
+			.bind(targetId, targetId)
+	]);
+
+	if ((deletion.meta?.changes ?? 0) === 0) {
+		throw new Error('Keep at least one admin');
 	}
 
-	await db.prepare('DELETE FROM users WHERE id = ?').bind(targetId).run();
+	const storageKeys = (keys.results ?? []).map((row) => row.storage_key);
+
+	// Purged only after the row is gone, so a refused delete never strands mail
+	// without the files it references. Best-effort from here: the account is
+	// already deleted, so a storage hiccup must not report failure — the caller
+	// would retry and be told the user does not exist, with the strays no longer
+	// reachable from any metadata. Log them instead.
+	if (bucket && storageKeys.length > 0) {
+		const purged = await Promise.allSettled(storageKeys.map((key) => bucket.delete(key)));
+		purged.forEach((outcome, index) => {
+			if (outcome.status === 'rejected') {
+				console.error('Failed to delete attachment object', storageKeys[index], outcome.reason);
+			}
+		});
+	}
 }
 
 export type AuthenticatedSession = {

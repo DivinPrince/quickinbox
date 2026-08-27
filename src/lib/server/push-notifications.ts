@@ -279,7 +279,7 @@ export function buildNewMailPayload(input: NewMailNotificationInput): NewMailPus
 	return {
 		title: truncate(input.subject || '(no subject)', 120) || '(no subject)',
 		body: `From ${truncate(input.from || 'Unknown sender', 160) || 'Unknown sender'}`,
-		tag: `quickmail-${input.emailId}`,
+		tag: `quickinbox-${input.emailId}`,
 		url: `/mail/${encodeURIComponent(input.emailId)}`
 	};
 }

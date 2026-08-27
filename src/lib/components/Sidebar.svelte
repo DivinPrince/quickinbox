@@ -3,6 +3,7 @@
 	import Icon from './Icon.svelte';
 	import Logo from './Logo.svelte';
 	import DomainSwitcher from './DomainSwitcher.svelte';
+	import { APP_NAME } from '$lib/constants';
 	import type { Domain, MailboxCounts } from '$lib/types';
 
 	let {
@@ -66,9 +67,9 @@
 
 <aside class="sidebar" class:collapsed>
 	<div class="sidebar-top">
-		<a href="/inbox" class="brand" title="Mail">
+		<a href="/inbox" class="brand" title={APP_NAME}>
 			<Logo size={30} />
-			{#if !collapsed}<span class="brand-name">Mail</span>{/if}
+			{#if !collapsed}<span class="brand-name">{APP_NAME}</span>{/if}
 		</a>
 	</div>
 

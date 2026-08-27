@@ -1,12 +1,13 @@
 <script lang="ts">
 	import MailboxView from '$lib/components/MailboxView.svelte';
+	import { APP_NAME } from '$lib/constants';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 </script>
 
 <svelte:head>
-	<title>{data.view === 'archive' ? 'Archive' : 'Inbox'} — Mail</title>
+	<title>{data.view === 'archive' ? 'Archive' : 'Inbox'} — {APP_NAME}</title>
 </svelte:head>
 
 <MailboxView view={data.view} mailbox={data.mailbox} filters={data.filters} />

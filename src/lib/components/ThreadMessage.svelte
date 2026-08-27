@@ -9,10 +9,13 @@
 
 	let {
 		message,
+		receivedLabel = null,
 		expanded = false,
 		onToggle
 	}: {
 		message: ThreadMessage;
+		/** Name of the mailbox identity that received this message, when known. */
+		receivedLabel?: string | null;
 		expanded?: boolean;
 		onToggle: () => void;
 	} = $props();
@@ -110,6 +113,11 @@
 				<button type="button" class="when" onclick={onToggle}>
 					{formatFullDate(message.created_at)}
 				</button>
+				{#if !outbound}
+					<p class="when">
+						Received at {message.to_addr}{receivedLabel ? ` (${receivedLabel})` : ''}
+					</p>
+				{/if}
 			</div>
 
 			{#if outbound}

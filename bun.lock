@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "mail",
+      "name": "quickinbox",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
         "postal-mime": "^3.0.0",

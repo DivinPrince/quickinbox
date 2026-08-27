@@ -2,7 +2,7 @@
 /**
  * Refuse to ship the template if anything personal leaked into it.
  *
- * QuickMail is maintained alongside a private deployment, so commits get
+ * Quickinbox is maintained alongside a private deployment, so commits get
  * cherry-picked between the two. This is the gate that stops a real API key,
  * a Cloudflare account id, or a personal hostname riding along into the repo
  * that anyone can read.

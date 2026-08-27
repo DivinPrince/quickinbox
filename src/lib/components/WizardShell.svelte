@@ -8,7 +8,7 @@
 		subtitle,
 		steps = [],
 		current = 1,
-		/** Show Mail ↔ provider marks above the title (domain connect screens). */
+		/** Show Quickinbox ↔ provider marks above the title (domain connect screens). */
 		partner = false,
 		partnerCaption = 'Connected via Cloudflare Email',
 		partnerKind = 'cloudflare',
