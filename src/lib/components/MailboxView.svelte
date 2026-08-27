@@ -97,7 +97,7 @@
 
 		return thread.participants
 			.filter((participant) => !participant.self)
-			.map((participant) => participant.label)
+			.map((participant) => participant.label || participant.address)
 			.join(', ');
 	}
 
