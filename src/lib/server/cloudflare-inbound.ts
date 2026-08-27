@@ -39,7 +39,8 @@ export async function handleCloudflareInbound(
 		bcc: mailboxAddresses(parsed.bcc)
 	});
 
-	const from = inboundSender(mailboxAddresses(parsed.from)[0], message.from);
+	const sender = firstMailboxIdentity(parsed.from);
+	const from = inboundSender(sender?.address, message.from);
 	const subject = parsed.subject?.trim() || message.headers.get('subject')?.trim() || '(no subject)';
 	const messageId =
 		normalizeMessageId(parsed.messageId ?? message.headers.get('message-id')) ?? null;
@@ -74,6 +75,7 @@ export async function handleCloudflareInbound(
 		userId: route.userId,
 		direction: 'inbound',
 		from,
+		fromName: sender?.name,
 		to: route.address,
 		cc: mailboxAddresses(parsed.cc).join(', ') || null,
 		subject,
@@ -91,7 +93,7 @@ export async function handleCloudflareInbound(
 	await scheduleNewMailNotification(env, {
 		emailId,
 		userId: route.userId,
-		from,
+		from: sender?.name || from,
 		subject
 	});
 }
@@ -158,6 +160,29 @@ function mailboxAddresses(value: Address | Address[] | undefined): string[] {
 	}
 
 	return addresses;
+}
+
+function firstMailboxIdentity(
+	value: Address | Address[] | undefined
+): { name: string | null; address: string } | null {
+	if (!value) return null;
+	const list = Array.isArray(value) ? value : [value];
+
+	for (const item of list) {
+		if (item.address) return { name: item.name?.trim() || null, address: parseEmailAddress(item.address) };
+		if (item.group) {
+			for (const member of item.group) {
+				if (member.address) {
+					return {
+						name: member.name?.trim() || null,
+						address: parseEmailAddress(member.address)
+					};
+				}
+			}
+		}
+	}
+
+	return null;
 }
 
 function attachmentBytes(content: Attachment['content']): Uint8Array | null {

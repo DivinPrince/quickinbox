@@ -90,16 +90,21 @@
 	 * they name the recipient; everywhere else names the people in the thread.
 	 */
 	function people(thread: ThreadSummary): string {
-		if (view === 'drafts' || (view === 'sent' && thread.participants.every((p) => p.self))) {
+		if (view === 'drafts' || view === 'sent') {
 			return recipientOf(thread) || (view === 'drafts' ? 'No recipient' : 'Unknown');
 		}
 
-		return thread.participants.map((participant) => participant.label).join(', ');
+		return thread.participants
+			.filter((participant) => !participant.self)
+			.map((participant) => participant.label)
+			.join(', ');
 	}
 
 	function recipientOf(thread: ThreadSummary): string {
-		const [first] = thread.participants;
-		return first?.address ? first.address.split('@')[0].replace(/[._-]+/g, ' ') : '';
+		return thread.participants
+			.filter((participant) => !participant.self)
+			.map((participant) => participant.label || participant.address)
+			.join(', ');
 	}
 
 	function initial(thread: ThreadSummary): string {
@@ -1152,7 +1157,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		text-transform: capitalize;
 	}
 
 	.row.unread .sender {

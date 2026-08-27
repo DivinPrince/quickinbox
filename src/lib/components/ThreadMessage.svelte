@@ -21,9 +21,9 @@
 	} = $props();
 
 	const outbound = $derived(message.direction === 'outbound');
-	const sender = $derived(outbound ? 'me' : message.from_addr);
+	const sender = $derived(outbound ? 'me' : message.from_name || message.from_addr);
 	const senderEmail = $derived(emailOf(message.from_addr));
-	const initial = $derived((message.from_addr[0] ?? '?').toUpperCase());
+	const initial = $derived(((message.from_name || message.from_addr)[0] ?? '?').toUpperCase());
 
 	/** Text-only messages get the same treatment as HTML ones. */
 	const text = $derived(splitQuotedText(message.body_text ?? ''));

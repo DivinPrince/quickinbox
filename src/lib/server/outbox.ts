@@ -148,6 +148,7 @@ export async function sendAndStore(
 		userId: user.id,
 		direction: 'outbound',
 		from: from.address,
+		fromName: from.label?.trim() || user.name,
 		to: parseRecipients(input.to).join(', '),
 		cc: parseRecipients(input.cc).join(', ') || null,
 		bcc: parseRecipients(input.bcc).join(', ') || null,
