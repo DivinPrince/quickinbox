@@ -109,7 +109,8 @@
 
 	function initial(thread: ThreadSummary): string {
 		const external = thread.participants.find((participant) => !participant.self);
-		return ((external ?? thread.participants[0])?.address[0] ?? '?').toUpperCase();
+		const participant = external ?? thread.participants[0];
+		return (participant?.label || participant?.address || '?')[0].toUpperCase();
 	}
 
 	/** Rows carry the newest message; opening it opens the whole conversation. */

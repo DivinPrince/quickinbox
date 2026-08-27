@@ -8,7 +8,10 @@ export const GET: RequestHandler = async ({ locals, platform }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	return json({ signature: await getEmailSignature(db, locals.user.id) });
+	return json(
+		{ signature: await getEmailSignature(db, locals.user.id) },
+		{ headers: { 'Cache-Control': 'no-store' } }
+	);
 };
 
 export const PATCH: RequestHandler = async ({ request, locals, platform }) => {
@@ -35,5 +38,5 @@ export const PATCH: RequestHandler = async ({ request, locals, platform }) => {
 	}
 
 	const signature = await updateEmailSignature(db, locals.user.id, body.signature);
-	return json({ ok: true, signature });
+	return json({ ok: true, signature }, { headers: { 'Cache-Control': 'no-store' } });
 };

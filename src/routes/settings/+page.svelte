@@ -13,8 +13,8 @@
 		type ThemePreference
 	} from '$lib/theme';
 	import { MAX_EMAIL_SIGNATURE_LENGTH } from '$lib/email-signature';
-	import QRCode from 'qrcode';
 	import { APP_NAME } from '$lib/constants';
+	import { formatDeviceActivity } from '$lib/device-activity';
 	import type { ApiTokenSummary, MailAddress } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -391,6 +391,7 @@
 			// to talk to, plus the one-time code.
 			const payload = JSON.stringify({ version: 1, origin: window.location.origin, code: body.code });
 			try {
+				const { default: QRCode } = await import('qrcode');
 				await QRCode.toCanvas(qrCanvas, payload, { width: 200, margin: 1 });
 			} catch {
 				pairError = 'Could not draw the QR code. Enter the code below instead.';
@@ -476,15 +477,6 @@
 		} finally {
 			revokingId = '';
 		}
-	}
-
-	function formatLastSeen(value: string | null) {
-		if (!value) return 'Never used';
-		const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 1000));
-		if (seconds < 60) return 'Active just now';
-		if (seconds < 3600) return `Active ${Math.floor(seconds / 60)} min ago`;
-		if (seconds < 86400) return `Active ${Math.floor(seconds / 3600)} h ago`;
-		return `Active ${Math.floor(seconds / 86400)} d ago`;
 	}
 
 	function platformLabel(device: DeviceSession) {
@@ -744,7 +736,7 @@
 								{#if device.is_current}<span class="badge">This device</span>{/if}
 							</p>
 							<p class="device-meta">
-								{platformLabel(device)} · {device.last_seen_at ? formatLastSeen(device.last_seen_at) : 'Signed in'}
+								{platformLabel(device)} · {device.last_seen_at ? formatDeviceActivity(device.last_seen_at) : 'Signed in'}
 								· added {new Date(device.created_at).toLocaleDateString()}
 							</p>
 						</div>
@@ -768,7 +760,7 @@
 		{#if pairingPanelOpen}
 			<div class="pair-panel" aria-busy={pairingBusy}>
 				<div class="pair-heading">
-					<p class="pair-title">Scan with the QuickMail app</p>
+					<p class="pair-title">Scan with the {APP_NAME} app</p>
 					<button type="button" class="icon-btn" aria-label="Close pairing" onclick={closePairingPanel}>
 						<Icon name="close-line" size={15} />
 					</button>
@@ -776,7 +768,7 @@
 
 				{#if pairingCode}
 					<canvas bind:this={qrCanvas} aria-hidden="true">
-						QuickMail mobile pairing code. Use the text code below if you cannot scan it.
+						{APP_NAME} mobile pairing code. Use the text code below if you cannot scan it.
 					</canvas>
 					<div class="pair-code">
 						<span>Or enter code: <code>{pairingCode}</code></span>

@@ -4,6 +4,7 @@
 	import AddressField from '$lib/components/AddressField.svelte';
 	import Check from '$lib/components/Check.svelte';
 	import { APP_NAME } from '$lib/constants';
+	import { formatDeviceActivity } from '$lib/device-activity';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -41,15 +42,6 @@
 		if (!userId) return 'Nobody (unrouted mail is held)';
 		const match = data.users.find((user) => user.id === userId);
 		return match ? `${match.name} (${match.email})` : 'Unknown user';
-	}
-
-	function formatDeviceActivity(value: string | null) {
-		if (!value) return 'Never used';
-		const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 1000));
-		if (seconds < 60) return 'Active just now';
-		if (seconds < 3600) return `Active ${Math.floor(seconds / 60)} min ago`;
-		if (seconds < 86400) return `Active ${Math.floor(seconds / 3600)} h ago`;
-		return `Active ${Math.floor(seconds / 86400)} d ago`;
 	}
 
 	function devicePlatform(value: string | null) {

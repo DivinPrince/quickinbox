@@ -60,7 +60,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 		messageOnly?: boolean;
 	};
 
-	const ids = body.messageOnly
+	const ids = body.messageOnly && body.archived === undefined
 		? [params.id!]
 		: await expandToThreads(db, locals.user.id, [params.id!]);
 

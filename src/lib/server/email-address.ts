@@ -10,7 +10,11 @@ export function parseEmailIdentity(value: string): EmailIdentity {
 		return { name: null, address: parseEmailAddress(trimmed) };
 	}
 
-	const name = bracketMatch[1].trim().replace(/^"|"$/g, '').trim();
+	const rawName = bracketMatch[1].trim();
+	const name =
+		rawName.startsWith('"') && rawName.endsWith('"')
+			? rawName.slice(1, -1).replace(/\\(.)/g, '$1').trim()
+			: rawName;
 	return {
 		name: name || null,
 		address: parseEmailAddress(bracketMatch[2])
@@ -38,7 +42,13 @@ export function parseEmailIdentities(value: string | null | undefined): EmailIde
 
 	for (let index = 0; index < value.length; index += 1) {
 		const character = value[index];
-		if (character === '"' && value[index - 1] !== '\\') inQuotes = !inQuotes;
+		if (character === '"') {
+			let backslashes = 0;
+			for (let previous = index - 1; previous >= 0 && value[previous] === '\\'; previous -= 1) {
+				backslashes += 1;
+			}
+			if (backslashes % 2 === 0) inQuotes = !inQuotes;
+		}
 		if (!inQuotes && character === '<') bracketDepth += 1;
 		if (!inQuotes && character === '>' && bracketDepth > 0) bracketDepth -= 1;
 		if (!inQuotes && bracketDepth === 0 && character === ',') {

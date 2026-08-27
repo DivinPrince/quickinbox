@@ -68,9 +68,9 @@
 	const collapsedCount = $derived(messages.filter((message) => !opened.has(message.id)).length);
 
 	/** Flags apply to the conversation, not to the message that opened it. */
-	async function patch(body: Record<string, boolean>) {
+	async function patch(body: Record<string, boolean>): Promise<Response | undefined> {
 		if (!latest) return;
-		await fetch(`/api/mail/${latest.id}`, {
+		return fetch(`/api/mail/${latest.id}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body)
@@ -88,8 +88,17 @@
 	}
 
 	async function toggleArchive() {
-		await patch({ archived: !data.archived });
-		goto(data.archived ? '/inbox?view=archive' : '/inbox');
+		error = '';
+		try {
+			const response = await patch({ archived: !data.archived });
+			if (!response?.ok) {
+				error = 'Could not update this conversation.';
+				return;
+			}
+			goto(data.archived ? '/inbox?view=archive' : '/inbox');
+		} catch {
+			error = 'Network error while updating this conversation.';
+		}
 	}
 
 	async function trash() {

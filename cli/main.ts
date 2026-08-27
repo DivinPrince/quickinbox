@@ -130,6 +130,10 @@ function printJson(value: unknown): void {
 	console.log(JSON.stringify(value, null, 2));
 }
 
+function terminalSafe(value: string): string {
+	return value.replace(/[\u0000-\u001f\u007f-\u009f]/g, '');
+}
+
 function printThreads(page: { threads: ThreadSummary[]; total: number; page: number; pageCount: number }): void {
 	if (page.threads.length === 0) {
 		console.log('No conversations.');
@@ -138,7 +142,9 @@ function printThreads(page: { threads: ThreadSummary[]; total: number; page: num
 
 	for (const thread of page.threads) {
 		const who = thread.participants
-			.map((participant) => (participant.self ? 'me' : participant.label || participant.address))
+			.map((participant) =>
+				participant.self ? 'me' : terminalSafe(participant.label || participant.address)
+			)
 			.join(', ');
 		const unread = thread.is_read ? ' ' : '*';
 		console.log(`${unread} ${thread.thread_id}  ${who}`);
@@ -251,8 +257,10 @@ async function run(argv: string[]): Promise<number> {
 			}
 			console.log(thread.subject);
 			for (const message of thread.messages) {
+				const from = terminalSafe(message.from_name || message.from_addr);
+				const to = terminalSafe(message.to_addr);
 				console.log(
-					`\n--- ${message.from_name || message.from_addr} → ${message.to_addr}  ${message.created_at}`
+					`\n--- ${from} → ${to}  ${message.created_at}`
 				);
 				console.log(message.body_text?.trim() || '(no text body)');
 				if (message.attachments.length > 0) {

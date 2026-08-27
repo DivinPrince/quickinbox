@@ -553,17 +553,25 @@ export async function getAuthenticatedSession(
 	const token_hash = await hashToken(token);
 	const row = await db
 		.prepare(
-			`SELECT s.id AS session_id, s.device_platform, u.id, u.email, u.name, u.is_admin, u.created_at
+			`SELECT s.id AS session_id, s.device_platform, s.last_seen_at, u.id, u.email, u.name, u.is_admin, u.created_at
 			 FROM sessions s
 			 JOIN users u ON u.id = s.user_id
 			 WHERE s.token_hash = ? AND datetime(s.expires_at) > datetime('now')`
 		)
 		.bind(token_hash)
-		.first<UserRow & { session_id: string; device_platform: string | null }>();
+		.first<
+			UserRow & { session_id: string; device_platform: string | null; last_seen_at: string | null }
+		>();
 
 	if (!row) return null;
 
-	if (row.device_platform) {
+	const lastSeenAt = row.last_seen_at
+		? Date.parse(`${row.last_seen_at.replace(' ', 'T')}Z`)
+		: Number.NaN;
+	if (
+		row.device_platform &&
+		(!Number.isFinite(lastSeenAt) || Date.now() - lastSeenAt >= 5 * 60 * 1000)
+	) {
 		await db
 			.prepare(
 				`UPDATE sessions SET last_seen_at = datetime('now')

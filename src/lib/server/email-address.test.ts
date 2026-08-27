@@ -28,6 +28,16 @@ describe('email address presentation', () => {
 		]);
 	});
 
+	test('parses a quoted name ending in a literal backslash before another recipient', () => {
+		assert.deepEqual(
+			parseEmailIdentities(String.raw`"Trailing\\" <first@example.com>, second@example.com`),
+			[
+				{ name: 'Trailing\\', address: 'first@example.com' },
+				{ name: null, address: 'second@example.com' }
+			]
+		);
+	});
+
 	test('formats names without losing punctuation', () => {
 		assert.equal(
 			formatEmailAddress('Smith, Jane', 'jane@example.com'),
