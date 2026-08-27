@@ -50,6 +50,7 @@
 	let items = $state<ThreadSummary[]>([]);
 	let selected = $state<string[]>([]);
 	let busy = $state(false);
+	let actionError = $state('');
 	let filterOpen = $state(false);
 	let moreOpen = $state(false);
 	let selectMenuOpen = $state(false);
@@ -136,15 +137,22 @@
 	/** One entry point for every list action, so the UI always refreshes after. */
 	async function run(action: string, ids: string[] = selected) {
 		if (busy) return;
+		actionError = '';
 		busy = true;
 		try {
-			await fetch('/api/mail/actions', {
+			const response = await fetch('/api/mail/actions', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ action, ids })
 			});
+			if (!response.ok) {
+				actionError = 'Could not update messages.';
+				return;
+			}
 			selected = [];
 			await invalidateAll();
+		} catch {
+			actionError = 'Network error while updating messages.';
 		} finally {
 			busy = false;
 			moreOpen = false;
@@ -635,6 +643,10 @@
 		</div>
 	</header>
 
+	{#if actionError}
+		<p class="action-error" role="alert">{actionError}</p>
+	{/if}
+
 	{#if activeFilterCount > 0}
 		<div class="filter-chips" aria-label="Active filters">
 			{#if filters.unreadOnly}
@@ -865,6 +877,12 @@
 	.selected-count {
 		font-size: 0.875rem;
 		font-weight: 500;
+	}
+
+	.action-error {
+		margin: 0.75rem 0.875rem 0;
+		font-size: 0.875rem;
+		color: var(--color-danger);
 	}
 
 	.bulk-actions {

@@ -566,7 +566,7 @@ export async function getAuthenticatedSession(
 	if (!row) return null;
 
 	const lastSeenAt = row.last_seen_at
-		? Date.parse(`${row.last_seen_at.replace(' ', 'T')}Z`)
+		? Date.parse(toIsoTimestamp(row.last_seen_at))
 		: Number.NaN;
 	if (
 		row.device_platform &&

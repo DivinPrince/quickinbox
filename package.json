@@ -23,7 +23,7 @@
 		"cf-typegen": "wrangler types",
 		"quickinbox": "bun cli/main.ts",
 		"quickmail": "bun cli/main.ts",
-		"test": "bun test src/lib/email-signature.test.ts src/lib/mobile.test.ts src/lib/push-client.test.ts src/lib/utils/html.test.ts src/lib/server/api-access.test.ts src/lib/server/api-tokens.test.ts src/lib/server/attachments.test.ts src/lib/server/auth.test.ts src/lib/server/cloudflare-inbound.test.ts src/lib/server/email-address.test.ts src/lib/server/forward.test.ts src/lib/server/mail-store.test.ts src/lib/server/outbox.test.ts src/lib/server/push-notifications.test.ts src/lib/server/threads.test.ts cli/client.test.ts"
+		"test": "bun test src/lib/email-signature.test.ts src/lib/mobile.test.ts src/lib/push-client.test.ts src/lib/utils/html.test.ts src/lib/device-activity.test.ts src/lib/server/api-access.test.ts src/lib/server/api-tokens.test.ts src/lib/server/attachments.test.ts src/lib/server/auth.test.ts src/lib/server/cloudflare-inbound.test.ts src/lib/server/email-address.test.ts src/lib/server/forward.test.ts src/lib/server/mail-store.test.ts src/lib/server/outbox.test.ts src/lib/server/push-notifications.test.ts src/lib/server/threads.test.ts cli/client.test.ts"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20260601.1",

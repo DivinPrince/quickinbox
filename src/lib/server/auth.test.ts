@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { User } from '$lib/types';
-import { deleteUser, setUserAdmin } from './auth';
+import { deleteUser, getAuthenticatedSession, setUserAdmin } from './auth';
 
 const actor: User = {
 	id: 'admin-1',
@@ -296,5 +296,43 @@ describe('setUserAdmin', () => {
 			() => setUserAdmin(db, actor, targetRow.id, false),
 			/Keep at least one admin/
 		);
+	});
+});
+
+describe('getAuthenticatedSession', () => {
+	test('does not rewrite a recent zoned mobile activity timestamp', async () => {
+		let updates = 0;
+		const db = {
+			prepare(sql: string) {
+				return {
+					bind(..._args: unknown[]) {
+						return {
+							async first() {
+								return {
+									session_id: 'session-1',
+									device_platform: 'ios',
+									last_seen_at: new Date().toISOString(),
+									id: actor.id,
+									email: actor.email,
+									name: actor.name,
+									is_admin: 1,
+									created_at: actor.created_at
+								};
+							},
+							async run() {
+								if (sql.includes('UPDATE sessions')) updates += 1;
+								return { meta: { changes: 1 } };
+							}
+						};
+					}
+				};
+			}
+		} as unknown as D1Database;
+
+		const session = await getAuthenticatedSession(db, 'mobile-token');
+
+		assert.equal(session?.sessionId, 'session-1');
+		assert.equal(session?.isMobile, true);
+		assert.equal(updates, 0);
 	});
 });

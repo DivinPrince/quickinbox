@@ -289,6 +289,10 @@
 		</div>
 	</header>
 
+	{#if error && !forwardOpen && !replyOpen}
+		<p class="reply-status" role="alert">{error}</p>
+	{/if}
+
 	<article class="surface-lg mail-card">
 		<div class="subject-row">
 			<h1>{data.subject}</h1>
