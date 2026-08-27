@@ -36,6 +36,7 @@ export type ThreadMessage = {
 	id: string;
 	direction: 'inbound' | 'outbound';
 	from_addr: string;
+	from_name: string | null;
 	to_addr: string;
 	cc_addr: string | null;
 	subject: string;

@@ -3,6 +3,7 @@ import { MAILBOX_PAGE_SIZE } from '$lib/constants';
 import { MAX_BODY_BYTES } from './constants';
 import { stripQuotedText } from '$lib/utils/quotes';
 import { displaySubject, normalizeSubject, resolveThreadId } from './threads';
+import { buildThreadParticipants } from './thread-participants';
 import type {
 	DeliveryStatus,
 	EmailAttachmentMeta,
@@ -13,7 +14,6 @@ import type {
 	MailboxView,
 	MailStatus,
 	ThreadMessage,
-	ThreadParticipant,
 	ThreadSummary
 } from '$lib/types';
 
@@ -32,6 +32,7 @@ export async function insertEmail(
 		userId: string;
 		direction: 'inbound' | 'outbound';
 		from: string;
+		fromName?: string | null;
 		to: string;
 		cc?: string | null;
 		bcc?: string | null;
@@ -71,7 +72,7 @@ export async function insertEmail(
 	await db
 		.prepare(
 			`INSERT INTO emails (
-				id, user_id, direction, from_addr, to_addr, cc_addr, bcc_addr, subject,
+				id, user_id, direction, from_addr, from_name, to_addr, cc_addr, bcc_addr, subject,
 				body_text, body_html, message_id, in_reply_to, references_header,
 				reply_to_email_id, thread_id, thread_key,
 				domain_id, address_id, provider_id, status, status_at, is_read
@@ -82,6 +83,7 @@ export async function insertEmail(
 			input.userId,
 			input.direction,
 			input.from,
+			input.fromName?.trim() || null,
 			input.to,
 			input.cc ?? null,
 			input.bcc ?? null,
@@ -217,6 +219,7 @@ type ThreadMessageRow = {
 	thread_id: string;
 	direction: 'inbound' | 'outbound';
 	from_addr: string;
+	from_name: string | null;
 	to_addr: string;
 	subject: string;
 	body_head: string | null;
@@ -317,7 +320,7 @@ export async function listMailbox(
 	const placeholders = threadIds.map(() => '?').join(', ');
 	const { results: messages } = await db
 		.prepare(
-			`SELECT m.id, COALESCE(m.thread_id, m.id) AS thread_id, m.direction, m.from_addr, m.to_addr,
+			`SELECT m.id, COALESCE(m.thread_id, m.id) AS thread_id, m.direction, m.from_addr, m.from_name, m.to_addr,
 			        m.subject, m.is_read, m.is_starred, m.archived_at, m.created_at, m.domain_id, m.address_id, m.status,
 			        substr(COALESCE(m.body_text, ''), 1, 4000) AS body_head,
 			        EXISTS(SELECT 1 FROM email_attachments a WHERE a.email_id = m.id) AS has_attachments
@@ -347,26 +350,7 @@ export async function listMailbox(
 function toThreadSummary(messages: ThreadMessageRow[]): ThreadSummary {
 	const oldest = messages[0];
 	const latest = messages[messages.length - 1];
-
-	// Senders in the order they first spoke, with our own identities collapsed
-	// into a single "me" the way a conversation header reads.
-	const participants: ThreadParticipant[] = [];
-	for (const message of messages) {
-		if (message.direction === 'outbound') {
-			if (!participants.some((entry) => entry.self)) {
-				participants.push({ label: 'me', address: message.from_addr, self: true });
-			}
-			continue;
-		}
-
-		const address = message.from_addr;
-		const seen = participants.some(
-			(entry) => !entry.self && entry.address.toLowerCase() === address.toLowerCase()
-		);
-		if (seen) continue;
-
-		participants.push({ label: displayNameFor(address), address, self: false });
-	}
+	const participants = buildThreadParticipants(messages);
 
 	return {
 		thread_id: oldest.thread_id,
@@ -386,13 +370,6 @@ function toThreadSummary(messages: ThreadMessageRow[]): ThreadSummary {
 		status: latest.status === 'draft' ? null : latest.status,
 		created_at: latest.created_at
 	};
-}
-
-/** "hello.there@x.com" → "hello there"; the list capitalizes it in CSS. */
-function displayNameFor(address: string): string {
-	if (!address) return 'Unknown';
-	const [local] = address.split('@');
-	return local.replace(/[._-]+/g, ' ');
 }
 
 /** The newest message's own words — quoted history is dropped. */
@@ -784,7 +761,7 @@ export async function listThreadMessages(
 
 	const { results } = await db
 		.prepare(
-			`SELECT e.id, e.direction, e.from_addr, e.to_addr, e.cc_addr, e.subject,
+			`SELECT e.id, e.direction, e.from_addr, e.from_name, e.to_addr, e.cc_addr, e.subject,
 			        e.body_text, e.body_html, e.message_id, e.references_header,
 			        e.status, e.status_detail, e.is_read, e.is_starred, e.deleted_at,
 			        e.archived_at, e.created_at

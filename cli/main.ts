@@ -251,7 +251,9 @@ async function run(argv: string[]): Promise<number> {
 			}
 			console.log(thread.subject);
 			for (const message of thread.messages) {
-				console.log(`\n--- ${message.from_addr} → ${message.to_addr}  ${message.created_at}`);
+				console.log(
+					`\n--- ${message.from_name || message.from_addr} → ${message.to_addr}  ${message.created_at}`
+				);
 				console.log(message.body_text?.trim() || '(no text body)');
 				if (message.attachments.length > 0) {
 					console.log(

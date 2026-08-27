@@ -1,3 +1,22 @@
+export type EmailIdentity = {
+	name: string | null;
+	address: string;
+};
+
+export function parseEmailIdentity(value: string): EmailIdentity {
+	const trimmed = value.trim();
+	const bracketMatch = trimmed.match(/^(.*?)<([^>]+)>$/);
+	if (!bracketMatch) {
+		return { name: null, address: parseEmailAddress(trimmed) };
+	}
+
+	const name = bracketMatch[1].trim().replace(/^"|"$/g, '').trim();
+	return {
+		name: name || null,
+		address: parseEmailAddress(bracketMatch[2])
+	};
+}
+
 export function parseEmailAddress(value: string): string {
 	const trimmed = value.trim();
 	const bracketMatch = trimmed.match(/<([^>]+)>/);
@@ -7,6 +26,40 @@ export function parseEmailAddress(value: string): string {
 
 	const emailMatch = trimmed.match(/[^\s<>]+@[^\s<>]+/);
 	return (emailMatch?.[0] ?? trimmed).toLowerCase().trim();
+}
+
+export function parseEmailIdentities(value: string | null | undefined): EmailIdentity[] {
+	if (!value) return [];
+
+	const parts: string[] = [];
+	let start = 0;
+	let inQuotes = false;
+	let bracketDepth = 0;
+
+	for (let index = 0; index < value.length; index += 1) {
+		const character = value[index];
+		if (character === '"' && value[index - 1] !== '\\') inQuotes = !inQuotes;
+		if (!inQuotes && character === '<') bracketDepth += 1;
+		if (!inQuotes && character === '>' && bracketDepth > 0) bracketDepth -= 1;
+		if (!inQuotes && bracketDepth === 0 && character === ',') {
+			parts.push(value.slice(start, index));
+			start = index + 1;
+		}
+	}
+	parts.push(value.slice(start));
+
+	return parts
+		.map(parseEmailIdentity)
+		.filter((identity) => identity.address.includes('@'));
+}
+
+export function formatEmailAddress(name: string | null | undefined, address: string): string {
+	const cleanAddress = parseEmailAddress(address);
+	const cleanName = name?.trim();
+	if (!cleanName) return cleanAddress;
+
+	const escapedName = cleanName.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+	return `"${escapedName}" <${cleanAddress}>`;
 }
 
 export function parseEmailAddresses(
