@@ -31,6 +31,7 @@ export const load: PageServerLoad = async ({ params, locals, platform }) => {
 		/** The message that was linked to — expanded first when the page opens. */
 		focusId: email.id,
 		trashed: Boolean(email.deleted_at),
+		archived: messages.length > 0 && messages.every((message) => Boolean(message.archived_at)),
 		subject: displaySubject(messages[0]?.subject ?? email.subject),
 		replyFrom: replyIdentity?.address ?? null,
 		replyFromName: replyIdentity?.label?.trim() || null,

@@ -1,14 +1,19 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { authorizeApiRequest } from '$lib/server/api-access';
 import { getUserByApiToken, readBearerToken } from '$lib/server/api-tokens';
-import { countUsers, getUserFromSession, readSessionToken } from '$lib/server/auth';
+import {
+	countUsers,
+	getAuthenticatedSession,
+	readSessionToken
+} from '$lib/server/auth';
 import { DOMAIN_COOKIE } from '$lib/server/constants';
 import { listAddressesForUser, listDomains } from '$lib/server/domains';
 
 const PUBLIC_PREFIXES = [
 	'/login',
 	'/setup',
-	'/api/auth',
+	'/api/auth/login',
+	'/api/auth/pair',
 	'/api/setup',
 	'/api/webhooks',
 	'/install.sh'
@@ -27,6 +32,7 @@ function jsonError(error: string, status: number): Response {
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const db = event.platform?.env.DB;
+	const { pathname } = event.url;
 	event.locals.user = null;
 	event.locals.authMethod = null;
 	event.locals.apiScopes = [];
@@ -34,23 +40,32 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.domains = [];
 	event.locals.addresses = [];
 	event.locals.activeDomainId = null;
-
-	const { pathname } = event.url;
+	event.locals.currentSessionId = null;
 
 	if (db) {
-		const session = readSessionToken(event.cookies);
-		event.locals.user = await getUserFromSession(db, session);
-		if (event.locals.user) {
+		// Browser sessions take precedence so an incidental or stale Authorization
+		// header cannot downgrade a legitimate cookie-authenticated API request.
+		const cookieSession = await getAuthenticatedSession(db, readSessionToken(event.cookies));
+		if (cookieSession && !cookieSession.isMobile) {
+			event.locals.user = cookieSession.user;
+			event.locals.currentSessionId = cookieSession.sessionId;
 			event.locals.authMethod = 'session';
 		} else if (pathname.startsWith('/api/')) {
 			const bearer = readBearerToken(event.request);
 			if (bearer) {
-				const auth = await getUserByApiToken(db, bearer);
-				if (auth) {
-					event.locals.user = auth.user;
+				const apiToken = await getUserByApiToken(db, bearer);
+				if (apiToken) {
+					event.locals.user = apiToken.user;
 					event.locals.authMethod = 'api_token';
-					event.locals.apiScopes = auth.scopes;
-					event.locals.apiTokenId = auth.tokenId;
+					event.locals.apiScopes = apiToken.scopes;
+					event.locals.apiTokenId = apiToken.tokenId;
+				} else {
+					const bearerSession = await getAuthenticatedSession(db, bearer);
+					if (bearerSession?.isMobile) {
+						event.locals.user = bearerSession.user;
+						event.locals.currentSessionId = bearerSession.sessionId;
+						event.locals.authMethod = 'mobile_session';
+					}
 				}
 			}
 		}

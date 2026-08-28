@@ -4,6 +4,7 @@
 	import AddressField from '$lib/components/AddressField.svelte';
 	import Check from '$lib/components/Check.svelte';
 	import { APP_NAME } from '$lib/constants';
+	import { formatDeviceActivity } from '$lib/device-activity';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -41,6 +42,12 @@
 		if (!userId) return 'Nobody (unrouted mail is held)';
 		const match = data.users.find((user) => user.id === userId);
 		return match ? `${match.name} (${match.email})` : 'Unknown user';
+	}
+
+	function devicePlatform(value: string | null) {
+		if (value === 'ios') return 'iOS';
+		if (value === 'android') return 'Android';
+		return 'Mobile';
 	}
 
 	async function createUser(event: SubmitEvent) {
@@ -391,6 +398,36 @@
 		</section>
 	</div>
 
+	<section class="surface-lg admin-card">
+		<h2><Icon name="smartphone-line" size={18} /> Connected mobile devices</h2>
+		<p class="card-hint">
+			Active paired sessions across all accounts. Users can disconnect their own devices in
+			Settings.
+		</p>
+
+		{#if data.devices.length > 0}
+			<ul class="device-list">
+				{#each data.devices as device (device.id)}
+					<li class="device-row">
+						<div class="device-icon" aria-hidden="true">
+							<Icon name="smartphone-line" size={16} />
+						</div>
+						<div class="min-w-0 flex-1">
+							<p class="user-name">{device.device_name ?? 'Mobile device'}</p>
+							<p class="user-email">{device.user_name} · {device.user_email}</p>
+						</div>
+						<div class="device-detail">
+							<p>{devicePlatform(device.device_platform)}</p>
+							<p>{formatDeviceActivity(device.last_seen_at)}</p>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<p class="hint">No mobile devices are currently connected.</p>
+		{/if}
+	</section>
+
 	{#if data.unrouted.length > 0}
 		<section class="surface-lg admin-card">
 			<h2><Icon name="question-mark" size={18} /> Unrouted mail</h2>
@@ -605,6 +642,52 @@
 
 	.user-list {
 		margin-top: 1rem;
+	}
+
+	.device-list {
+		margin-top: 1rem;
+	}
+
+	.device-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.75rem 0;
+	}
+
+	.device-row + .device-row {
+		box-shadow: inset 0 1px 0 var(--color-line);
+	}
+
+	.device-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		border-radius: 0.75rem;
+		color: var(--color-text-secondary);
+		background: var(--color-surface-muted);
+	}
+
+	.device-detail {
+		flex-shrink: 0;
+		text-align: right;
+		font-size: 0.75rem;
+		color: var(--color-text-secondary);
+	}
+
+	@media (max-width: 36rem) {
+		.device-row {
+			align-items: flex-start;
+			flex-wrap: wrap;
+		}
+
+		.device-detail {
+			width: 100%;
+			padding-left: 3rem;
+			text-align: left;
+		}
 	}
 
 	.user-row {

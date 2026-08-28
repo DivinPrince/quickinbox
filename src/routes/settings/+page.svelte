@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import StackHeader from '$lib/components/StackHeader.svelte';
 	import Check from '$lib/components/Check.svelte';
@@ -14,6 +14,7 @@
 	} from '$lib/theme';
 	import { MAX_EMAIL_SIGNATURE_LENGTH } from '$lib/email-signature';
 	import { APP_NAME } from '$lib/constants';
+	import { formatDeviceActivity } from '$lib/device-activity';
 	import type { ApiTokenSummary, MailAddress } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -290,6 +291,208 @@
 		}
 		edited = body.addresses;
 	}
+
+	// ---- Connected devices --------------------------------------------------
+
+	type DeviceSession = {
+		id: string;
+		device_name: string | null;
+		device_platform: string | null;
+		created_at: string;
+		last_seen_at: string | null;
+		expires_at: string;
+		is_current: boolean;
+	};
+
+	let devices = $state<DeviceSession[]>(untrack(() => data.devices ?? []));
+	let pairingPanelOpen = $state(false);
+	let pairingCode = $state('');
+	let pairingExpiresAt = $state('');
+	let pairingSecondsRemaining = $state(0);
+	let pairingBusy = $state(false);
+	let pairError = $state('');
+	let deviceError = $state('');
+	let pairCopied = $state(false);
+	let revokingId = $state('');
+	let qrCanvas: HTMLCanvasElement | undefined = $state();
+	let pairingTimer: ReturnType<typeof setInterval> | undefined;
+	let pairingRequest: AbortController | undefined;
+	let pairingGeneration = 0;
+
+	const pairingCountdown = $derived(
+		`${Math.floor(pairingSecondsRemaining / 60)}:${String(pairingSecondsRemaining % 60).padStart(2, '0')}`
+	);
+
+	function stopPairingTimer() {
+		if (pairingTimer) clearInterval(pairingTimer);
+		pairingTimer = undefined;
+	}
+
+	function updatePairingCountdown() {
+		if (!pairingPanelOpen || !pairingExpiresAt || document.visibilityState === 'hidden') return;
+
+		const expiresAt = Date.parse(pairingExpiresAt);
+		if (!Number.isFinite(expiresAt)) {
+			stopPairingTimer();
+			pairingCode = '';
+			pairError = 'The pairing code had an invalid expiry time. Try again.';
+			return;
+		}
+
+		pairingSecondsRemaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+		if (pairingSecondsRemaining === 0) {
+			pairingCode = '';
+			// If QR rendering is still finishing, leave the timer running so the
+			// next tick refreshes after that request releases its busy state.
+			if (!pairingBusy) {
+				stopPairingTimer();
+				void requestPairingCode();
+			}
+		}
+	}
+
+	function startPairingTimer() {
+		stopPairingTimer();
+		updatePairingCountdown();
+		if (pairingCode && pairingSecondsRemaining > 0) {
+			pairingTimer = setInterval(updatePairingCountdown, 1_000);
+		}
+	}
+
+	async function requestPairingCode() {
+		if (!pairingPanelOpen || pairingBusy) return;
+
+		pairingBusy = true;
+		pairError = '';
+		pairCopied = false;
+		const generation = pairingGeneration;
+		const controller = new AbortController();
+		pairingRequest = controller;
+
+		try {
+			const res = await fetch('/api/auth/pair-codes', {
+				method: 'POST',
+				signal: controller.signal
+			});
+			const body = await res.json();
+			if (!pairingPanelOpen || generation !== pairingGeneration) return;
+			if (!res.ok) {
+				pairError = body.error ?? 'Could not create a pairing code';
+				return;
+			}
+
+			pairingCode = body.code;
+			pairingExpiresAt = body.expiresAt;
+			startPairingTimer();
+			await tick();
+			if (!pairingPanelOpen || generation !== pairingGeneration || !qrCanvas) return;
+
+			// The QR carries the server origin so the app knows which deployment
+			// to talk to, plus the one-time code.
+			const payload = JSON.stringify({ version: 1, origin: window.location.origin, code: body.code });
+			try {
+				const { default: QRCode } = await import('qrcode');
+				await QRCode.toCanvas(qrCanvas, payload, { width: 200, margin: 1 });
+			} catch {
+				pairError = 'Could not draw the QR code. Enter the code below instead.';
+			}
+		} catch (requestError) {
+			if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+			if (pairingPanelOpen && generation === pairingGeneration) {
+				pairError = 'Network error. Check your connection and try again.';
+			}
+		} finally {
+			if (pairingRequest === controller) {
+				pairingRequest = undefined;
+				pairingBusy = false;
+			}
+		}
+	}
+
+	function openPairingPanel() {
+		pairingPanelOpen = true;
+		pairingCode = '';
+		pairingExpiresAt = '';
+		pairingSecondsRemaining = 0;
+		void requestPairingCode();
+	}
+
+	function closePairingPanel() {
+		pairingPanelOpen = false;
+		pairingGeneration += 1;
+		pairingRequest?.abort();
+		pairingRequest = undefined;
+		pairingBusy = false;
+		stopPairingTimer();
+		pairingCode = '';
+		pairingExpiresAt = '';
+		pairingSecondsRemaining = 0;
+		pairError = '';
+		pairCopied = false;
+	}
+
+	$effect(() => {
+		function handleVisibilityChange() {
+			if (!pairingPanelOpen) return;
+			if (document.visibilityState === 'hidden') {
+				stopPairingTimer();
+				return;
+			}
+
+			const expiry = Date.parse(pairingExpiresAt);
+			if (!pairingCode || !Number.isFinite(expiry) || expiry <= Date.now()) {
+				pairingCode = '';
+				void requestPairingCode();
+			} else {
+				startPairingTimer();
+			}
+		}
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+			pairingGeneration += 1;
+			pairingRequest?.abort();
+			stopPairingTimer();
+		};
+	});
+
+	async function revokeDevice(id: string) {
+		const device = devices.find((candidate) => candidate.id === id);
+		if (!device || device.is_current) return;
+		const name = device.device_name ?? 'this browser session';
+		if (!confirm(`Disconnect ${name}? It will lose access immediately.`)) return;
+		revokingId = id;
+		deviceError = '';
+
+		try {
+			const res = await fetch(`/api/devices/${id}`, { method: 'DELETE' });
+			if (!res.ok) {
+				deviceError = 'Could not disconnect that device';
+				return;
+			}
+			devices = devices.filter((device) => device.id !== id);
+		} catch {
+			deviceError = 'Network error while disconnecting that device';
+		} finally {
+			revokingId = '';
+		}
+	}
+
+	function platformLabel(device: DeviceSession) {
+		if (device.device_platform === 'ios') return 'iOS';
+		if (device.device_platform === 'android') return 'Android';
+		return 'Web browser';
+	}
+
+	async function copyPairingCode() {
+		try {
+			await navigator.clipboard.writeText(pairingCode);
+			pairCopied = true;
+		} catch {
+			pairError = 'Could not copy the code. Select it and copy it manually.';
+		}
+	}
 </script>
 
 <svelte:head>
@@ -515,6 +718,88 @@
 			</button>
 		</div>
 	</section>
+
+	<section class="surface-lg card">
+		<h2><Icon name="smartphone-line" size={18} /> Connected devices</h2>
+		<p class="card-hint">
+			Browsers and mobile apps signed in to this account. Disconnect a session to revoke
+			its access immediately.
+		</p>
+
+		{#if devices.length > 0}
+			<ul class="device-list">
+				{#each devices as device (device.id)}
+					<li class="device-row">
+						<div class="min-w-0 flex-1">
+							<p class="device-name">
+								{device.device_name ?? 'Web browser'}
+								{#if device.is_current}<span class="badge">This device</span>{/if}
+							</p>
+							<p class="device-meta">
+								{platformLabel(device)} · {device.last_seen_at ? formatDeviceActivity(device.last_seen_at) : 'Signed in'}
+								· added {new Date(device.created_at).toLocaleDateString()}
+							</p>
+						</div>
+						{#if !device.is_current}
+							<button
+								type="button"
+								class="btn-ghost text-xs"
+								disabled={revokingId === device.id}
+								onclick={() => revokeDevice(device.id)}
+							>
+								{revokingId === device.id ? 'Disconnecting…' : 'Disconnect'}
+							</button>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<p class="hint">No active sessions.</p>
+		{/if}
+
+		{#if pairingPanelOpen}
+			<div class="pair-panel" aria-busy={pairingBusy}>
+				<div class="pair-heading">
+					<p class="pair-title">Scan with the {APP_NAME} app</p>
+					<button type="button" class="icon-btn" aria-label="Close pairing" onclick={closePairingPanel}>
+						<Icon name="close-line" size={15} />
+					</button>
+				</div>
+
+				{#if pairingCode}
+					<canvas bind:this={qrCanvas} aria-hidden="true">
+						{APP_NAME} mobile pairing code. Use the text code below if you cannot scan it.
+					</canvas>
+					<div class="pair-code">
+						<span>Or enter code: <code>{pairingCode}</code></span>
+						<button type="button" class="btn-ghost text-xs" onclick={copyPairingCode}>Copy code</button>
+					</div>
+					{#if pairCopied}<p class="pair-copied" role="status">Code copied.</p>{/if}
+					<p
+						class="pair-expiry"
+						role="timer"
+						aria-label={`Pairing code refreshes in ${pairingSecondsRemaining} seconds`}
+					>
+						Refreshes in <span aria-hidden="true">{pairingCountdown}</span>. Each code works once.
+					</p>
+				{:else if pairingBusy}
+					<p class="pair-loading" role="status">Creating a secure pairing code…</p>
+				{:else}
+					<p class="pair-loading">A pairing code isn't available right now.</p>
+					<button type="button" class="btn-ghost text-xs" onclick={requestPairingCode}>
+						Try again
+					</button>
+				{/if}
+			</div>
+		{:else}
+			<button type="button" class="btn-primary pair-btn" onclick={openPairingPanel}>
+				Connect mobile app
+			</button>
+		{/if}
+
+		{#if pairError}<p class="error" role="status">{pairError}</p>{/if}
+		{#if deviceError}<p class="error" role="alert">{deviceError}</p>{/if}
+	</section>
 </div>
 
 {#if creating}
@@ -640,6 +925,118 @@
 
 	.signature-form {
 		margin-top: 1rem;
+	}
+
+	.device-list {
+		margin-top: 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.device-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.625rem 0.75rem;
+		border-radius: 0.75rem;
+		background: var(--color-surface-muted);
+		box-shadow: inset 0 0 0 1px var(--color-line);
+	}
+
+	.device-name {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		min-width: 0;
+		font-size: 0.875rem;
+		font-weight: 500;
+		overflow-wrap: anywhere;
+	}
+
+	.device-meta {
+		font-size: 0.75rem;
+		color: var(--color-text-secondary);
+	}
+
+	.pair-panel {
+		margin-top: 1rem;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.375rem;
+		padding: 1rem;
+		border-radius: 0.75rem;
+		background: var(--color-surface-muted);
+		box-shadow: inset 0 0 0 1px var(--color-line);
+	}
+
+	.pair-title {
+		font-size: 0.8125rem;
+		font-weight: 600;
+	}
+
+	.pair-heading {
+		display: flex;
+		width: 100%;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
+
+	.pair-panel canvas {
+		max-width: 100%;
+		height: auto;
+		align-self: center;
+		background: #fff;
+		border-radius: 0.5rem;
+		padding: 0.25rem;
+	}
+
+	.pair-code code {
+		font-size: 0.8125rem;
+		user-select: all;
+		overflow-wrap: anywhere;
+	}
+
+	.pair-code {
+		display: flex;
+		width: 100%;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
+
+	.pair-copied {
+		font-size: 0.75rem;
+		color: var(--tone-good-fg);
+	}
+
+	.pair-expiry,
+	.pair-code,
+	.pair-loading {
+		font-size: 0.75rem;
+		color: var(--color-text-secondary);
+	}
+
+	.pair-btn {
+		margin-top: 1rem;
+	}
+
+	@media (max-width: 30rem) {
+		.device-row {
+			align-items: flex-start;
+			flex-wrap: wrap;
+		}
+
+		.device-row > button {
+			min-height: 2.75rem;
+		}
+
+		.pair-code {
+			align-items: flex-start;
+			flex-direction: column;
+		}
 	}
 
 	.signature-input {

@@ -54,18 +54,20 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 	const body = (await request.json()) as {
 		isRead?: boolean;
 		isStarred?: boolean;
+		archived?: boolean;
 		trashed?: boolean;
 		/** Set to limit the change to this one message instead of the thread. */
 		messageOnly?: boolean;
 	};
 
-	const ids = body.messageOnly
+	const ids = body.messageOnly && body.archived === undefined
 		? [params.id!]
 		: await expandToThreads(db, locals.user.id, [params.id!]);
 
 	const changed = await setEmailFlags(db, locals.user.id, ids, {
 		isRead: body.isRead,
 		isStarred: body.isStarred,
+		archived: body.archived,
 		trashed: body.trashed
 	});
 

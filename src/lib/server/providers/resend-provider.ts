@@ -9,6 +9,7 @@ import {
 import type { EmailProvider, ProviderDomain } from '../email-provider';
 import { ProviderError } from '../email-provider';
 import type { OutboundMailInput, OutboundMailResult } from '../send-mail';
+import { formatEmailAddress } from '../email-address';
 
 export function createResendProvider(apiKey: string): EmailProvider {
 	const client = createResendClient(apiKey);
@@ -19,7 +20,7 @@ export function createResendProvider(apiKey: string): EmailProvider {
 			try {
 				const result = await client.send(
 					{
-						from: `${input.senderName} <${input.from.address}>`,
+						from: formatEmailAddress(input.senderName, input.from.address),
 						to: input.to,
 						...(input.cc?.length ? { cc: input.cc } : {}),
 						...(input.bcc?.length ? { bcc: input.bcc } : {}),

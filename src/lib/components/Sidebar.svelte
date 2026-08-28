@@ -31,6 +31,12 @@
 
 	const mailboxes = $derived<NavItem[]>([
 		{ href: '/inbox', icon: 'inbox-line', label: 'Inbox', badge: counts.inbox_unread },
+		{
+			href: '/inbox?view=archive',
+			icon: 'archive-line',
+			label: 'Archive',
+			count: counts.archive
+		},
 		{ href: '/drafts', icon: 'draft-line', label: 'Drafts', count: counts.drafts },
 		{ href: '/sent', icon: 'send-plane-line', label: 'Sent' },
 		{ href: '/starred', icon: 'star-line', label: 'Starred', count: counts.starred },
@@ -43,7 +49,19 @@
 	]);
 
 	function isActive(href: string): boolean {
-		return $page.url.pathname === href || $page.url.pathname.startsWith(`${href}/`);
+		const [pathname, query = ''] = href.split('?');
+		if ($page.url.pathname !== pathname && !$page.url.pathname.startsWith(`${pathname}/`)) {
+			return false;
+		}
+
+		// Inbox and Archive share the same route; the view query distinguishes them.
+		if (pathname === '/inbox') {
+			const expectedView = new URLSearchParams(query).get('view');
+			const currentView = $page.url.searchParams.get('view');
+			return expectedView ? currentView === expectedView : currentView !== 'archive';
+		}
+
+		return true;
 	}
 </script>
 

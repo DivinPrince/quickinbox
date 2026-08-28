@@ -29,6 +29,7 @@
 
 	const META: Record<MailboxView, { title: string; icon: string; empty: string }> = {
 		inbox: { title: 'Inbox', icon: 'inbox-line', empty: 'Your inbox is empty' },
+		archive: { title: 'Archive', icon: 'archive-line', empty: 'No archived messages' },
 		starred: { title: 'Starred', icon: 'star-line', empty: 'No starred messages' },
 		drafts: { title: 'Drafts', icon: 'draft-line', empty: 'No drafts saved' },
 		sent: { title: 'Sent', icon: 'send-plane-line', empty: 'Nothing sent yet' },
@@ -49,6 +50,7 @@
 	let items = $state<ThreadSummary[]>([]);
 	let selected = $state<string[]>([]);
 	let busy = $state(false);
+	let actionError = $state('');
 	let filterOpen = $state(false);
 	let moreOpen = $state(false);
 	let selectMenuOpen = $state(false);
@@ -89,21 +91,27 @@
 	 * they name the recipient; everywhere else names the people in the thread.
 	 */
 	function people(thread: ThreadSummary): string {
-		if (view === 'drafts' || (view === 'sent' && thread.participants.every((p) => p.self))) {
+		if (view === 'drafts' || view === 'sent') {
 			return recipientOf(thread) || (view === 'drafts' ? 'No recipient' : 'Unknown');
 		}
 
-		return thread.participants.map((participant) => participant.label).join(', ');
+		return thread.participants
+			.filter((participant) => !participant.self)
+			.map((participant) => participant.label || participant.address)
+			.join(', ');
 	}
 
 	function recipientOf(thread: ThreadSummary): string {
-		const [first] = thread.participants;
-		return first?.address ? first.address.split('@')[0].replace(/[._-]+/g, ' ') : '';
+		return thread.participants
+			.filter((participant) => !participant.self)
+			.map((participant) => participant.label || participant.address)
+			.join(', ');
 	}
 
 	function initial(thread: ThreadSummary): string {
 		const external = thread.participants.find((participant) => !participant.self);
-		return ((external ?? thread.participants[0])?.address[0] ?? '?').toUpperCase();
+		const participant = external ?? thread.participants[0];
+		return (participant?.label || participant?.address || '?')[0].toUpperCase();
 	}
 
 	/** Rows carry the newest message; opening it opens the whole conversation. */
@@ -129,15 +137,22 @@
 	/** One entry point for every list action, so the UI always refreshes after. */
 	async function run(action: string, ids: string[] = selected) {
 		if (busy) return;
+		actionError = '';
 		busy = true;
 		try {
-			await fetch('/api/mail/actions', {
+			const response = await fetch('/api/mail/actions', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ action, ids })
 			});
+			if (!response.ok) {
+				actionError = 'Could not update messages.';
+				return;
+			}
 			selected = [];
 			await invalidateAll();
+		} catch {
+			actionError = 'Network error while updating messages.';
 		} finally {
 			busy = false;
 			moreOpen = false;
@@ -318,6 +333,27 @@
 					>
 						<Icon name="star-off-line" size={16} />
 					</button>
+					{#if view === 'archive'}
+						<button
+							type="button"
+							class="tool-btn"
+							title="Move to inbox"
+							disabled={busy}
+							onclick={() => run('unarchive')}
+						>
+							<Icon name="inbox-line" size={16} />
+						</button>
+					{:else if view !== 'drafts' && view !== 'trash'}
+						<button
+							type="button"
+							class="tool-btn"
+							title="Archive"
+							disabled={busy}
+							onclick={() => run('archive')}
+						>
+							<Icon name="archive-line" size={16} />
+						</button>
+					{/if}
 
 					{#if view === 'trash'}
 						<button
@@ -607,6 +643,10 @@
 		</div>
 	</header>
 
+	{#if actionError}
+		<p class="action-error" role="alert">{actionError}</p>
+	{/if}
+
 	{#if activeFilterCount > 0}
 		<div class="filter-chips" aria-label="Active filters">
 			{#if filters.unreadOnly}
@@ -745,6 +785,25 @@
 								>
 									<Icon name={thread.is_read ? 'mail-line' : 'mail-open-line'} size={15} />
 								</button>
+								{#if view === 'archive'}
+									<button
+										type="button"
+										class="tool-btn"
+										title="Move to inbox"
+										onclick={() => run('unarchive', [thread.latest_id])}
+									>
+										<Icon name="inbox-line" size={15} />
+									</button>
+								{:else if view !== 'drafts'}
+									<button
+										type="button"
+										class="tool-btn"
+										title="Archive"
+										onclick={() => run('archive', [thread.latest_id])}
+									>
+										<Icon name="archive-line" size={15} />
+									</button>
+								{/if}
 								<button
 									type="button"
 									class="tool-btn"
@@ -818,6 +877,12 @@
 	.selected-count {
 		font-size: 0.875rem;
 		font-weight: 500;
+	}
+
+	.action-error {
+		margin: 0.75rem 0.875rem 0;
+		font-size: 0.875rem;
+		color: var(--color-danger);
 	}
 
 	.bulk-actions {
@@ -1111,7 +1176,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		text-transform: capitalize;
 	}
 
 	.row.unread .sender {

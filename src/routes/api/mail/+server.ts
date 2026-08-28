@@ -25,6 +25,7 @@ function mailboxView(url: URL): MailboxView {
 	const view = url.searchParams.get('view');
 	switch (view) {
 		case 'inbox':
+		case 'archive':
 		case 'starred':
 		case 'drafts':
 		case 'sent':

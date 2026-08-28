@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { listUsers } from '$lib/server/auth';
+import { listAllMobileDeviceSessions, listUsers } from '$lib/server/auth';
 import {
 	safeEmailProviderKind,
 	listAvailableDomains,
@@ -22,15 +22,17 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			domains: locals.domains,
 			available: [],
 			unrouted: [],
+			devices: [],
 			providerKind,
 			loadError: 'Database unavailable'
 		};
 	}
 
-	const [users, addresses, unrouted] = await Promise.all([
+	const [users, addresses, unrouted, devices] = await Promise.all([
 		listUsers(db),
 		listAllAddresses(db),
-		listUnroutedEmails(db, 25)
+		listUnroutedEmails(db, 25),
+		listAllMobileDeviceSessions(db)
 	]);
 
 	try {
@@ -43,6 +45,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			users,
 			addresses,
 			unrouted,
+			devices,
 			domains: locals.domains,
 			available,
 			providerKind,
@@ -53,6 +56,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			users,
 			addresses,
 			unrouted,
+			devices,
 			domains: locals.domains,
 			available: [],
 			providerKind,

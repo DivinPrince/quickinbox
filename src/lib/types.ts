@@ -70,11 +70,12 @@ export type MailAddress = {
 };
 
 /** The mailboxes the sidebar can show. Drafts/Trash are flags, not folders. */
-export type MailboxView = 'inbox' | 'starred' | 'drafts' | 'sent' | 'trash';
+export type MailboxView = 'inbox' | 'archive' | 'starred' | 'drafts' | 'sent' | 'trash';
 
 export type MailboxCounts = {
 	inbox: number;
 	inbox_unread: number;
+	archive: number;
 	starred: number;
 	drafts: number;
 	sent: number;
@@ -86,6 +87,7 @@ export type EmailRow = {
 	user_id: string;
 	direction: 'inbound' | 'outbound';
 	from_addr: string;
+	from_name: string | null;
 	to_addr: string;
 	cc_addr: string | null;
 	bcc_addr: string | null;
@@ -110,6 +112,7 @@ export type EmailRow = {
 	is_read: number;
 	is_starred: number;
 	deleted_at: string | null;
+	archived_at: string | null;
 	created_at: string;
 };
 
@@ -124,6 +127,7 @@ export type EmailSummary = {
 	is_read: boolean;
 	is_starred: boolean;
 	is_draft: boolean;
+	is_archived: boolean;
 	has_attachments: boolean;
 	domain_id: string | null;
 	address_id: string | null;
@@ -153,6 +157,7 @@ export type ThreadSummary = {
 	is_read: boolean;
 	is_starred: boolean;
 	is_draft: boolean;
+	is_archived: boolean;
 	has_attachments: boolean;
 	domain_id: string | null;
 	/** Which registered address the newest message arrived on, when known. */
@@ -184,6 +189,7 @@ export type ThreadMessage = {
 	id: string;
 	direction: 'inbound' | 'outbound';
 	from_addr: string;
+	from_name: string | null;
 	to_addr: string;
 	cc_addr: string | null;
 	subject: string;
@@ -196,6 +202,7 @@ export type ThreadMessage = {
 	is_read: boolean;
 	is_starred: boolean;
 	deleted_at: string | null;
+	archived_at: string | null;
 	created_at: string;
 	attachments: EmailAttachmentMeta[];
 };

@@ -31,7 +31,13 @@
 	const forwardFiles = $derived(latest?.attachments.length ?? 0);
 
 	const backHref = $derived(
-		data.trashed ? '/trash' : latest?.direction === 'outbound' ? '/sent' : '/inbox'
+		data.trashed
+			? '/trash'
+			: data.archived
+				? '/inbox?view=archive'
+				: latest?.direction === 'outbound'
+					? '/sent'
+					: '/inbox'
 	);
 
 	/**
@@ -62,9 +68,9 @@
 	const collapsedCount = $derived(messages.filter((message) => !opened.has(message.id)).length);
 
 	/** Flags apply to the conversation, not to the message that opened it. */
-	async function patch(body: Record<string, boolean>) {
+	async function patch(body: Record<string, boolean>): Promise<Response | undefined> {
 		if (!latest) return;
-		await fetch(`/api/mail/${latest.id}`, {
+		return fetch(`/api/mail/${latest.id}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body)
@@ -79,6 +85,20 @@
 	async function markUnread() {
 		await patch({ isRead: false });
 		goto(backHref);
+	}
+
+	async function toggleArchive() {
+		error = '';
+		try {
+			const response = await patch({ archived: !data.archived });
+			if (!response?.ok) {
+				error = 'Could not update this conversation.';
+				return;
+			}
+			goto(data.archived ? '/inbox?view=archive' : '/inbox');
+		} catch {
+			error = 'Network error while updating this conversation.';
+		}
 	}
 
 	async function trash() {
@@ -239,6 +259,14 @@
 				<button type="button" class="icon-btn" aria-label="Mark as unread" onclick={markUnread}>
 					<Icon name="mail-line" size={16} />
 				</button>
+				<button
+					type="button"
+					class="icon-btn"
+					aria-label={data.archived ? 'Move to inbox' : 'Archive'}
+					onclick={toggleArchive}
+				>
+					<Icon name={data.archived ? 'inbox-line' : 'archive-line'} size={16} />
+				</button>
 				<button type="button" class="icon-btn" aria-label="Move to trash" onclick={trash}>
 					<Icon name="delete-bin-line" size={16} />
 				</button>
@@ -260,6 +288,10 @@
 			</button>
 		</div>
 	</header>
+
+	{#if error && !forwardOpen && !replyOpen}
+		<p class="reply-status" role="alert">{error}</p>
+	{/if}
 
 	<article class="surface-lg mail-card">
 		<div class="subject-row">
