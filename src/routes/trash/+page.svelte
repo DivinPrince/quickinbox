@@ -1,5 +1,5 @@
 <script lang="ts">
-	import MailboxView from '$lib/components/MailboxView.svelte';
+	import MailboxSlot from '$lib/components/MailboxSlot.svelte';
 	import { APP_NAME } from '$lib/constants';
 	import type { PageData } from './$types';
 
@@ -10,4 +10,4 @@
 	<title>Trash — {APP_NAME}</title>
 </svelte:head>
 
-<MailboxView view={data.view} mailbox={data.mailbox} filters={data.filters} />
+<MailboxSlot view={data.view} mailbox={data.mailbox} filters={data.filters} />

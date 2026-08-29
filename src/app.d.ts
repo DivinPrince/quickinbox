@@ -43,6 +43,8 @@ declare global {
 			activeDomainId: string | null;
 			/** Server-only id of the session credential used for this request. */
 			currentSessionId: string | null;
+			/** Active UI theme id (Zero, Classic, or a drop-in folder). */
+			uiTheme: string;
 		}
 	}
 }

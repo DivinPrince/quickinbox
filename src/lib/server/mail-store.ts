@@ -180,6 +180,10 @@ function viewFilter(view: MailboxView): string {
 			return "e.deleted_at IS NULL AND e.is_starred = 1 AND (e.status IS NULL OR e.status <> 'draft')";
 		case 'trash':
 			return 'e.deleted_at IS NOT NULL';
+		default: {
+			const _never: never = view;
+			return _never;
+		}
 	}
 }
 

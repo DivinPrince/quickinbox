@@ -1,0 +1,7 @@
+{
+	"id": "zero",
+	"name": "Zero",
+	"version": "1.0.0",
+	"engine": "quickinbox-theme@1",
+	"colorSchemes": ["light", "dark"]
+}

@@ -1,0 +1,109 @@
+<script lang="ts">
+	import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL } from '$lib/constants';
+	import type { OutboundAttachmentInput } from '$lib/types';
+	import Icon from '../icons/Icon.svelte';
+
+	let {
+		sending = false,
+		attachments = $bindable([]),
+		error = '',
+		extra
+	}: {
+		sending?: boolean;
+		attachments?: OutboundAttachmentInput[];
+		error?: string;
+		extra?: import('svelte').Snippet;
+	} = $props();
+
+	let input = $state<HTMLInputElement | null>(null);
+	let attachError = $state('');
+	let isMac = $state(true);
+
+	$effect(() => {
+		isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+	});
+
+	async function addFiles(files: FileList | null) {
+		if (!files?.length) return;
+		attachError = '';
+
+		for (const file of files) {
+			if (attachments.length >= MAX_ATTACHMENTS_PER_EMAIL) {
+				attachError = `Max ${MAX_ATTACHMENTS_PER_EMAIL} files`;
+				break;
+			}
+			if (file.size > MAX_ATTACHMENT_BYTES) {
+				const limitMb = MAX_ATTACHMENT_BYTES / (1024 * 1024);
+				attachError = `"${file.name}" exceeds ${limitMb}MB`;
+				continue;
+			}
+			const content = await fileToBase64(file);
+			attachments = [
+				...attachments,
+				{
+					filename: file.name,
+					type: file.type || 'application/octet-stream',
+					content
+				}
+			];
+		}
+
+		if (input) input.value = '';
+	}
+
+	function remove(index: number) {
+		attachments = attachments.filter((_, i) => i !== index);
+	}
+
+	function fileToBase64(file: File): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const result = reader.result as string;
+				resolve(result.split(',')[1] ?? '');
+			};
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
+	}
+</script>
+
+<div class="z-composer-foot">
+	<button type="submit" class="z-send" disabled={sending}>
+		<span>{sending ? 'Sending…' : 'Send'}</span>
+		<span class="z-send-kbd">
+			<span>{isMac ? '⌘' : 'Ctrl'}</span>
+			<Icon name="CurvedArrow" size={14} />
+		</span>
+	</button>
+	<button type="button" class="z-add" onclick={() => input?.click()}>
+		<Icon name="Plus" size={12} />
+		<span>Add</span>
+	</button>
+	<input
+		bind:this={input}
+		type="file"
+		multiple
+		class="hidden"
+		onchange={(event) => addFiles(event.currentTarget.files)}
+	/>
+	{#if extra}
+		{@render extra()}
+	{/if}
+	{#if attachments.length > 0}
+		<div class="z-attach-chips">
+			{#each attachments as file, index (file.filename + index)}
+				<span class="z-attach-chip">
+					<Icon name="Paper" size={12} />
+					<span class="z-attach-name">{file.filename}</span>
+					<button type="button" class="z-attach-remove" aria-label="Remove" onclick={() => remove(index)}>
+						<Icon name="X" size={12} />
+					</button>
+				</span>
+			{/each}
+		</div>
+	{/if}
+	{#if attachError || error}
+		<p class="z-composer-error">{attachError || error}</p>
+	{/if}
+</div>

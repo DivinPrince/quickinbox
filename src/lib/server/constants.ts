@@ -13,5 +13,7 @@ export const PAIRING_CODE_TTL_MINUTES = 5;
 export const PAIR_RATE_LIMIT_MAX = 10;
 export const PAIR_RATE_LIMIT_WINDOW_SECONDS = 300;
 export const MAX_BODY_BYTES = 256_000;
+export const UI_THEME_COOKIE = 'qi_ui_theme';
+export const UI_THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 /** Cookie remembering which connected domain the dashboard is filtered to. */
 export const DOMAIN_COOKIE = 'mail_domain';
