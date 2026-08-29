@@ -7,6 +7,7 @@
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { requestSkipViewTransition } from '$lib/app-chrome';
 	import { APP_NAME } from '$lib/constants';
+	import { t } from '$lib/i18n';
 	import type { OutboundAttachmentInput } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -29,7 +30,7 @@
 	let cc = $state(draft?.cc_addr ?? '');
 	let bcc = $state(draft?.bcc_addr ?? '');
 	let subject = $state(draft?.subject ?? '');
-	let html = $state(draft?.body_html ?? '');
+	let html = $state(draft?.body_html || draft?.body_text || '');
 	let attachments = $state<OutboundAttachmentInput[]>([]);
 	let showCopies = $state(Boolean(draft?.cc_addr || draft?.bcc_addr));
 	let error = $state('');
@@ -61,14 +62,14 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? 'Could not save draft';
+				error = body.error ?? t('compose.couldNotSaveDraft');
 				return false;
 			}
 			draftId = body.id;
 			savedAt = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 			return true;
 		} catch {
-			error = 'Network error';
+			error = t('common.networkError');
 			return false;
 		} finally {
 			savingDraft = false;
@@ -78,7 +79,7 @@
 	async function closeComposer() {
 		if (hasDraftText && !(await saveDraft())) return;
 		if (attachments.length > 0) {
-			error = 'Attachments are not saved with drafts. Send the message or remove them first.';
+			error = t('compose.attachmentsNotSaved');
 			return;
 		}
 		requestSkipViewTransition();
@@ -97,7 +98,7 @@
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		if (isHtmlEmpty(html)) {
-			error = 'Write a message';
+			error = t('compose.writeMessage');
 			return;
 		}
 
@@ -122,12 +123,12 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? 'Failed to send';
+				error = body.error ?? t('compose.failedToSend');
 				return;
 			}
 			window.location.href = '/sent';
 		} catch {
-			error = 'Network error';
+			error = t('common.networkError');
 		} finally {
 			sending = false;
 		}
@@ -135,7 +136,7 @@
 </script>
 
 <svelte:head>
-	<title>{draftId ? 'Draft' : 'Compose'} — {APP_NAME}</title>
+	<title>{draftId ? t('compose.draftTitle', { app: APP_NAME }) : t('compose.title', { app: APP_NAME })}</title>
 </svelte:head>
 
 <form class="compose-page" onsubmit={submit}>
@@ -143,25 +144,25 @@
 		<button
 			type="button"
 			class="icon-btn"
-			aria-label="Close"
+			aria-label={t('common.close')}
 			onpointerdown={(event) => event.stopPropagation()}
 			onclick={closeComposer}
 		>
 			<Icon name="close-line" size={22} />
 		</button>
 		<div class="compose-heading">
-			<h1 class="page-title">{draftId ? 'Draft' : 'New message'}</h1>
-			{#if savedAt}<span class="saved">Saved {savedAt}</span>{/if}
+			<h1 class="page-title">{draftId ? t('compose.draft') : t('nav.compose')}</h1>
+			{#if savedAt}<span class="saved">{t('common.savedAt', { time: savedAt })}</span>{/if}
 		</div>
 		<button type="submit" class="btn-primary" disabled={sending}>
-			{sending ? 'Sending…' : 'Send'}
+			{sending ? t('common.sending') : t('common.send')}
 		</button>
 	</header>
 
 	<header class="compose-header">
 		<div class="compose-heading">
-			<h1 class="page-title">{draftId ? 'Draft' : 'New message'}</h1>
-			{#if savedAt}<span class="saved">Saved {savedAt}</span>{/if}
+			<h1 class="page-title">{draftId ? t('compose.draft') : t('nav.compose')}</h1>
+			{#if savedAt}<span class="saved">{t('common.savedAt', { time: savedAt })}</span>{/if}
 		</div>
 
 		<div class="compose-actions">
@@ -171,20 +172,20 @@
 				onclick={() => (showCopies = !showCopies)}
 				aria-expanded={showCopies}
 			>
-				Cc/Bcc
+				{t('compose.ccBcc')}
 			</button>
 			<button type="button" class="btn-ghost" disabled={savingDraft || !hasDraftText} onclick={saveDraft}>
 				<Icon name="save-line" size={15} />
-				{savingDraft ? 'Saving…' : 'Save draft'}
+				{savingDraft ? t('common.saving') : t('compose.saveDraft')}
 			</button>
 			{#if draftId}
-				<button type="button" class="btn-ghost" onclick={discardDraft} aria-label="Discard draft">
+				<button type="button" class="btn-ghost" onclick={discardDraft} aria-label={t('compose.discardDraft')}>
 					<Icon name="delete-bin-line" size={15} />
 				</button>
 			{/if}
 			<button type="submit" class="btn-primary" disabled={sending}>
 				<Icon name="send-plane-2-fill" size={16} />
-				{sending ? 'Sending…' : 'Send'}
+				{sending ? t('common.sending') : t('common.send')}
 			</button>
 		</div>
 	</header>
@@ -192,13 +193,13 @@
 	<div class="surface compose-fields">
 		<!-- With several domains connected, choosing the identity matters. -->
 		<div class="field-row">
-			<span class="field-label">From</span>
+			<span class="field-label">{t('compose.from')}</span>
 			{#if addresses.length > 1}
 				<select
 					value={fromAddressId}
 					onchange={(event) => (chosenAddressId = event.currentTarget.value)}
 					class="field-input"
-					aria-label="Send from"
+					aria-label={t('compose.sendFrom')}
 				>
 					{#each addresses as address (address.id)}
 						<option value={address.id}>
@@ -216,7 +217,7 @@
 		</div>
 
 		<div class="field-row">
-			<span class="field-label">To</span>
+			<span class="field-label">{t('compose.to')}</span>
 			<input
 				id="to"
 				type="text"
@@ -224,7 +225,7 @@
 				autocomplete="email"
 				bind:value={to}
 				required
-				placeholder="recipient@example.com"
+				placeholder={t('compose.recipientPlaceholder')}
 				class="field-input"
 			/>
 			<button
@@ -233,29 +234,29 @@
 				onclick={() => (showCopies = !showCopies)}
 				aria-expanded={showCopies}
 			>
-				Cc/Bcc
+				{t('compose.ccBcc')}
 			</button>
 		</div>
 
 		{#if showCopies}
 			<div class="field-row">
-				<span class="field-label">Cc</span>
-				<input type="text" bind:value={cc} placeholder="Comma separated" class="field-input" />
+				<span class="field-label">{t('compose.cc')}</span>
+				<input type="text" bind:value={cc} placeholder={t('compose.commaSeparated')} class="field-input" />
 			</div>
 			<div class="field-row">
-				<span class="field-label">Bcc</span>
-				<input type="text" bind:value={bcc} placeholder="Comma separated" class="field-input" />
+				<span class="field-label">{t('compose.bcc')}</span>
+				<input type="text" bind:value={bcc} placeholder={t('compose.commaSeparated')} class="field-input" />
 			</div>
 		{/if}
 
 		<div class="field-row">
-			<span class="field-label">Subject</span>
+			<span class="field-label">{t('compose.subject')}</span>
 			<input
 				id="subject"
 				type="text"
 				bind:value={subject}
 				required
-				placeholder="Subject"
+				placeholder={t('compose.subject')}
 				class="field-input"
 			/>
 		</div>
@@ -275,7 +276,7 @@
 					type="button"
 					class="icon-btn"
 					disabled={savingDraft || !hasDraftText}
-					aria-label={savingDraft ? 'Saving' : 'Save draft'}
+					aria-label={savingDraft ? t('common.saving') : t('compose.saveDraft')}
 					onclick={saveDraft}
 				>
 					<Icon name="save-line" size={18} />
@@ -284,7 +285,7 @@
 					<button
 						type="button"
 						class="icon-btn danger"
-						aria-label="Discard draft"
+						aria-label={t('compose.discardDraft')}
 						onclick={discardDraft}
 					>
 						<Icon name="delete-bin-line" size={18} />

@@ -5,6 +5,9 @@
 	import Check from '$lib/components/Check.svelte';
 	import { APP_NAME } from '$lib/constants';
 	import { formatDeviceActivity } from '$lib/device-activity';
+	import { plural, t } from '$lib/i18n';
+	import { page } from '$app/stores';
+	import { providerName } from '$lib/provider-copy';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -39,15 +42,15 @@
 	}
 
 	function userLabel(userId: string | null) {
-		if (!userId) return 'Nobody (unrouted mail is held)';
+		if (!userId) return t('admin.nobodyUnrouted');
 		const match = data.users.find((user) => user.id === userId);
-		return match ? `${match.name} (${match.email})` : 'Unknown user';
+		return match ? `${match.name} (${match.email})` : t('admin.unknownUser');
 	}
 
 	function devicePlatform(value: string | null) {
-		if (value === 'ios') return 'iOS';
-		if (value === 'android') return 'Android';
-		return 'Mobile';
+		if (value === 'ios') return t('settings.ios');
+		if (value === 'android') return t('settings.android');
+		return t('admin.mobile');
 	}
 
 	async function createUser(event: SubmitEvent) {
@@ -69,12 +72,12 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				userError = body.error ?? 'Failed to create user';
+				userError = body.error ?? t('admin.failedCreateUser');
 				return;
 			}
 			window.location.reload();
 		} catch {
-			userError = 'Network error';
+			userError = t('common.networkError');
 		} finally {
 			creatingUser = false;
 		}
@@ -96,12 +99,12 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => ({}));
-				roleError = body.error ?? 'Could not change that role';
+				roleError = body.error ?? t('admin.couldNotChangeRole');
 				return;
 			}
 			window.location.reload();
 		} catch {
-			roleError = 'Network error';
+			roleError = t('common.networkError');
 		} finally {
 			changingRole = null;
 		}
@@ -114,7 +117,7 @@
 	async function removeUser(userId: string, label: string) {
 		if (
 			!confirm(
-				`Delete ${label}? Their addresses and stored mail go too, and any domain they catch mail for falls back to unrouted.`
+				t('admin.deleteUserConfirm', { label })
 			)
 		) {
 			return;
@@ -127,12 +130,12 @@
 			const res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
 			if (!res.ok) {
 				const body = await res.json().catch(() => ({}));
-				deleteError = body.error ?? 'Failed to delete user';
+				deleteError = body.error ?? t('admin.failedDeleteUser');
 				return;
 			}
 			window.location.reload();
 		} catch {
-			deleteError = 'Network error';
+			deleteError = t('common.networkError');
 		} finally {
 			deletingUser = null;
 		}
@@ -150,12 +153,12 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				domainError = body.error ?? 'Could not connect that domain';
+				domainError = body.error ?? t('onboarding.couldNotConnect');
 				return;
 			}
 			window.location.reload();
 		} catch {
-			domainError = 'Network error';
+			domainError = t('common.networkError');
 		} finally {
 			connecting = null;
 		}
@@ -170,14 +173,14 @@
 		});
 		const body = await res.json();
 		if (!res.ok) {
-			domainError = body.error ?? 'Update failed';
+			domainError = body.error ?? t('admin.updateFailed');
 			return;
 		}
 		window.location.reload();
 	}
 
 	async function disconnect(domainId: string, domainName: string) {
-		if (!confirm(`Stop using ${domainName} in this dashboard? Mail already received is kept.`)) {
+		if (!confirm(t('admin.disconnectDomainConfirm', { domain: domainName }))) {
 			return;
 		}
 
@@ -187,11 +190,11 @@
 </script>
 
 <svelte:head>
-	<title>Admin — {APP_NAME}</title>
+	<title>{t('admin.title', { app: APP_NAME })}</title>
 </svelte:head>
 
 <div class="admin-page">
-	<StackHeader title="Admin" back={false} />
+	<StackHeader title={t('nav.admin')} back={false} />
 
 	{#if data.loadError}
 		<div class="surface-lg banner">
@@ -201,8 +204,8 @@
 	{/if}
 
 	<section class="surface-lg admin-card">
-		<h2><Icon name="global-line" size={18} /> Domains</h2>
-		<p class="card-hint">Catch-all gets unmatched mail.</p>
+		<h2><Icon name="global-line" size={18} /> {t('nav.domains')}</h2>
+		<p class="card-hint">{t('admin.domainsHint')}</p>
 
 		<ul class="domain-list">
 			{#each data.domains as domain (domain.id)}
@@ -211,22 +214,20 @@
 						<div class="min-w-0">
 							<p class="domain-name">{domain.name}</p>
 							<p class="domain-sub">
-								{addressesFor(domain.id).length} address{addressesFor(domain.id).length === 1
-									? ''
-									: 'es'}
+								{plural($page.data.locale, 'admin.addressCount', 'admin.addressCountPlural', addressesFor(domain.id).length)}
 								{#if domain.region}· {domain.region}{/if}
 							</p>
 						</div>
 						<div class="chips">
-							<span class="chip" class:chip-on={domain.sending_enabled}>send</span>
-							<span class="chip" class:chip-on={domain.receiving_enabled}>receive</span>
+							<span class="chip" class:chip-on={domain.sending_enabled}>{t('settings.send')}</span>
+							<span class="chip" class:chip-on={domain.receiving_enabled}>{t('settings.receive')}</span>
 							<span class="chip" class:chip-ok={domain.status === 'verified'}>{domain.status}</span>
 						</div>
 					</div>
 
 					<div class="domain-controls">
 						<label class="control">
-							<span class="control-label">Catch-all</span>
+							<span class="control-label">{t('admin.catchall')}</span>
 							<select
 								value={domain.catchall_user_id ?? ''}
 								onchange={(event) =>
@@ -234,7 +235,7 @@
 										catchallUserId: (event.currentTarget as HTMLSelectElement).value || null
 									})}
 							>
-								<option value="">Nobody (hold as unrouted)</option>
+								<option value="">{t('admin.nobodyHold')}</option>
 								{#each data.users as user (user.id)}
 									<option value={user.id}>{user.name} — {user.email}</option>
 								{/each}
@@ -247,14 +248,14 @@
 								class="btn-ghost text-xs"
 								onclick={() => updateDomain(domain.id, { refresh: true })}
 							>
-								<Icon name="refresh-line" size={14} /> Re-sync
+								<Icon name="refresh-line" size={14} /> {t('admin.resync')}
 							</button>
 							<button
 								type="button"
 								class="btn-ghost text-xs"
 								onclick={() => disconnect(domain.id, domain.name)}
 							>
-								Disconnect
+								{t('common.disconnect')}
 							</button>
 						</div>
 					</div>
@@ -262,17 +263,15 @@
 					{#if !domain.receiving_enabled}
 						<p class="hint">
 							<Icon name="information-line" size={13} />
-							Inbound is off
 							{data.providerKind === 'cloudflare'
-								? '— point Email Routing’s catch-all at this Worker'
-								: '— add the MX record'}
-							to receive.
+								? t('admin.inboundOffRouting')
+								: t('admin.inboundOffMx')}
 						</p>
 					{/if}
 					{#if domain.catchall_user_id}
 						<p class="hint">
 							<Icon name="user-received-line" size={13} />
-							Goes to {userLabel(domain.catchall_user_id)}.
+							{t('admin.goesTo', { label: userLabel(domain.catchall_user_id) })}
 						</p>
 					{/if}
 				</li>
@@ -282,7 +281,7 @@
 		{#if connectable.length > 0}
 			<div class="connect-block">
 				<p class="connect-title">
-					Available in {data.providerKind === 'cloudflare' ? 'Cloudflare Email' : 'Resend'}
+					{t('admin.availableIn', { provider: providerName(data.providerKind) })}
 				</p>
 				<ul class="connect-list">
 					{#each connectable as domain (domain.id)}
@@ -297,7 +296,7 @@
 								disabled={connecting === domain.id}
 								onclick={() => connect(domain.id)}
 							>
-								{connecting === domain.id ? 'Connecting…' : 'Connect'}
+								{connecting === domain.id ? t('common.connecting') : t('common.connect')}
 							</button>
 						</li>
 					{/each}
@@ -310,46 +309,46 @@
 
 	<div class="admin-grid">
 		<section class="surface-lg admin-card">
-			<h2><Icon name="user-add-line" size={18} /> New user</h2>
-			<p class="card-hint">Address is their login.</p>
+			<h2><Icon name="user-add-line" size={18} /> {t('admin.newUser')}</h2>
+			<p class="card-hint">{t('admin.newUserHint')}</p>
 			<form class="mt-4 space-y-3" onsubmit={createUser}>
-				<input type="text" bind:value={name} required placeholder="Display name" class="admin-input" />
+				<input type="text" bind:value={name} required placeholder={t('admin.displayName')} class="admin-input" />
 				<AddressField
 					bind:localPart
 					bind:domainId={newUserDomainId}
 					domains={data.domains}
 					placeholder="name"
-					label="Address"
+					label={t('settings.addressLabel')}
 				/>
 				<input
 					type="text"
 					bind:value={password}
 					required
 					minlength="8"
-					placeholder="Temporary password"
+					placeholder={t('admin.temporaryPassword')}
 					class="admin-input"
 				/>
 
 				<div class="role-row">
 					<Check
-						label="Make this user an admin"
-						caption="Admin"
+						label={t('admin.makeAdmin')}
+						caption={t('nav.admin')}
 						checked={makeAdmin}
 						onchange={(next) => (makeAdmin = next)}
 					/>
-					<span class="role-hint">Can manage users, domains, and unrouted mail.</span>
+					<span class="role-hint">{t('admin.roleHint')}</span>
 				</div>
 
 				{#if userError}<p class="error">{userError}</p>{/if}
 
 				<button type="submit" disabled={creatingUser} class="btn-primary">
-					{creatingUser ? 'Creating…' : 'Create'}
+					{creatingUser ? t('common.creating') : t('common.create')}
 				</button>
 			</form>
 		</section>
 
 		<section class="surface-lg admin-card">
-			<h2><Icon name="group-line" size={18} /> {data.users.length} users</h2>
+			<h2><Icon name="group-line" size={18} /> {plural($page.data.locale, 'admin.usersCount', 'admin.usersCountPlural', data.users.length)}</h2>
 			<ul class="user-list">
 				{#each data.users as user (user.id)}
 					<li class="user-row">
@@ -365,14 +364,14 @@
 						</div>
 						{#if user.id === data.user?.id}
 							{#if user.is_admin}
-								<span class="admin-badge">Admin</span>
+								<span class="admin-badge">{t('nav.admin')}</span>
 							{/if}
 						{:else}
 							<Check
 								label={user.is_admin
-									? `Remove admin from ${user.name}`
-									: `Make ${user.name} an admin`}
-								caption="Admin"
+									? t('admin.removeAdminFrom', { name: user.name })
+									: t('admin.makeNamedAdmin', { name: user.name })}
+								caption={t('nav.admin')}
 								checked={user.is_admin}
 								disabled={changingRole === user.id}
 								onchange={(next) => setRole(user.id, next)}
@@ -382,8 +381,8 @@
 							<button
 								type="button"
 								class="user-delete"
-								title="Delete {user.name}"
-								aria-label="Delete {user.name}"
+								title={t('admin.deleteNamed', { name: user.name })}
+								aria-label={t('admin.deleteNamed', { name: user.name })}
 								disabled={deletingUser === user.id}
 								onclick={() => removeUser(user.id, user.name)}
 							>
@@ -399,10 +398,9 @@
 	</div>
 
 	<section class="surface-lg admin-card">
-		<h2><Icon name="smartphone-line" size={18} /> Connected mobile devices</h2>
+		<h2><Icon name="smartphone-line" size={18} /> {t('admin.mobileDevices')}</h2>
 		<p class="card-hint">
-			Active paired sessions across all accounts. Users can disconnect their own devices in
-			Settings.
+			{t('admin.mobileDevicesHint')}
 		</p>
 
 		{#if data.devices.length > 0}
@@ -413,30 +411,30 @@
 							<Icon name="smartphone-line" size={16} />
 						</div>
 						<div class="min-w-0 flex-1">
-							<p class="user-name">{device.device_name ?? 'Mobile device'}</p>
+							<p class="user-name">{device.device_name ?? t('admin.mobileDevice')}</p>
 							<p class="user-email">{device.user_name} · {device.user_email}</p>
 						</div>
 						<div class="device-detail">
 							<p>{devicePlatform(device.device_platform)}</p>
-							<p>{formatDeviceActivity(device.last_seen_at)}</p>
+							<p>{formatDeviceActivity(device.last_seen_at, $page.data.locale)}</p>
 						</div>
 					</li>
 				{/each}
 			</ul>
 		{:else}
-			<p class="hint">No mobile devices are currently connected.</p>
+			<p class="hint">{t('admin.noMobileDevices')}</p>
 		{/if}
 	</section>
 
 	{#if data.unrouted.length > 0}
 		<section class="surface-lg admin-card">
-			<h2><Icon name="question-mark" size={18} /> Unrouted mail</h2>
-			<p class="card-hint">No matching address or catch-all.</p>
+			<h2><Icon name="question-mark" size={18} /> {t('admin.unrouted')}</h2>
+			<p class="card-hint">{t('admin.unroutedHint')}</p>
 			<ul class="user-list">
 				{#each data.unrouted as item (item.id)}
 					<li class="user-row">
 						<div class="min-w-0 flex-1">
-							<p class="user-name">{item.subject || '(no subject)'}</p>
+							<p class="user-name">{item.subject || t('mailbox.noSubject')}</p>
 							<p class="user-email">{item.from_addr} → {item.to_addr}</p>
 						</div>
 					</li>

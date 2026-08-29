@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { t } from '$lib/i18n';
 	import type { DeliveryStatus } from '$lib/types';
 
 	let {
@@ -11,15 +12,17 @@
 	} = $props();
 
 	// Resend reports these over the webhook; before that a message is just queued.
-	const meta: Record<DeliveryStatus, { label: string; icon: string; tone: string }> = {
-		queued: { label: 'Sending', icon: 'time-line', tone: 'neutral' },
-		sent: { label: 'Sent', icon: 'check-line', tone: 'neutral' },
-		delivered: { label: 'Delivered', icon: 'check-double-line', tone: 'good' },
-		delayed: { label: 'Delayed', icon: 'time-line', tone: 'warn' },
-		bounced: { label: 'Bounced', icon: 'error-warning-line', tone: 'bad' },
-		complained: { label: 'Marked as spam', icon: 'spam-2-line', tone: 'warn' },
-		failed: { label: 'Failed', icon: 'close-circle-line', tone: 'bad' }
-	};
+	const meta = $derived(
+		({
+			queued: { label: t('delivery.queued'), icon: 'time-line', tone: 'neutral' },
+			sent: { label: t('delivery.sent'), icon: 'check-line', tone: 'neutral' },
+			delivered: { label: t('delivery.delivered'), icon: 'check-double-line', tone: 'good' },
+			delayed: { label: t('delivery.delayed'), icon: 'time-line', tone: 'warn' },
+			bounced: { label: t('delivery.bounced'), icon: 'error-warning-line', tone: 'bad' },
+			complained: { label: t('delivery.complained'), icon: 'spam-2-line', tone: 'warn' },
+			failed: { label: t('delivery.failed'), icon: 'close-circle-line', tone: 'bad' }
+		}) satisfies Record<DeliveryStatus, { label: string; icon: string; tone: string }>
+	);
 
 	const info = $derived(status ? meta[status] : null);
 </script>

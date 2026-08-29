@@ -11,6 +11,8 @@
 		providerName
 	} from '$lib/provider-copy';
 	import { APP_NAME } from '$lib/constants';
+	import { plural, t } from '$lib/i18n';
+	import { page } from '$app/stores';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -38,7 +40,7 @@
 
 	async function connectDomains() {
 		if (selected.length === 0) {
-			error = 'Pick at least one domain to continue';
+			error = t('onboarding.pickAtLeastOne');
 			return;
 		}
 
@@ -53,12 +55,12 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? 'Could not connect that domain';
+				error = body.error ?? t('onboarding.couldNotConnect');
 				return;
 			}
 			window.location.reload();
 		} catch {
-			error = 'Network error';
+			error = t('common.networkError');
 		} finally {
 			connecting = false;
 		}
@@ -77,12 +79,12 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? 'Could not create that address';
+				error = body.error ?? t('onboarding.couldNotCreateAddress');
 				return;
 			}
 			window.location.href = '/inbox';
 		} catch {
-			error = 'Network error';
+			error = t('common.networkError');
 		} finally {
 			creating = false;
 		}
@@ -90,25 +92,25 @@
 </script>
 
 <svelte:head>
-	<title>Get started — {APP_NAME}</title>
+	<title>{t('setup.title', { app: APP_NAME })}</title>
 </svelte:head>
 
 <WizardShell
-	title={needsDomain ? 'Connect a domain' : 'Claim your address'}
+	title={needsDomain ? t('onboarding.connectDomain') : t('onboarding.claimAddress')}
 	subtitle={needsDomain
 		? onboardingSubtitle(data.providerKind)
-		: "Choose the address you'll send and receive mail from."}
+		: t('onboarding.chooseAddress')}
 	partner={needsDomain}
 	partnerKind={data.providerKind}
-	partnerCaption={`${APP_NAME} + ${providerName(data.providerKind)}`}
+	partnerCaption={t('setup.partnerCaption', { app: APP_NAME, provider: providerName(data.providerKind) })}
 >
 	{#if needsDomain}
 		{#if !data.isAdmin}
 			<div class="surface-lg notice">
 				<Icon name="time-line" size={18} />
 				<div>
-					<p class="notice-title">Waiting on your admin</p>
-					<p class="notice-body">No domain has been connected yet. Ask an admin to finish setup.</p>
+					<p class="notice-title">{t('onboarding.waitingAdminTitle')}</p>
+					<p class="notice-body">{t('onboarding.waitingAdminBody')}</p>
 				</div>
 			</div>
 		{:else if !data.providerConfigured || data.loadError}
@@ -116,7 +118,7 @@
 				<Icon name={data.providerConfigured ? 'error-warning-line' : 'key-2-line'} size={18} />
 				<div>
 					<p class="notice-title">
-						{data.providerConfigured ? "Couldn't load your domains" : missingProviderTitle(data.providerKind)}
+						{data.providerConfigured ? t('setup.couldNotLoadDomains') : missingProviderTitle(data.providerKind)}
 					</p>
 					<p class="notice-body">{data.loadError}</p>
 				</div>
@@ -143,8 +145,15 @@
 				onclick={connectDomains}
 			>
 				{connecting
-					? 'Connecting…'
-					: `Continue with ${selected.length || 'no'} domain${selected.length === 1 ? '' : 's'}`}
+					? t('common.connecting')
+					: selected.length === 0
+						? t('onboarding.continueNoDomain')
+						: plural(
+								$page.data.locale,
+								'onboarding.continueDomains',
+								'onboarding.continueDomainsPlural',
+								selected.length
+							)}
 			</button>
 		{/if}
 	{:else}
@@ -153,15 +162,14 @@
 
 			{#if cleanLocal && activeDomain}
 				<p class="preview">
-					You'll send and receive as <strong>{cleanLocal}@{activeDomain.name}</strong>
+					{t('onboarding.sendReceiveAs', { address: `${cleanLocal}@${activeDomain.name}` })}
 				</p>
 			{/if}
 
 			{#if activeDomain && !activeDomain.receiving_enabled}
 				<p class="hint">
 					<Icon name="information-line" size={14} />
-					Receiving isn't enabled on {activeDomain.name} — you can send, but inbound mail won't
-					arrive.
+					{t('onboarding.receivingOff', { domain: activeDomain.name })}
 				</p>
 			{/if}
 
@@ -172,13 +180,13 @@
 				class="btn-primary w-full py-2.5 mt-4"
 				disabled={creating || !cleanLocal}
 			>
-				{creating ? 'Creating…' : 'Go to inbox'}
+				{creating ? t('common.creating') : t('onboarding.goToInbox')}
 			</button>
 		</form>
 
 		{#if data.isAdmin && data.available.some((domain) => !domain.connected)}
 			<p class="footnote">
-				Want more than one domain here? Connect them any time from <a href="/admin">Admin</a>.
+				{t('onboarding.moreDomainsFootnote')} <a href="/admin">{t('nav.admin')}</a>.
 			</p>
 		{/if}
 	{/if}

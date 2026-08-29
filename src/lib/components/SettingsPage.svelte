@@ -16,9 +16,11 @@
 	import { MAX_EMAIL_SIGNATURE_LENGTH } from '$lib/email-signature';
 	import { APP_NAME } from '$lib/constants';
 	import { formatDeviceActivity } from '$lib/device-activity';
+	import { intlLocale, t } from '$lib/i18n';
 	import type { ApiTokenSummary, Domain, MailAddress } from '$lib/types';
 	import type { SettingsSection } from '$lib/settings-section';
 	import UiThemePicker from './UiThemePicker.svelte';
+	import LocalePicker from './LocalePicker.svelte';
 
 	type DeviceSession = {
 		id: string;
@@ -54,27 +56,63 @@
 		return showAll || section === name;
 	}
 
-	const SHORTCUTS: { keys: string; label: string }[] = [
-		{ keys: '⌘K', label: 'Search' },
-		{ keys: 'C', label: 'Compose' },
-		{ keys: 'E', label: 'Archive' },
-		{ keys: 'D', label: 'Move to bin' },
-		{ keys: 'R', label: 'Reply' },
-		{ keys: 'A', label: 'Reply all' },
-		{ keys: 'F', label: 'Forward' },
-		{ keys: 'S', label: 'Star' },
-		{ keys: 'U', label: 'Mark unread' },
-		{ keys: 'G then I', label: 'Go to inbox' },
-		{ keys: 'G then D', label: 'Go to drafts' },
-		{ keys: 'G then T', label: 'Go to sent' },
-		{ keys: 'G then A', label: 'Go to archive' },
-		{ keys: 'G then B', label: 'Go to bin' },
-		{ keys: 'G then S', label: 'Go to settings' },
-		{ keys: '1 / 2 / 3', label: 'All / Unread / Starred' },
-		{ keys: '⌘↵', label: 'Send' },
-		{ keys: 'Esc', label: 'Close' },
-		{ keys: '?', label: 'Keyboard shortcuts' }
-	];
+	const SHORTCUTS = $derived<{ keys: string; label: string }[]>([
+		{ keys: '⌘K', label: t('shortcuts.search') },
+		{ keys: 'C', label: t('shortcuts.compose') },
+		{ keys: 'E', label: t('shortcuts.archive') },
+		{ keys: 'D', label: t('shortcuts.moveToBin') },
+		{ keys: 'R', label: t('shortcuts.reply') },
+		{ keys: 'A', label: t('shortcuts.replyAll') },
+		{ keys: 'F', label: t('shortcuts.forward') },
+		{ keys: 'S', label: t('shortcuts.star') },
+		{ keys: 'U', label: t('shortcuts.markUnread') },
+		{ keys: 'G then I', label: t('shortcuts.goToInbox') },
+		{ keys: 'G then D', label: t('shortcuts.goToDrafts') },
+		{ keys: 'G then T', label: t('shortcuts.goToSent') },
+		{ keys: 'G then A', label: t('shortcuts.goToArchive') },
+		{ keys: 'G then B', label: t('shortcuts.goToBin') },
+		{ keys: 'G then S', label: t('shortcuts.goToSettings') },
+		{ keys: '1 / 2 / 3', label: t('shortcuts.filters') },
+		{ keys: '⌘↵', label: t('shortcuts.send') },
+		{ keys: 'Esc', label: t('shortcuts.close') },
+		{ keys: '?', label: t('shortcuts.title') }
+	]);
+
+	function sectionTitle(name: SettingsSection): string {
+		switch (name) {
+			case 'general':
+				return t('nav.general');
+			case 'appearance':
+				return t('nav.appearance');
+			case 'connections':
+				return t('nav.connections');
+			case 'notifications':
+				return t('nav.notifications');
+			case 'shortcuts':
+				return t('nav.shortcuts');
+			case 'all':
+				return t('nav.settings');
+			default: {
+				const _never: never = name;
+				return _never;
+			}
+		}
+	}
+
+	function themeLabel(value: ThemePreference): string {
+		switch (value) {
+			case 'light':
+				return t('settings.themeLight');
+			case 'dark':
+				return t('settings.themeDark');
+			case 'system':
+				return t('settings.themeSystem');
+			default: {
+				const _never: never = value;
+				return _never;
+			}
+		}
+	}
 
 	// The preference lives in localStorage, so it can only be read on the client.
 	let theme = $state<ThemePreference>('system');
@@ -106,14 +144,14 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				signatureError = body.error ?? 'Could not save signature';
+				signatureError = body.error ?? t('settings.couldNotSaveSignature');
 				return;
 			}
 
 			signature = body.signature;
 			signatureSaved = true;
 		} catch {
-			signatureError = 'Network error';
+			signatureError = t('common.networkError');
 		} finally {
 			signatureBusy = false;
 		}
@@ -194,7 +232,7 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				keyError = body.error ?? 'Could not create the API key';
+				keyError = body.error ?? t('settings.couldNotCreateKey');
 				return;
 			}
 			tokens = [body.tokenMeta, ...tokens.filter((token) => token.id !== body.tokenMeta.id)];
@@ -202,7 +240,7 @@
 			copied = false;
 			keyName = '';
 		} catch {
-			keyError = 'Network error';
+			keyError = t('common.networkError');
 		} finally {
 			keyBusy = false;
 		}
@@ -230,18 +268,22 @@
 	}
 
 	async function revokeKey(id: string) {
-		if (!confirm('Revoke this key?')) return;
+		if (!confirm(t('settings.revokeConfirm'))) return;
 		const res = await fetch(`/api/apikeys/${id}`, { method: 'DELETE' });
 		const body = await res.json();
 		if (!res.ok) {
-			keyError = body.error ?? 'Could not revoke that key';
+				keyError = body.error ?? t('settings.couldNotRevokeKey');
 			return;
 		}
 		tokens = body.tokens;
 	}
 
 	function formatDate(value: string): string {
-		return new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+		return new Date(value).toLocaleDateString(intlLocale($page.data.locale), {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		});
 	}
 
 	$effect(() => {
@@ -265,14 +307,14 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? 'Could not add that address';
+				error = body.error ?? t('settings.couldNotAddAddress');
 				return;
 			}
 			edited = [...addresses, body.address];
 			localPart = '';
 			displayName = '';
 		} catch {
-			error = 'Network error';
+			error = t('common.networkError');
 		} finally {
 			busy = false;
 		}
@@ -292,12 +334,12 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? 'Could not save that name';
+				error = body.error ?? t('settings.couldNotSaveName');
 				return;
 			}
 			edited = body.addresses;
 		} catch {
-			error = 'Network error';
+			error = t('common.networkError');
 		} finally {
 			savingId = '';
 		}
@@ -327,12 +369,12 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? 'Could not save that signature';
+				error = body.error ?? t('settings.couldNotSaveMailboxSignature');
 				return;
 			}
 			edited = body.addresses;
 		} catch {
-			error = 'Network error';
+			error = t('common.networkError');
 		} finally {
 			savingId = '';
 		}
@@ -342,7 +384,7 @@
 		const res = await fetch(`/api/addresses/${id}`, { method: 'DELETE' });
 		const body = await res.json();
 		if (!res.ok) {
-			error = body.error ?? 'Could not remove that address';
+				error = body.error ?? t('settings.couldNotRemoveAddress');
 			return;
 		}
 		edited = body.addresses;
@@ -381,7 +423,7 @@
 		if (!Number.isFinite(expiresAt)) {
 			stopPairingTimer();
 			pairingCode = '';
-			pairError = 'The pairing code had an invalid expiry time. Try again.';
+			pairError = t('settings.invalidPairingExpiry');
 			return;
 		}
 
@@ -423,7 +465,7 @@
 			const body = await res.json();
 			if (!pairingPanelOpen || generation !== pairingGeneration) return;
 			if (!res.ok) {
-				pairError = body.error ?? 'Could not create a pairing code';
+				pairError = body.error ?? t('settings.couldNotCreatePairing');
 				return;
 			}
 
@@ -440,12 +482,12 @@
 				const { default: QRCode } = await import('qrcode');
 				await QRCode.toCanvas(qrCanvas, payload, { width: 200, margin: 1 });
 			} catch {
-				pairError = 'Could not draw the QR code. Enter the code below instead.';
+				pairError = t('settings.couldNotDrawQr');
 			}
 		} catch (requestError) {
 			if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
 			if (pairingPanelOpen && generation === pairingGeneration) {
-				pairError = 'Network error. Check your connection and try again.';
+				pairError = t('settings.pairingNetwork');
 			}
 		} finally {
 			if (pairingRequest === controller) {
@@ -506,29 +548,29 @@
 	async function revokeDevice(id: string) {
 		const device = devices.find((candidate) => candidate.id === id);
 		if (!device || device.is_current) return;
-		const name = device.device_name ?? 'this browser session';
-		if (!confirm(`Disconnect ${name}? It will lose access immediately.`)) return;
+		const name = device.device_name ?? t('settings.thisBrowserSession');
+		if (!confirm(t('settings.disconnectDevice', { name }))) return;
 		revokingId = id;
 		deviceError = '';
 
 		try {
 			const res = await fetch(`/api/devices/${id}`, { method: 'DELETE' });
 			if (!res.ok) {
-				deviceError = 'Could not disconnect that device';
+				deviceError = t('settings.couldNotDisconnect');
 				return;
 			}
 			devices = devices.filter((device) => device.id !== id);
 		} catch {
-			deviceError = 'Network error while disconnecting that device';
+			deviceError = t('settings.disconnectNetwork');
 		} finally {
 			revokingId = '';
 		}
 	}
 
 	function platformLabel(device: DeviceSession) {
-		if (device.device_platform === 'ios') return 'iOS';
-		if (device.device_platform === 'android') return 'Android';
-		return 'Web browser';
+		if (device.device_platform === 'ios') return t('settings.ios');
+		if (device.device_platform === 'android') return t('settings.android');
+		return t('settings.webBrowser');
 	}
 
 	async function copyPairingCode() {
@@ -536,41 +578,31 @@
 			await navigator.clipboard.writeText(pairingCode);
 			pairCopied = true;
 		} catch {
-			pairError = 'Could not copy the code. Select it and copy it manually.';
+			pairError = t('settings.couldNotCopyCode');
 		}
 	}
 </script>
 
 <svelte:head>
-	<title>Settings — {APP_NAME}</title>
+	<title>{t('settings.title', { app: APP_NAME })}</title>
 </svelte:head>
 
 <svelte:window onkeydown={handleWindowKeydown} />
 
 <div class="settings-page" class:zero={zeroChrome}>
 	{#if showAll && !zeroChrome}
-		<StackHeader title="Settings" back={false} />
+		<StackHeader title={t('nav.settings')} back={false} />
 	{:else}
 		<h1 class="settings-section-title">
-			{section === 'general'
-				? 'General'
-				: section === 'appearance'
-					? 'Appearance'
-					: section === 'connections'
-						? 'Connections'
-						: section === 'notifications'
-							? 'Notifications'
-							: section === 'all'
-								? 'Settings'
-								: 'Shortcuts'}
+			{sectionTitle(section)}
 		</h1>
 	{/if}
 
 	{#if show('appearance')}
 	<section class="surface-lg card">
-		<h2><Icon name="contrast-2-line" size={18} /> Appearance</h2>
+		<h2><Icon name="contrast-2-line" size={18} /> {t('nav.appearance')}</h2>
 
-		<div class="theme-options" role="radiogroup" aria-label="Theme">
+		<div class="theme-options" role="radiogroup" aria-label={t('settings.theme')}>
 			{#each THEME_OPTIONS as option (option.value)}
 				<button
 					type="button"
@@ -587,7 +619,7 @@
 					</span>
 					<span class="theme-label">
 						<Icon name={option.icon} size={15} />
-						{option.label}
+						{themeLabel(option.value)}
 					</span>
 					{#if theme === option.value}
 						<span class="theme-check"><Icon name="check-line" size={14} /></span>
@@ -596,8 +628,11 @@
 			{/each}
 		</div>
 
-		<p class="card-hint" style="margin-top: 1.25rem;">Interface</p>
+		<p class="card-hint" style="margin-top: 1.25rem;">{t('settings.interface')}</p>
 		<UiThemePicker />
+		<p class="card-hint" style="margin-top: 1.25rem;">{t('settings.language')}</p>
+		<p class="card-hint">{t('settings.languageHint')}</p>
+		<LocalePicker />
 	</section>
 	{/if}
 
@@ -609,8 +644,8 @@
 
 	{#if show('general')}
 	<section class="surface-lg card">
-		<h2><Icon name="pencil-line" size={18} /> Signature</h2>
-		<p class="card-hint">Used when a mailbox has no signature of its own.</p>
+		<h2><Icon name="pencil-line" size={18} /> {t('settings.signature')}</h2>
+		<p class="card-hint">{t('settings.signatureHint')}</p>
 
 		<form class="signature-form" onsubmit={saveSignature}>
 			<textarea
@@ -625,22 +660,21 @@
 			<div class="signature-actions">
 				<span class="character-count">{signature.length}/{MAX_EMAIL_SIGNATURE_LENGTH}</span>
 				<button type="submit" class="btn-primary" disabled={signatureBusy}>
-					{signatureBusy ? 'Saving…' : 'Save'}
+					{signatureBusy ? t('common.saving') : t('common.save')}
 				</button>
 			</div>
 
 			{#if signatureError}<p class="error">{signatureError}</p>{/if}
-			{#if signatureSaved}<p class="saved">Saved</p>{/if}
+			{#if signatureSaved}<p class="saved">{t('common.saved')}</p>{/if}
 		</form>
 	</section>
 	{/if}
 
 	{#if show('connections')}
 	<section class="surface-lg card">
-		<h2><Icon name="at-line" size={18} /> Addresses</h2>
+		<h2><Icon name="at-line" size={18} /> {t('settings.addresses')}</h2>
 		<p class="card-hint">
-			The From name is what recipients see. A signature on an address replaces the account
-			signature for that mailbox. Leave either blank to use the account default.
+			{t('settings.addressesHint')}
 		</p>
 
 		<ul class="address-list">
@@ -652,8 +686,8 @@
 								type="text"
 								class="name-input"
 								value={address.label ?? ''}
-								placeholder="From name"
-								aria-label="From name for {address.address}"
+								placeholder={t('settings.fromName')}
+								aria-label={t('settings.fromNameFor', { address: address.address })}
 								disabled={savingId === address.id}
 								onchange={(event) => saveLabel(address.id, event.currentTarget.value)}
 							/>
@@ -661,10 +695,10 @@
 						</div>
 
 						{#if address.is_default}
-							<span class="badge">Default</span>
+							<span class="badge">{t('common.default')}</span>
 						{:else}
 							<button type="button" class="btn-ghost text-xs" onclick={() => makeDefault(address.id)}>
-								Make default
+								{t('settings.makeDefault')}
 							</button>
 						{/if}
 
@@ -672,7 +706,7 @@
 							<button
 								type="button"
 								class="icon-btn"
-								aria-label="Remove {address.address}"
+								aria-label={t('settings.removeAddress', { address: address.address })}
 								onclick={() => remove(address.id)}
 							>
 								<Icon name="delete-bin-line" size={15} />
@@ -684,8 +718,8 @@
 						rows="2"
 						maxlength={MAX_EMAIL_SIGNATURE_LENGTH}
 						value={address.signature ?? ''}
-						placeholder="Signature for this address"
-						aria-label="Signature for {address.address}"
+						placeholder={t('settings.mailboxSignature')}
+						aria-label={t('settings.mailboxSignature')}
 						disabled={savingId === address.id}
 						onchange={(event) => saveMailboxSignature(address.id, event.currentTarget.value)}
 					></textarea>
@@ -695,7 +729,7 @@
 
 		<form class="add-form" onsubmit={addAddress}>
 			<div class="add-field">
-				<label class="field-title" for="new-display-name">From name</label>
+				<label class="field-title" for="new-display-name">{t('settings.fromName')}</label>
 				<input
 					id="new-display-name"
 					type="text"
@@ -709,18 +743,18 @@
 					bind:domainId
 					domains={data.domains}
 					placeholder="another"
-					label="Address"
+					label={t('settings.addressLabel')}
 				/>
 			</div>
 			<button type="submit" class="btn-primary" disabled={busy || !localPart.trim()}>
-				{busy ? 'Adding…' : 'Add'}
+				{busy ? t('common.adding') : t('common.add')}
 			</button>
 		</form>
 
 		{#if selectedDomain && !selectedDomain.receiving_enabled}
 			<p class="hint">
 				<Icon name="information-line" size={14} />
-				{selectedDomain.name} can send, but inbound is off.
+				{t('settings.canSendNotReceive', { domain: selectedDomain.name })}
 			</p>
 		{/if}
 
@@ -728,14 +762,14 @@
 	</section>
 
 	<section class="surface-lg card">
-		<h2><Icon name="global-line" size={18} /> Connected domains</h2>
+		<h2><Icon name="global-line" size={18} /> {t('settings.connectedDomains')}</h2>
 		<ul class="domain-list">
 			{#each data.domains as domain (domain.id)}
 				<li class="domain-row">
 					<span class="domain-name">{domain.name}</span>
 					<span class="caps">
-						<span class="chip" class:chip-on={domain.sending_enabled}>send</span>
-						<span class="chip" class:chip-on={domain.receiving_enabled}>receive</span>
+						<span class="chip" class:chip-on={domain.sending_enabled}>{t('settings.send')}</span>
+						<span class="chip" class:chip-on={domain.receiving_enabled}>{t('settings.receive')}</span>
 						<span class="chip" class:chip-ok={domain.status === 'verified'}>{domain.status}</span>
 					</span>
 				</li>
@@ -745,10 +779,10 @@
 
 	<section class="surface-lg card">
 		<div class="card-head">
-			<h2><Icon name="key-2-line" size={18} /> API keys</h2>
+			<h2><Icon name="key-2-line" size={18} /> {t('settings.apiKeys')}</h2>
 			<button type="button" class="btn-primary" onclick={openCreate}>
 				<Icon name="add-line" size={15} />
-				New
+				{t('settings.new')}
 			</button>
 		</div>
 
@@ -769,7 +803,7 @@
 						<button
 							type="button"
 							class="icon-btn"
-							aria-label="Revoke {token.name}"
+							aria-label={t('settings.revokeKey', { name: token.name })}
 							onclick={() => revokeKey(token.id)}
 						>
 							<Icon name="delete-bin-line" size={15} />
@@ -778,24 +812,23 @@
 				{/each}
 			</ul>
 		{:else}
-			<p class="empty">No keys</p>
+			<p class="empty">{t('settings.noKeys')}</p>
 		{/if}
 
 		{#if keyError && !creating}<p class="error">{keyError}</p>{/if}
 
 		<div class="install-row">
 			<code>{installCommand}</code>
-			<button type="button" class="icon-btn" aria-label="Copy install command" onclick={copyInstall}>
+			<button type="button" class="icon-btn" aria-label={t('settings.copyInstall')} onclick={copyInstall}>
 				<Icon name={installCopied ? 'check-line' : 'file-copy-line'} size={15} />
 			</button>
 		</div>
 	</section>
 
 	<section class="surface-lg card">
-		<h2><Icon name="smartphone-line" size={18} /> Connected devices</h2>
+		<h2><Icon name="smartphone-line" size={18} /> {t('settings.devices')}</h2>
 		<p class="card-hint">
-			Browsers and mobile apps signed in to this account. Disconnect a session to revoke
-			its access immediately.
+			{t('settings.devicesHint')}
 		</p>
 
 		{#if devices.length > 0}
@@ -804,12 +837,12 @@
 					<li class="device-row">
 						<div class="min-w-0 flex-1">
 							<p class="device-name">
-								{device.device_name ?? 'Web browser'}
-								{#if device.is_current}<span class="badge">This device</span>{/if}
+								{device.device_name ?? t('settings.webBrowser')}
+								{#if device.is_current}<span class="badge">{t('settings.thisDevice')}</span>{/if}
 							</p>
 							<p class="device-meta">
-								{platformLabel(device)} · {device.last_seen_at ? formatDeviceActivity(device.last_seen_at) : 'Signed in'}
-								· added {new Date(device.created_at).toLocaleDateString()}
+								{platformLabel(device)} · {device.last_seen_at ? formatDeviceActivity(device.last_seen_at, $page.data.locale) : t('settings.signedIn')}
+								· {t('settings.addedOn', { date: new Date(device.created_at).toLocaleDateString(intlLocale($page.data.locale)) })}
 							</p>
 						</div>
 						{#if !device.is_current}
@@ -819,53 +852,53 @@
 								disabled={revokingId === device.id}
 								onclick={() => revokeDevice(device.id)}
 							>
-								{revokingId === device.id ? 'Disconnecting…' : 'Disconnect'}
+								{revokingId === device.id ? t('common.disconnecting') : t('common.disconnect')}
 							</button>
 						{/if}
 					</li>
 				{/each}
 			</ul>
 		{:else}
-			<p class="hint">No active sessions.</p>
+			<p class="hint">{t('settings.noSessions')}</p>
 		{/if}
 
 		{#if pairingPanelOpen}
 			<div class="pair-panel" aria-busy={pairingBusy}>
 				<div class="pair-heading">
-					<p class="pair-title">Scan with the {APP_NAME} app</p>
-					<button type="button" class="icon-btn" aria-label="Close pairing" onclick={closePairingPanel}>
+					<p class="pair-title">{t('settings.scanWithApp', { app: APP_NAME })}</p>
+					<button type="button" class="icon-btn" aria-label={t('settings.closePairing')} onclick={closePairingPanel}>
 						<Icon name="close-line" size={15} />
 					</button>
 				</div>
 
 				{#if pairingCode}
 					<canvas bind:this={qrCanvas} aria-hidden="true">
-						{APP_NAME} mobile pairing code. Use the text code below if you cannot scan it.
+						{t('settings.pairingCanvas', { app: APP_NAME })}
 					</canvas>
 					<div class="pair-code">
-						<span>Or enter code: <code>{pairingCode}</code></span>
-						<button type="button" class="btn-ghost text-xs" onclick={copyPairingCode}>Copy code</button>
+						<span>{t('settings.orEnterCode')} <code>{pairingCode}</code></span>
+						<button type="button" class="btn-ghost text-xs" onclick={copyPairingCode}>{t('settings.copyCode')}</button>
 					</div>
-					{#if pairCopied}<p class="pair-copied" role="status">Code copied.</p>{/if}
+					{#if pairCopied}<p class="pair-copied" role="status">{t('settings.codeCopied')}</p>{/if}
 					<p
 						class="pair-expiry"
 						role="timer"
-						aria-label={`Pairing code refreshes in ${pairingSecondsRemaining} seconds`}
+						aria-label={t('settings.pairingRefreshes', { seconds: pairingSecondsRemaining })}
 					>
-						Refreshes in <span aria-hidden="true">{pairingCountdown}</span>. Each code works once.
+						{t('settings.refreshesIn', { countdown: pairingCountdown })}
 					</p>
 				{:else if pairingBusy}
-					<p class="pair-loading" role="status">Creating a secure pairing code…</p>
+					<p class="pair-loading" role="status">{t('settings.creatingPairing')}</p>
 				{:else}
-					<p class="pair-loading">A pairing code isn't available right now.</p>
+					<p class="pair-loading">{t('settings.pairingUnavailable')}</p>
 					<button type="button" class="btn-ghost text-xs" onclick={requestPairingCode}>
-						Try again
+						{t('common.tryAgain')}
 					</button>
 				{/if}
 			</div>
 		{:else}
 			<button type="button" class="btn-primary pair-btn" onclick={openPairingPanel}>
-				Connect mobile app
+				{t('settings.connectMobile')}
 			</button>
 		{/if}
 
@@ -876,8 +909,8 @@
 
 	{#if section === 'shortcuts'}
 		<section class="surface-lg card">
-			<h2><Icon name="keyboard-line" size={18} /> Shortcuts</h2>
-			<p class="card-hint">These apply to the Zero interface.</p>
+			<h2><Icon name="keyboard-line" size={18} /> {t('nav.shortcuts')}</h2>
+			<p class="card-hint">{t('settings.shortcutsHint')}</p>
 			<ul class="shortcut-list">
 				{#each SHORTCUTS as row (row.label)}
 					<li>
@@ -902,47 +935,47 @@
 			class="key-modal"
 			role="dialog"
 			aria-modal="true"
-			aria-label={revealed ? 'Copy API key' : 'New API key'}
+			aria-label={revealed ? t('settings.copyApiKey') : t('settings.newApiKey')}
 			tabindex="-1"
 		>
 			<div class="modal-head">
 				<h3>
 					<Icon name="key-2-line" size={16} />
-					{revealed ? 'Copy this key' : 'New API key'}
+					{revealed ? t('settings.copyThisKey') : t('settings.newApiKey')}
 				</h3>
-				<button type="button" class="icon-btn" aria-label="Close" onclick={closeCreate}>
+				<button type="button" class="icon-btn" aria-label={t('common.close')} onclick={closeCreate}>
 					<Icon name="close-line" size={16} />
 				</button>
 			</div>
 
 			{#if revealed}
-				<p class="modal-note">Shown once. Copy it now.</p>
+				<p class="modal-note">{t('settings.shownOnce')}</p>
 				<pre class="token-box">{revealed.token}</pre>
 				<div class="modal-actions">
 					<button type="button" class="btn-primary" onclick={copyKey}>
 						<Icon name={copied ? 'check-line' : 'file-copy-line'} size={15} />
-						{copied ? 'Copied' : 'Copy'}
+						{copied ? t('common.copied') : t('common.copy')}
 					</button>
-					<button type="button" class="btn-ghost" onclick={closeCreate}>Done</button>
+					<button type="button" class="btn-ghost" onclick={closeCreate}>{t('common.done')}</button>
 				</div>
 			{:else}
 				<form class="key-form" onsubmit={createKey}>
-					<label class="sr-only" for="apikey-name">Key name</label>
+					<label class="sr-only" for="apikey-name">{t('settings.keyName')}</label>
 					<input
 						id="apikey-name"
 						class="text-input"
-						placeholder="Name"
+						placeholder={t('settings.name')}
 						value={keyName}
 						autofocus
 						oninput={(event) => (keyName = event.currentTarget.value)}
 					/>
 
 					<div class="scope-row">
-						<Check label="Send mail" caption="send" checked={sendScope} onchange={(next) => (sendScope = next)} />
-						<Check label="Read mail" caption="read" checked={readScope} onchange={(next) => (readScope = next)} />
+						<Check label={t('settings.sendMail')} caption="send" checked={sendScope} onchange={(next) => (sendScope = next)} />
+						<Check label={t('settings.readMail')} caption="read" checked={readScope} onchange={(next) => (readScope = next)} />
 						{#if data.isAdmin}
 							<Check
-								label="Admin"
+								label={t('nav.admin')}
 								caption="admin"
 								checked={adminScope}
 								onchange={(next) => (adminScope = next)}
@@ -953,9 +986,9 @@
 					{#if keyError}<p class="error">{keyError}</p>{/if}
 
 					<div class="modal-actions">
-						<button type="button" class="btn-ghost" onclick={closeCreate}>Cancel</button>
+						<button type="button" class="btn-ghost" onclick={closeCreate}>{t('common.cancel')}</button>
 						<button type="submit" class="btn-primary" disabled={keyBusy || !canCreateKey}>
-							{keyBusy ? 'Creating…' : 'Create'}
+							{keyBusy ? t('common.creating') : t('common.create')}
 						</button>
 					</div>
 				</form>

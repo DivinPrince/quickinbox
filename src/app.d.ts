@@ -45,6 +45,8 @@ declare global {
 			currentSessionId: string | null;
 			/** Active UI theme id (Zero, Classic, or a drop-in folder). */
 			uiTheme: string;
+			/** Active UI locale (en, fr, zh-CN, es). */
+			locale: string;
 		}
 	}
 }

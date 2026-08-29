@@ -12,6 +12,7 @@
 	} from '$lib/app-chrome';
 	import { setupMobileViewTransitions } from '$lib/view-transitions';
 	import { persistUiTheme } from '$lib/ui-theme/apply';
+import { persistLocale } from '$lib/i18n';
 	import { getTheme } from '$lib/ui-theme/registry';
 	import type { ThemeShellData } from '$lib/ui-theme/types';
 	import type { LayoutData } from './$types';
@@ -42,6 +43,10 @@
 
 	$effect(() => {
 		if (data.user) persistUiTheme(data.uiTheme);
+	});
+
+	$effect(() => {
+		persistLocale(data.locale);
 	});
 
 	$effect(() => {

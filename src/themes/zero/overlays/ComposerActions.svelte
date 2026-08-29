@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL } from '$lib/constants';
+	import AttachmentIcon from '$lib/components/Icon.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	import type { OutboundAttachmentInput } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
+	import { t } from '$lib/i18n';
 
 	let {
 		sending = false,
@@ -29,12 +32,12 @@
 
 		for (const file of files) {
 			if (attachments.length >= MAX_ATTACHMENTS_PER_EMAIL) {
-				attachError = `Max ${MAX_ATTACHMENTS_PER_EMAIL} files`;
+				attachError = t('compose.maxFiles', { count: MAX_ATTACHMENTS_PER_EMAIL });
 				break;
 			}
 			if (file.size > MAX_ATTACHMENT_BYTES) {
 				const limitMb = MAX_ATTACHMENT_BYTES / (1024 * 1024);
-				attachError = `"${file.name}" exceeds ${limitMb}MB`;
+				attachError = t('compose.fileTooLarge', { name: file.name, limit: limitMb });
 				continue;
 			}
 			const content = await fileToBase64(file);
@@ -70,15 +73,15 @@
 
 <div class="z-composer-foot">
 	<button type="submit" class="z-send" disabled={sending}>
-		<span>{sending ? 'Sending…' : 'Send'}</span>
+		<span>{sending ? t('common.sending') : t('common.send')}</span>
 		<span class="z-send-kbd">
 			<span>{isMac ? '⌘' : 'Ctrl'}</span>
 			<Icon name="CurvedArrow" size={14} />
 		</span>
 	</button>
 	<button type="button" class="z-add" onclick={() => input?.click()}>
-		<Icon name="Plus" size={12} />
-		<span>Add</span>
+		<AttachmentIcon name="attachment-2" size={12} />
+		<span>{t('attach.attach')}</span>
 	</button>
 	<input
 		bind:this={input}
@@ -96,9 +99,11 @@
 				<span class="z-attach-chip">
 					<Icon name="Paper" size={12} />
 					<span class="z-attach-name">{file.filename}</span>
-					<button type="button" class="z-attach-remove" aria-label="Remove" onclick={() => remove(index)}>
-						<Icon name="X" size={12} />
-					</button>
+					<Tooltip text={t('common.remove')}>
+						<button type="button" class="z-attach-remove" aria-label={t('common.remove')} onclick={() => remove(index)}>
+							<Icon name="X" size={12} />
+						</button>
+					</Tooltip>
 				</span>
 			{/each}
 		</div>

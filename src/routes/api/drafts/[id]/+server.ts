@@ -19,6 +19,7 @@ export const GET: RequestHandler = async ({ params, locals, platform }) => {
 		bcc_addr: draft.bcc_addr,
 		subject: draft.subject,
 		body_html: draft.body_html,
+		body_text: draft.body_text,
 		from_addr: draft.from_addr,
 		address_id: draft.address_id
 	});

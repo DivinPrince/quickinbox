@@ -76,7 +76,7 @@ export async function insertEmail(
 				body_text, body_html, message_id, in_reply_to, references_header,
 				reply_to_email_id, thread_id, thread_key,
 				domain_id, address_id, provider_id, status, status_at, is_read
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
 		)
 		.bind(
 			id,

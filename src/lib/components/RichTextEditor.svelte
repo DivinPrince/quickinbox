@@ -1,9 +1,11 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import Tooltip from './Tooltip.svelte';
+	import { t } from '$lib/i18n';
 
 	let {
 		html = $bindable(''),
-		placeholder = 'Write your message…',
+		placeholder = t('compose.writeMessagePlaceholder'),
 		minHeight = 240,
 		embedded = false,
 		fill = false,
@@ -18,7 +20,24 @@
 		toolbarEnd?: import('svelte').Snippet;
 	} = $props();
 
-	let editor = $state<HTMLDivElement | null>(null);
+	let editor: HTMLDivElement | null = null;
+
+	/** Copy `html` into the live editor without resetting the caret on each keystroke. */
+	function hydrateEditor(node: HTMLDivElement, next: string) {
+		const apply = (value: string) => {
+			if (node.innerHTML !== value) node.innerHTML = value;
+		};
+		apply(next);
+		editor = node;
+		return {
+			update(value: string) {
+				apply(value);
+			},
+			destroy() {
+				if (editor === node) editor = null;
+			}
+		};
+	}
 
 	function exec(command: string, value?: string) {
 		editor?.focus();
@@ -37,17 +56,24 @@
 		html = editor?.innerHTML ?? '';
 	}
 
-	const tools = [
-		{ icon: 'bold', command: 'bold', label: 'Bold' },
-		{ icon: 'italic', command: 'italic', label: 'Italic' },
-		{ icon: 'underline', command: 'underline', label: 'Underline' },
-		{ icon: 'list-unordered', command: 'insertUnorderedList', label: 'List' },
-		{ icon: 'link', command: 'createLink', label: 'Link', prompt: true }
-	] as const;
+	type EditorTool = {
+		icon: string;
+		command: string;
+		label: string;
+		prompt?: boolean;
+	};
 
-	function handleTool(tool: (typeof tools)[number]) {
-		if ('prompt' in tool && tool.prompt) {
-			const url = window.prompt('Link URL');
+	const tools = $derived<EditorTool[]>([
+		{ icon: 'bold', command: 'bold', label: t('editor.bold') },
+		{ icon: 'italic', command: 'italic', label: t('editor.italic') },
+		{ icon: 'underline', command: 'underline', label: t('editor.underline') },
+		{ icon: 'list-unordered', command: 'insertUnorderedList', label: t('editor.list') },
+		{ icon: 'link', command: 'createLink', label: t('editor.link'), prompt: true }
+	]);
+
+	function handleTool(tool: EditorTool) {
+		if (tool.prompt) {
+			const url = window.prompt(t('editor.linkUrl'));
 			if (url) exec('createLink', url);
 			return;
 		}
@@ -58,15 +84,16 @@
 <div class="editor-shell" class:editor-shell-embedded={embedded} class:editor-shell-fill={fill}>
 	<div class="toolbar">
 		{#each tools as tool (tool.command)}
-			<button
-				type="button"
-				class="icon-btn"
-				title={tool.label}
-				aria-label={tool.label}
-				onclick={() => handleTool(tool)}
-			>
-				<Icon name={tool.icon} size={16} />
-			</button>
+			<Tooltip text={tool.label}>
+				<button
+					type="button"
+					class="icon-btn"
+					aria-label={tool.label}
+					onclick={() => handleTool(tool)}
+				>
+					<Icon name={tool.icon} size={16} />
+				</button>
+			</Tooltip>
 		{/each}
 		{#if toolbarEnd}
 			<div class="toolbar-end">
@@ -76,7 +103,7 @@
 	</div>
 
 	<div
-		bind:this={editor}
+		use:hydrateEditor={html}
 		contenteditable="true"
 		role="textbox"
 		aria-multiline="true"

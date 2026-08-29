@@ -8,8 +8,16 @@ import {
 } from '$lib/server/auth';
 import { DOMAIN_COOKIE, UI_THEME_COOKIE, UI_THEME_COOKIE_MAX_AGE } from '$lib/server/constants';
 import { listAddressesForUser, listDomains } from '$lib/server/domains';
+import { getUserLocale } from '$lib/server/locale';
 import { getUserUiTheme } from '$lib/server/ui-theme';
 import { BUILTIN_THEME_IDS, DEFAULT_UI_THEME, parseThemeId } from '$lib/ui-theme/ids';
+import {
+	DEFAULT_LOCALE,
+	LOCALE_COOKIE,
+	LOCALE_COOKIE_MAX_AGE,
+	localeFromAcceptLanguage,
+	matchLocale
+} from '$lib/i18n/locales';
 
 const PUBLIC_PREFIXES = [
 	'/login',
@@ -37,9 +45,13 @@ function render(
 	resolve: Parameters<Handle>[0]['resolve']
 ): ReturnType<Handle> {
 	const uiTheme = event.locals.uiTheme || DEFAULT_UI_THEME;
+	const locale = event.locals.locale || DEFAULT_LOCALE;
 	return resolve(event, {
 		transformPageChunk: ({ html }) =>
-			html.replace('<html lang="en">', `<html lang="en" data-ui-theme="${uiTheme}">`)
+			html.replace(
+				'<html lang="en">',
+				`<html lang="${locale}" data-ui-theme="${uiTheme}">`
+			)
 	});
 }
 
@@ -55,6 +67,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.activeDomainId = null;
 	event.locals.currentSessionId = null;
 	event.locals.uiTheme = parseThemeId(event.cookies.get(UI_THEME_COOKIE), BUILTIN_THEME_IDS);
+	event.locals.locale =
+		matchLocale(event.cookies.get(LOCALE_COOKIE)) ??
+		localeFromAcceptLanguage(event.request.headers.get('accept-language'));
 
 	if (db) {
 		// Browser sessions take precedence so an incidental or stale Authorization
@@ -129,12 +144,24 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (db && event.locals.user) {
-		const stored = await getUserUiTheme(db, event.locals.user.id);
-		event.locals.uiTheme = stored;
-		if (event.cookies.get(UI_THEME_COOKIE) !== stored) {
-			event.cookies.set(UI_THEME_COOKIE, stored, {
+		const [storedTheme, storedLocale] = await Promise.all([
+			getUserUiTheme(db, event.locals.user.id),
+			getUserLocale(db, event.locals.user.id)
+		]);
+		event.locals.uiTheme = storedTheme;
+		event.locals.locale = storedLocale;
+		if (event.cookies.get(UI_THEME_COOKIE) !== storedTheme) {
+			event.cookies.set(UI_THEME_COOKIE, storedTheme, {
 				path: '/',
 				maxAge: UI_THEME_COOKIE_MAX_AGE,
+				sameSite: 'lax',
+				httpOnly: false
+			});
+		}
+		if (event.cookies.get(LOCALE_COOKIE) !== storedLocale) {
+			event.cookies.set(LOCALE_COOKIE, storedLocale, {
+				path: '/',
+				maxAge: LOCALE_COOKIE_MAX_AGE,
 				sameSite: 'lax',
 				httpOnly: false
 			});
@@ -192,5 +219,5 @@ export const handle: Handle = async ({ event, resolve }) => {
 		throw redirect(303, '/inbox');
 	}
 
-	return resolve(event);
+	return render(event, resolve);
 };

@@ -5,6 +5,8 @@
 	import EmailBody from './EmailBody.svelte';
 	import { formatFullDate, formatRelativeDate } from '$lib/utils/date';
 	import { splitQuotedText } from '$lib/utils/quotes';
+	import { page } from '$app/stores';
+	import { t } from '$lib/i18n';
 	import type { ThreadMessage } from '$lib/types';
 
 	let {
@@ -21,7 +23,7 @@
 	} = $props();
 
 	const outbound = $derived(message.direction === 'outbound');
-	const sender = $derived(outbound ? 'me' : message.from_name || message.from_addr);
+	const sender = $derived(outbound ? t('common.me') : message.from_name || message.from_addr);
 	const senderEmail = $derived(emailOf(message.from_addr));
 	const initial = $derived(((message.from_name || message.from_addr)[0] ?? '?').toUpperCase());
 
@@ -85,7 +87,7 @@
 <article class="message" class:collapsed={!expanded}>
 	{#if expanded}
 		<header class="head">
-			<div class="avatar" class:self={outbound}>{outbound ? 'me' : initial}</div>
+			<div class="avatar" class:self={outbound}>{outbound ? t('common.me') : initial}</div>
 
 			<div class="who">
 				<p class="name">
@@ -93,7 +95,7 @@
 						class="sender"
 						role="button"
 						tabindex="0"
-						title={copied ? 'Copied' : `Copy ${senderEmail}`}
+						title={copied ? t('common.copied') : t('thread.copyEmail', { email: senderEmail })}
 						onclick={copySender}
 						onkeydown={onSenderKeydown}
 					>
@@ -103,19 +105,21 @@
 						type="button"
 						class="copy-sender"
 						class:copied
-						aria-label={copied ? 'Copied' : `Copy ${senderEmail}`}
+						aria-label={copied ? t('common.copied') : t('thread.copyEmail', { email: senderEmail })}
 						onclick={copySender}
 					>
 						<Icon name={copied ? 'check-line' : 'file-copy-line'} size={13} />
 					</button>
-					<button type="button" class="direction" onclick={onToggle}>to {message.to_addr}</button>
+					<button type="button" class="direction" onclick={onToggle}>{t('thread.toLabel', { address: message.to_addr })}</button>
 				</p>
 				<button type="button" class="when" onclick={onToggle}>
-					{formatFullDate(message.created_at)}
+					{formatFullDate(message.created_at, $page.data.locale)}
 				</button>
 				{#if !outbound}
 					<p class="when">
-						Received at {message.to_addr}{receivedLabel ? ` (${receivedLabel})` : ''}
+						{receivedLabel
+							? t('thread.receivedAtNamed', { address: message.to_addr, label: receivedLabel })
+							: t('thread.receivedAt', { address: message.to_addr })}
 					</p>
 				{/if}
 			</div>
@@ -135,7 +139,7 @@
 						type="button"
 						class="quote-toggle"
 						aria-expanded={quoteOpen}
-						aria-label={quoteOpen ? 'Hide quoted text' : 'Show quoted text'}
+						aria-label={quoteOpen ? t('thread.hideQuoted') : t('thread.showQuoted')}
 						onclick={() => (quoteOpen = !quoteOpen)}
 					>
 						···
@@ -145,7 +149,7 @@
 					{/if}
 				{/if}
 			{:else}
-				<p class="empty">Empty message</p>
+				<p class="empty">{t('thread.emptyMessage')}</p>
 			{/if}
 		</div>
 
@@ -154,18 +158,18 @@
 		{#if message.status === 'bounced' || message.status === 'failed'}
 			<p class="failure">
 				<Icon name="error-warning-line" size={13} />
-				{message.status_detail ?? "This message didn't reach the recipient."}
+				{message.status_detail ?? t('thread.didNotReach')}
 			</p>
 		{/if}
 	{:else}
 		<button type="button" class="summary" onclick={onToggle}>
-			<span class="avatar small" class:self={outbound}>{outbound ? 'me' : initial}</span>
+			<span class="avatar small" class:self={outbound}>{outbound ? t('common.me') : initial}</span>
 			<span class="name">{sender}</span>
 			<span class="snippet">{snippet}</span>
 			{#if message.attachments.length > 0}
 				<Icon name="attachment-2" size={13} />
 			{/if}
-			<span class="when">{formatRelativeDate(message.created_at)}</span>
+			<span class="when">{formatRelativeDate(message.created_at, $page.data.locale)}</span>
 		</button>
 	{/if}
 </article>

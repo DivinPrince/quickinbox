@@ -13,6 +13,7 @@
 		receivingHint
 	} from '$lib/provider-copy';
 	import { APP_NAME } from '$lib/constants';
+	import { t } from '$lib/i18n';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -34,7 +35,7 @@
 
 	function goToDetails() {
 		if (!chosen) {
-			error = 'Pick a domain to continue';
+			error = t('setup.pickDomain');
 			return;
 		}
 		error = '';
@@ -46,11 +47,11 @@
 		error = '';
 
 		if (password.length < 8) {
-			error = 'Password must be at least 8 characters';
+			error = t('setup.passwordMin');
 			return;
 		}
 		if (password !== confirm) {
-			error = 'Passwords do not match';
+			error = t('setup.passwordMismatch');
 			return;
 		}
 
@@ -68,13 +69,13 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? 'Setup failed';
+				error = body.error ?? t('setup.failed');
 				return;
 			}
 			// The endpoint signs us in, so go straight to the inbox.
 			window.location.href = body.signedIn ? '/inbox' : '/login';
 		} catch {
-			error = 'Network error';
+			error = t('common.networkError');
 		} finally {
 			submitting = false;
 		}
@@ -82,19 +83,19 @@
 </script>
 
 <svelte:head>
-	<title>Get started — {APP_NAME}</title>
+	<title>{t('setup.title', { app: APP_NAME })}</title>
 </svelte:head>
 
 <WizardShell
-	title={step === 1 ? 'Choose your domain' : 'Create your account'}
+	title={step === 1 ? t('setup.chooseDomain') : t('setup.createAccount')}
 	subtitle={step === 1
 		? domainPickerSubtitle(data.providerKind)
-		: `You'll send and receive on ${chosen?.name}.`}
-	steps={['Domain', 'Account']}
+		: t('setup.sendReceiveOn', { domain: chosen?.name ?? '' })}
+	steps={[t('setup.stepDomain'), t('setup.stepAccount')]}
 	current={step}
 	partner={step === 1}
 	partnerKind={data.providerKind}
-	partnerCaption={`${APP_NAME} + ${providerName(data.providerKind)}`}
+	partnerCaption={t('setup.partnerCaption', { app: APP_NAME, provider: providerName(data.providerKind) })}
 >
 	{#if step === 1}
 		{#if !data.providerConfigured}
@@ -110,7 +111,7 @@
 			<div class="surface-lg notice notice-warn">
 				<Icon name="error-warning-line" size={18} />
 				<div>
-					<p class="notice-title">Couldn't load your domains</p>
+					<p class="notice-title">{t('setup.couldNotLoadDomains')}</p>
 					<p class="notice-body">{data.loadError}</p>
 				</div>
 			</div>
@@ -130,12 +131,12 @@
 			{#if error}<p class="error">{error}</p>{/if}
 
 			<button type="button" class="btn-primary w-full py-2.5 mt-4" onclick={goToDetails}>
-				Continue{chosen ? ` with ${chosen.name}` : ''}
+				{chosen ? t('setup.continueWith', { name: chosen.name }) : t('common.continue')}
 			</button>
 		{/if}
 	{:else}
 		<form class="surface-lg details-card" onsubmit={finish}>
-			<label class="field-title" for="name">Your name</label>
+			<label class="field-title" for="name">{t('setup.yourName')}</label>
 			<input
 				id="name"
 				type="text"
@@ -151,16 +152,17 @@
 					domainId={chosen?.id ?? ''}
 					domains={chosen ? [chosen] : []}
 					placeholder={suggestion || 'you'}
-					label="Your address"
+					label={t('setup.yourAddress')}
 				/>
 			</div>
 
 			<p class="preview">
-				This is your inbox <em>and</em> your login —
-				<strong>{(cleanLocal || suggestion || 'you') + '@' + (chosen?.name ?? '')}</strong>
+				{t('setup.inboxAndLogin', {
+					address: (cleanLocal || suggestion || 'you') + '@' + (chosen?.name ?? '')
+				})}
 			</p>
 
-			<label class="field-title mt-4" for="password">Password</label>
+			<label class="field-title mt-4" for="password">{t('auth.password')}</label>
 			<input
 				id="password"
 				type="password"
@@ -171,7 +173,7 @@
 				class="text-input"
 			/>
 
-			<label class="field-title mt-4" for="confirm">Confirm password</label>
+			<label class="field-title mt-4" for="confirm">{t('setup.confirmPassword')}</label>
 			<input
 				id="confirm"
 				type="password"
@@ -193,10 +195,10 @@
 
 			<div class="actions">
 				<button type="button" class="btn-ghost" onclick={() => (step = 1)}>
-					<Icon name="arrow-left-line" size={16} /> Back
+					<Icon name="arrow-left-line" size={16} /> {t('common.back')}
 				</button>
 				<button type="submit" class="btn-primary flex-1 py-2.5" disabled={submitting}>
-					{submitting ? 'Setting up…' : 'Create account'}
+					{submitting ? t('setup.settingUp') : t('setup.createAccountButton')}
 				</button>
 			</div>
 		</form>

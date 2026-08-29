@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
+
 	let {
 		localPart = $bindable(''),
 		domainId = $bindable(''),
 		domains,
 		placeholder = 'you',
-		label = 'Your address'
+		label = t('setup.yourAddress')
 	}: {
 		localPart: string;
 		domainId: string;
@@ -30,7 +32,7 @@
 		class="local-input"
 	/>
 	<span class="at">@</span>
-	<select bind:value={domainId} class="domain-select" aria-label="Domain">
+	<select bind:value={domainId} class="domain-select" aria-label={t('domains.domain')}>
 		{#each domains as domain (domain.id)}
 			<option value={domain.id}>{domain.name}</option>
 		{/each}

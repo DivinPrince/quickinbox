@@ -264,6 +264,24 @@ The same credentials drive an MCP server for Claude, Cursor, and other agents:
 Tools: `list_threads`, `get_thread`, `search_mail`, `send_message`, `reply`,
 `list_attachments`.
 
+## Internationalization
+
+The UI ships in English, French, Simplified Chinese, and Spanish. Language is stored
+on the account (Settings → Appearance) and in a `qi_locale` cookie — URLs stay the
+same. Email bodies are never translated.
+
+Catalogs live in `messages/`. After editing `messages/en.json`, generate the other
+locales with [General Translation](https://generaltranslation.com):
+
+```bash
+# GT_API_KEY and GT_PROJECT_ID from https://generaltranslation.com/dashboard
+bun run translate
+```
+
+CI does the same on pushes to `main` (and on a manual **CI** workflow run). Set
+repository secrets `GT_API_KEY` and `GT_PROJECT_ID` — never commit them. The
+translate job opens a PR with updated catalogs.
+
 ## How inbound routing works
 
 Both providers accept every address on a connected domain. The app then routes:

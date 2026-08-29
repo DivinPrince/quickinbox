@@ -95,6 +95,8 @@ export const ZERO_ICON_NAMES = [
 	"Phone",
 	"PurpleThickCheck",
 	"Printer",
-	"OldPhone"
+	"OldPhone",
+	"Sun",
+	"Moon"
 ] as const;
 export type ZeroIconName = (typeof ZERO_ICON_NAMES)[number];

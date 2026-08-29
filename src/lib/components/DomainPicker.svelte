@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { t } from '$lib/i18n';
 	import type { AvailableDomain } from '$lib/types';
 
 	let {
@@ -50,10 +51,10 @@
 
 				<span class="domain-caps">
 					<span class="cap" class:cap-on={domain.can_send}>
-						<Icon name="send-plane-line" size={13} /> Send
+						<Icon name="send-plane-line" size={13} /> {t('domains.send')}
 					</span>
 					<span class="cap" class:cap-on={domain.can_receive}>
-						<Icon name="inbox-line" size={13} /> Receive
+						<Icon name="inbox-line" size={13} /> {t('domains.receive')}
 					</span>
 				</span>
 			</button>
@@ -64,8 +65,7 @@
 {#if selected.some((id) => domains.find((d) => d.id === id && !d.can_receive))}
 	<p class="hint">
 		<Icon name="information-line" size={14} />
-		Receiving is off for a selected domain. Enable inbound on it at the mail provider to get
-		mail — sending still works.
+		{t('domains.receivingOffSelected')}
 	</p>
 {/if}
 

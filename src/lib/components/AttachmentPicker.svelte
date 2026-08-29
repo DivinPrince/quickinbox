@@ -2,6 +2,7 @@
 	import Icon from './Icon.svelte';
 	import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL } from '$lib/constants';
 	import type { OutboundAttachmentInput } from '$lib/types';
+	import { t } from '$lib/i18n';
 
 	let {
 		attachments = $bindable([]),
@@ -24,12 +25,12 @@
 
 		for (const file of files) {
 			if (attachments.length >= MAX_ATTACHMENTS_PER_EMAIL) {
-				error = `Max ${MAX_ATTACHMENTS_PER_EMAIL} files`;
+				error = t('compose.maxFiles', { count: MAX_ATTACHMENTS_PER_EMAIL });
 				break;
 			}
 			if (file.size > MAX_ATTACHMENT_BYTES) {
 				const limitMb = MAX_ATTACHMENT_BYTES / (1024 * 1024);
-				error = `"${file.name}" exceeds ${limitMb}MB`;
+				error = t('compose.fileTooLarge', { name: file.name, limit: limitMb });
 				continue;
 			}
 
@@ -69,12 +70,12 @@
 		<button
 			type="button"
 			class="attach-btn"
-			aria-label="Attach"
+			aria-label={t('attach.attach')}
 			onclick={() => input?.click()}
 		>
 			<Icon name="attachment-2" size={16} />
 			{#if mode !== 'button'}
-				<span>Attach</span>
+				<span>{t('attach.attach')}</span>
 			{/if}
 		</button>
 
@@ -92,7 +93,7 @@
 			<span class="attachment-chip">
 				<Icon name="file-3-line" size={14} />
 				<span class="max-w-[140px] truncate">{file.filename}</span>
-				<button type="button" class="chip-remove" aria-label="Remove" onclick={() => remove(index)}>
+				<button type="button" class="chip-remove" aria-label={t('common.remove')} onclick={() => remove(index)}>
 					<Icon name="close-line" size={14} />
 				</button>
 			</span>

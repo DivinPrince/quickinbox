@@ -2,7 +2,9 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { disablePushForCurrentAccount } from '$lib/push-client';
+	import { t } from '$lib/i18n';
 	import type { ThemeShellProps } from '$lib/ui-theme/types';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	import AccountHeader from './AccountHeader.svelte';
 	import Icon from './icons/Icon.svelte';
 	import CommandPalette from './overlays/CommandPalette.svelte';
@@ -57,48 +59,48 @@
 
 	const mailNav = $derived<{ title: string; items: NavItem[] }[]>([
 		{
-			title: 'Core',
+			title: t('nav.core'),
 			items: [
 				{
 					href: '/inbox',
 					icon: 'Inbox',
-					label: 'Inbox',
+					label: t('nav.inbox'),
 					badge: data.counts.inbox_unread || undefined,
 					shortcut: 'g i'
 				},
 				{
 					href: '/drafts',
 					icon: 'Folder',
-					label: 'Drafts',
+					label: t('nav.drafts'),
 					badge: data.counts.drafts || undefined,
 					shortcut: 'g d'
 				},
-				{ href: '/sent', icon: 'Plane2', label: 'Sent', shortcut: 'g t' }
+				{ href: '/sent', icon: 'Plane2', label: t('nav.sent'), shortcut: 'g t' }
 			]
 		},
 		{
-			title: 'Management',
+			title: t('nav.management'),
 			items: [
 				{
 					href: '/archive',
 					icon: 'Archive',
-					label: 'Archive',
+					label: t('nav.archive'),
 					badge: data.counts.archive || undefined,
 					shortcut: 'g a'
 				},
-				{ href: '/trash', icon: 'Bin', label: 'Bin', badge: data.counts.trash || undefined, shortcut: 'g b' }
+				{ href: '/trash', icon: 'Bin', label: t('nav.bin'), badge: data.counts.trash || undefined, shortcut: 'g b' }
 			]
 		}
 	]);
 
 	const settingsNav = $derived<NavItem[]>([
-		{ href: '/inbox', icon: 'ArrowLeft', label: 'Back' },
-		{ href: '/settings/general', icon: 'SettingsGear', label: 'General', shortcut: 'g s' },
-		{ href: '/settings/appearance', icon: 'Stars', label: 'Appearance' },
-		{ href: '/settings/connections', icon: 'Users', label: 'Connections' },
-		{ href: '/settings/notifications', icon: 'Bell', label: 'Notifications' },
-		{ href: '/settings/shortcuts', icon: 'Tabs', label: 'Shortcuts', shortcut: '?' },
-		...(data.user.is_admin ? [{ href: '/admin', icon: 'SettingsGear', label: 'Admin' }] : [])
+		{ href: '/inbox', icon: 'ArrowLeft', label: t('common.back') },
+		{ href: '/settings/general', icon: 'SettingsGear', label: t('nav.general'), shortcut: 'g s' },
+		{ href: '/settings/appearance', icon: 'Stars', label: t('nav.appearance') },
+		{ href: '/settings/connections', icon: 'Users', label: t('nav.connections') },
+		{ href: '/settings/notifications', icon: 'Bell', label: t('nav.notifications') },
+		{ href: '/settings/shortcuts', icon: 'Tabs', label: t('nav.shortcuts'), shortcut: '?' },
+		...(data.user.is_admin ? [{ href: '/admin', icon: 'SettingsGear', label: t('nav.admin') }] : [])
 	]);
 
 	function isActive(href: string): boolean {
@@ -241,7 +243,7 @@
 	data-mobile-open={mobileOpen ? 'true' : 'false'}
 >
 	{#if mobileOpen}
-		<button type="button" class="z-mobile-scrim" aria-label="Close sidebar" onclick={() => (mobileOpen = false)}
+		<button type="button" class="z-mobile-scrim" aria-label={t('nav.closeSidebar')} onclick={() => (mobileOpen = false)}
 		></button>
 	{/if}
 
@@ -249,16 +251,18 @@
 		<AccountHeader {data} collapsed={settings || mobileOpen ? false : collapsed} onLogout={logout} />
 
 		{#if !settings}
-			<button type="button" class="z-compose" onclick={openCompose}>
-				{#if collapsed && !mobileOpen}
-					<Icon name="PencilCompose" size={14} />
-				{:else}
-					<span class="z-compose-label">
+			<Tooltip text={t('nav.compose')} shortcut="C" side="right" enabled={collapsed && !mobileOpen} stretch>
+				<button type="button" class="z-compose" aria-label={t('nav.compose')} onclick={openCompose}>
+					{#if collapsed && !mobileOpen}
 						<Icon name="PencilCompose" size={14} />
-						New email
-					</span>
-				{/if}
-			</button>
+					{:else}
+						<span class="z-compose-label">
+							<Icon name="PencilCompose" size={14} />
+							{t('nav.compose')}
+						</span>
+					{/if}
+				</button>
+			</Tooltip>
 		{/if}
 
 		<nav class="z-nav">
@@ -274,13 +278,26 @@
 					<div class="z-nav-section">
 						{#if !collapsed || mobileOpen}<div class="z-nav-title">{section.title}</div>{/if}
 						{#each section.items as item (item.href)}
-							<a href={item.href} class="z-nav-link" class:active={isActive(item.href)} title={item.label}>
-								<Icon name={item.icon} size={16} />
-								{#if !collapsed || mobileOpen}
-									<span>{item.label}</span>
-									{#if item.badge}<span class="z-nav-badge">{item.badge}</span>{/if}
-								{/if}
-							</a>
+							<Tooltip
+								text={item.label}
+								shortcut={item.shortcut}
+								side="right"
+								enabled={collapsed && !mobileOpen}
+								stretch
+							>
+								<a
+									href={item.href}
+									class="z-nav-link"
+									class:active={isActive(item.href)}
+									aria-label={collapsed && !mobileOpen ? item.label : undefined}
+								>
+									<Icon name={item.icon} size={16} />
+									{#if !collapsed || mobileOpen}
+										<span>{item.label}</span>
+										{#if item.badge}<span class="z-nav-badge">{item.badge}</span>{/if}
+									{/if}
+								</a>
+							</Tooltip>
 						{/each}
 					</div>
 				{/each}
@@ -289,10 +306,17 @@
 
 		<div class="z-sidebar-foot">
 			{#if !settings}
-				<a href="/settings/general" class="z-nav-link" class:active={isActive('/settings')}>
-					<Icon name="SettingsGear" size={16} />
-					{#if !collapsed || mobileOpen}<span>Settings</span>{/if}
-				</a>
+				<Tooltip text={t('nav.settings')} side="right" enabled={collapsed && !mobileOpen} stretch>
+					<a
+						href="/settings/general"
+						class="z-nav-link"
+						class:active={isActive('/settings')}
+						aria-label={collapsed && !mobileOpen ? t('nav.settings') : undefined}
+					>
+						<Icon name="SettingsGear" size={16} />
+						{#if !collapsed || mobileOpen}<span>{t('nav.settings')}</span>{/if}
+					</a>
+				</Tooltip>
 			{/if}
 		</div>
 	</aside>
@@ -301,9 +325,11 @@
 		{#if settings}
 			<div class="z-settings-panel">
 				<div class="z-settings-bar">
-					<button type="button" class="z-icon-btn z-settings-toggle" aria-label="Open sidebar" onclick={toggleSidebar}>
-						<Icon name="PanelLeftOpen" size={16} />
-					</button>
+					<Tooltip text={t('nav.openSidebar')}>
+						<button type="button" class="z-icon-btn z-settings-toggle" aria-label={t('nav.openSidebar')} onclick={toggleSidebar}>
+							<Icon name="PanelLeftOpen" size={16} />
+						</button>
+					</Tooltip>
 				</div>
 				<div class="z-settings-scroll">
 					{@render children()}
@@ -315,10 +341,18 @@
 	</div>
 
 	<nav class="z-mobile-nav">
-		<a href="/inbox" aria-label="Inbox"><Icon name="Inbox" size={18} /></a>
-		<button type="button" aria-label="Compose" onclick={openCompose}><Icon name="PencilCompose" size={16} /></button>
-		<a href="/sent" aria-label="Sent"><Icon name="Plane2" size={18} /></a>
-		<a href="/settings/general" aria-label="Settings"><Icon name="SettingsGear" size={18} /></a>
+		<Tooltip text={t('nav.inbox')} side="top">
+			<a href="/inbox" aria-label={t('nav.inbox')}><Icon name="Inbox" size={18} /></a>
+		</Tooltip>
+		<Tooltip text={t('nav.compose')} side="top">
+			<button type="button" aria-label={t('nav.compose')} onclick={openCompose}><Icon name="PencilCompose" size={16} /></button>
+		</Tooltip>
+		<Tooltip text={t('nav.sent')} side="top">
+			<a href="/sent" aria-label={t('nav.sent')}><Icon name="Plane2" size={18} /></a>
+		</Tooltip>
+		<Tooltip text={t('nav.settings')} side="top">
+			<a href="/settings/general" aria-label={t('nav.settings')}><Icon name="SettingsGear" size={18} /></a>
+		</Tooltip>
 	</nav>
 </div>
 

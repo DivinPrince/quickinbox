@@ -1,4 +1,6 @@
 import type { MailboxView } from '$lib/types';
+import { DEFAULT_LOCALE } from '$lib/i18n/locales';
+import { translate } from '$lib/i18n/translate';
 
 export const FOLDER_PATH: Record<MailboxView, string> = {
 	inbox: '/inbox',
@@ -8,6 +10,27 @@ export const FOLDER_PATH: Record<MailboxView, string> = {
 	sent: '/sent',
 	trash: '/trash'
 };
+
+export function folderTitle(view: MailboxView, locale: string = DEFAULT_LOCALE): string {
+	switch (view) {
+		case 'inbox':
+			return translate(locale, 'nav.inbox');
+		case 'archive':
+			return translate(locale, 'nav.archive');
+		case 'starred':
+			return translate(locale, 'nav.starred');
+		case 'drafts':
+			return translate(locale, 'nav.drafts');
+		case 'sent':
+			return translate(locale, 'nav.sent');
+		case 'trash':
+			return translate(locale, 'nav.bin');
+		default: {
+			const _never: never = view;
+			return _never;
+		}
+	}
+}
 
 export const FOLDER_TITLE: Record<MailboxView, string> = {
 	inbox: 'Inbox',
@@ -48,15 +71,16 @@ export function mailboxViewForEmail(email: {
 
 export function participantName(
 	participants: { label: string; address: string; self: boolean }[],
-	view: MailboxView
+	view: MailboxView,
+	locale: string = DEFAULT_LOCALE
 ): string {
 	if (view === 'sent' || view === 'drafts') {
 		const others = participants.filter((person) => !person.self);
-		if (others.length === 0) return 'me';
+		if (others.length === 0) return translate(locale, 'common.me');
 		return others.map((person) => person.label || person.address).join(', ');
 	}
 	const first = participants.find((person) => !person.self) ?? participants[0];
-	return first?.label || first?.address || 'Unknown';
+	return first?.label || first?.address || translate(locale, 'common.unknown');
 }
 
 export function initials(value: string): string {

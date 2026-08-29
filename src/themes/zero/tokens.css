@@ -93,3 +93,8 @@
 	background: var(--z-sidebar);
 	color: var(--z-fg);
 }
+
+html[lang='zh-CN'][data-ui-theme='zero'] {
+	--font-geist-sans: 'Geist Variable', 'Geist', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC',
+		'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}

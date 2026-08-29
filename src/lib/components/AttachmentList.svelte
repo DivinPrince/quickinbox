@@ -8,6 +8,8 @@
 		isPreviewableInline
 	} from '$lib/utils/attachments';
 	import type { EmailAttachmentMeta } from '$lib/types';
+	import { plural, t } from '$lib/i18n';
+	import { page } from '$app/stores';
 
 	let {
 		emailId,
@@ -25,7 +27,7 @@
 	<section class="attachments" class:compact>
 		<h2 class="attachments-title">
 			<Icon name="attachment-2" size={15} />
-			{attachments.length} {attachments.length === 1 ? 'attachment' : 'attachments'}
+			{plural($page.data.locale, 'mailbox.attachment', 'mailbox.attachmentsCount', attachments.length)}
 		</h2>
 
 		<div class="attachments-grid">
@@ -53,7 +55,7 @@
 								class="action"
 								download={file.filename}
 							>
-								Download
+								{t('mailbox.download')}
 							</a>
 						</figcaption>
 					</figure>
@@ -75,7 +77,7 @@
 									class="action"
 								>
 									<Icon name="external-link-line" size={14} />
-									Open
+									{t('common.open')}
 								</a>
 							{/if}
 							<a
@@ -84,7 +86,7 @@
 								download={file.filename}
 							>
 								<Icon name="download-2-line" size={14} />
-								Download
+								{t('mailbox.download')}
 							</a>
 						</div>
 					</div>
