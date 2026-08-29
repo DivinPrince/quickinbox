@@ -12,7 +12,7 @@
 	type ResultItem = { kind: 'thread'; thread: ThreadSummary; label: string };
 
 	const nav = $derived<NavItem[]>([
-		{ kind: 'nav', href: '/inbox?compose=1', icon: 'PencilCompose', label: t('nav.newEmail') },
+		{ kind: 'nav', href: '/inbox?compose=1', icon: 'PencilCompose', label: t('nav.compose') },
 		{ kind: 'nav', href: '/inbox', icon: 'Inbox', label: t('nav.inbox') },
 		{ kind: 'nav', href: '/drafts', icon: 'Folder', label: t('nav.drafts') },
 		{ kind: 'nav', href: '/sent', icon: 'Plane2', label: t('nav.sent') },

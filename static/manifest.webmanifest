@@ -40,7 +40,7 @@
 			"icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
 		},
 		{
-			"name": "New message",
+			"name": "Compose",
 			"short_name": "Compose",
 			"url": "/compose",
 			"icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]

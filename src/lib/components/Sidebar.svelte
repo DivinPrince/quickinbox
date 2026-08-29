@@ -74,9 +74,9 @@
 		</a>
 	</div>
 
-	<a href="/compose" class="new-message" title={t('nav.newMessage')}>
+	<a href="/compose" class="new-message" title={t('nav.compose')} aria-label={t('nav.compose')}>
 		<Icon name="pencil-line" size={collapsed ? 18 : 16} />
-		{#if !collapsed}<span>{t('nav.newMessage')}</span>{/if}
+		{#if !collapsed}<span>{t('nav.compose')}</span>{/if}
 	</a>
 
 	<nav class="nav">

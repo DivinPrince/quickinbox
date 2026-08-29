@@ -111,7 +111,7 @@
 	href="/compose"
 	class="compose-fab"
 	class:hidden={moreOpen || !showFab}
-	aria-label={t('nav.newMessage')}
+	aria-label={t('nav.compose')}
 	onclick={() => haptic(8)}
 >
 	<Icon name="pencil-fill" size={22} />

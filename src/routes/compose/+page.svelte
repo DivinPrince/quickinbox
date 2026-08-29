@@ -151,7 +151,7 @@
 			<Icon name="close-line" size={22} />
 		</button>
 		<div class="compose-heading">
-			<h1 class="page-title">{draftId ? t('compose.draft') : t('nav.newMessage')}</h1>
+			<h1 class="page-title">{draftId ? t('compose.draft') : t('nav.compose')}</h1>
 			{#if savedAt}<span class="saved">{t('common.savedAt', { time: savedAt })}</span>{/if}
 		</div>
 		<button type="submit" class="btn-primary" disabled={sending}>
@@ -161,7 +161,7 @@
 
 	<header class="compose-header">
 		<div class="compose-heading">
-			<h1 class="page-title">{draftId ? t('compose.draft') : t('nav.newMessage')}</h1>
+			<h1 class="page-title">{draftId ? t('compose.draft') : t('nav.compose')}</h1>
 			{#if savedAt}<span class="saved">{t('common.savedAt', { time: savedAt })}</span>{/if}
 		</div>
 

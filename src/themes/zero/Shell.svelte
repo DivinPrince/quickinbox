@@ -251,14 +251,14 @@
 		<AccountHeader {data} collapsed={settings || mobileOpen ? false : collapsed} onLogout={logout} />
 
 		{#if !settings}
-			<Tooltip text={t('nav.newEmail')} shortcut="C" side="right" enabled={collapsed && !mobileOpen} stretch>
-				<button type="button" class="z-compose" aria-label={t('nav.newEmail')} onclick={openCompose}>
+			<Tooltip text={t('nav.compose')} shortcut="C" side="right" enabled={collapsed && !mobileOpen} stretch>
+				<button type="button" class="z-compose" aria-label={t('nav.compose')} onclick={openCompose}>
 					{#if collapsed && !mobileOpen}
 						<Icon name="PencilCompose" size={14} />
 					{:else}
 						<span class="z-compose-label">
 							<Icon name="PencilCompose" size={14} />
-							{t('nav.newEmail')}
+							{t('nav.compose')}
 						</span>
 					{/if}
 				</button>
