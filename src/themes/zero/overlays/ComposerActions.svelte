@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL } from '$lib/constants';
+	import AttachmentIcon from '$lib/components/Icon.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import type { OutboundAttachmentInput } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
@@ -79,8 +80,8 @@
 		</span>
 	</button>
 	<button type="button" class="z-add" onclick={() => input?.click()}>
-		<Icon name="Plus" size={12} />
-		<span>{t('common.add')}</span>
+		<AttachmentIcon name="attachment-2" size={12} />
+		<span>{t('attach.attach')}</span>
 	</button>
 	<input
 		bind:this={input}
