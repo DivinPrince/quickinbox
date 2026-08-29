@@ -74,6 +74,15 @@ describe('API key access', () => {
 			}),
 			{ ok: true }
 		);
+		assert.deepEqual(
+			authorizeApiRequest({
+				pathname: '/api/drafts/abc',
+				method: 'GET',
+				authMethod: 'api_token',
+				scopes: ['mail:read']
+			}),
+			{ ok: true }
+		);
 	});
 
 	test('admin routes stay off mail keys', () => {

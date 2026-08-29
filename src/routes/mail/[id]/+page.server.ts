@@ -1,9 +1,10 @@
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getEmailForUser, listThreadMessages, markThreadRead } from '$lib/server/mail-store';
 import { resolveReplyFromAddress } from '$lib/server/outbox';
 import { displaySubject } from '$lib/server/threads';
 import { listAddressesForUser } from '$lib/server/domains';
+import { folderPath, mailboxViewForEmail } from '$lib/mail/folders';
 
 export const load: PageServerLoad = async ({ params, locals, platform }) => {
 	if (!locals.user || !platform?.env.DB) {
@@ -13,6 +14,10 @@ export const load: PageServerLoad = async ({ params, locals, platform }) => {
 	const email = await getEmailForUser(platform.env.DB, locals.user.id, params.id);
 	if (!email) {
 		throw error(404, 'Email not found');
+	}
+
+	if (locals.uiTheme !== 'classic') {
+		throw redirect(303, `${folderPath(mailboxViewForEmail(email))}?thread=${encodeURIComponent(email.id)}`);
 	}
 
 	// Opening any message opens its whole conversation.

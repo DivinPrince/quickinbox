@@ -135,6 +135,17 @@
 					<span class="sheet-count">{counts.drafts}</span>
 				{/if}
 			</a>
+			<a
+				href="/inbox?view=archive"
+				class="sheet-link"
+				class:active={$page.url.pathname === '/archive' || $page.url.searchParams.get('view') === 'archive'}
+			>
+				<Icon name="archive-line" size={20} />
+				<span>Archive</span>
+				{#if counts.archive}
+					<span class="sheet-count">{counts.archive}</span>
+				{/if}
+			</a>
 			<a href="/trash" class="sheet-link" class:active={$page.url.pathname === '/trash'}>
 				<Icon name="delete-bin-line" size={20} />
 				<span>Trash</span>

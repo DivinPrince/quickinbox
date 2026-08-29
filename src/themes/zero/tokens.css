@@ -1,0 +1,95 @@
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
+[data-ui-theme='zero'] {
+	--font-geist-sans: 'Geist Variable', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+		system-ui, sans-serif;
+	--font-geist-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, 'SF Mono',
+		Consolas, 'Liberation Mono', Menlo, monospace;
+	--font-sans: var(--font-geist-sans);
+	--radius: 0.5rem;
+	--darkBackground: #141414;
+	--lightBackground: #ffffff;
+	--offsetDark: #0a0a0a;
+	--offsetLight: #f5f5f5;
+	--panelDark: #1a1a1a;
+	--panelLight: #ffffff;
+	--iconDark: #898989;
+	--iconLight: #6d6d6d;
+	--logout: #d93036;
+	--mutedText: #8c8c8c;
+	--icon-color: var(--iconLight);
+	--z-compose: var(--color-accent, #90ac9a);
+	--z-compose-hover: var(--color-accent-hover, #7f9c89);
+	--z-primary: var(--z-compose);
+	--z-primary-hover: var(--z-compose-hover);
+	--z-on-primary: var(--color-on-accent, #14231a);
+	--z-send: var(--z-compose);
+	--z-send-hover: var(--z-compose-hover);
+	--z-send-fg: var(--z-on-primary);
+	--mainBlue: var(--z-compose);
+	--skyBlue: var(--z-compose);
+	--composeBlue: var(--z-compose);
+	--z-bg: #ffffff;
+	--z-fg: hsl(240 10% 3.9%);
+	--z-sidebar: hsl(0 0% 98%);
+	--z-sidebar-fg: hsl(240 5.3% 26.1%);
+	--z-panel: var(--panelLight);
+	--z-border: #e7e7e7;
+	--z-muted: hsl(240 3.8% 46.1%);
+	--z-hover: var(--offsetLight);
+	--z-chip: #ffffff;
+	--z-chip-border: hsl(240 5.9% 90%);
+	--z-toolbar: #ffffff;
+	--z-nav-active: color-mix(in srgb, var(--z-fg) 6%, transparent);
+	color-scheme: light;
+	font-family: var(--font-geist-sans);
+	background: var(--z-sidebar);
+	--color-bg: var(--z-sidebar);
+	--color-surface: var(--z-panel);
+	--color-surface-muted: var(--offsetLight);
+	--color-surface-hover: #ebebeb;
+	--color-text: var(--z-fg);
+	--color-text-secondary: var(--z-muted);
+	--color-muted: var(--z-muted);
+	--color-line: var(--z-border);
+	--color-focus-line: var(--color-accent, #90ac9a);
+	--color-focus-halo: var(--color-accent-soft, rgba(144, 172, 154, 0.18));
+}
+
+[data-ui-theme='zero'][data-theme='dark'] {
+	--icon-color: var(--iconDark);
+	--z-bg: #141414;
+	--z-fg: hsl(0 0% 98%);
+	--z-sidebar: #141414;
+	--z-sidebar-fg: hsl(240 4.8% 96.9%);
+	--z-panel: var(--panelDark);
+	--z-border: #252525;
+	--z-muted: #898989;
+	--z-hover: rgba(255, 255, 255, 0.04);
+	--z-chip: #313131;
+	--z-chip-border: #404040;
+	--z-toolbar: #313131;
+	--z-nav-active: #202020;
+	--z-compose-hover: var(--color-accent-hover, #a4bfad);
+	--z-on-primary: var(--color-on-accent, #10201a);
+	--z-send-hover: var(--z-compose-hover);
+	--z-send-fg: var(--z-on-primary);
+	color-scheme: dark;
+	background: var(--z-sidebar);
+	--color-bg: var(--z-sidebar);
+	--color-surface: var(--z-panel);
+	--color-surface-muted: #202020;
+	--color-surface-hover: #2a2a2a;
+	--color-text: var(--z-fg);
+	--color-text-secondary: var(--z-muted);
+	--color-muted: var(--z-muted);
+	--color-line: var(--z-border);
+	--color-scrim: rgba(0, 0, 0, 0.55);
+}
+
+[data-ui-theme='zero'] body {
+	font-family: var(--font-geist-sans);
+	background: var(--z-sidebar);
+	color: var(--z-fg);
+}
