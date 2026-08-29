@@ -13,15 +13,18 @@ while ((match = re.exec(src))) {
 	const name = match[1];
 	let svg = match[2]
 		.replaceAll('className={className}', 'class={className}')
-		.replaceAll('className={className}', 'class={className}')
+		.replaceAll('className=', 'class=')
 		.replaceAll('fillRule=', 'fill-rule=')
 		.replaceAll('clipRule=', 'clip-rule=')
+		.replaceAll('clipPath=', 'clip-path=')
 		.replaceAll('strokeWidth=', 'stroke-width=')
 		.replaceAll('strokeLinecap=', 'stroke-linecap=')
 		.replaceAll('strokeLinejoin=', 'stroke-linejoin=')
 		.replaceAll('fillOpacity=', 'fill-opacity=')
 		.replaceAll('strokeOpacity=', 'stroke-opacity=')
 		.replaceAll('colorInterpolationFilters=', 'color-interpolation-filters=')
+		.replace(/style=\{\{\s*stopColor:\s*'([^']+)'\s*\}\}/g, 'stop-color="$1"')
+		.replace(/\s*mask-type="[^"]*"/g, '')
 		.replaceAll('xmlns="http://www.w3.org/2000/svg"', 'xmlns="http://www.w3.org/2000/svg"');
 	icons.push({ name, svg });
 }

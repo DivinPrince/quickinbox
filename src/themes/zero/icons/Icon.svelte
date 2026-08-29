@@ -83,8 +83,8 @@
       y2="1.9982"
       gradientTransform="matrix(1 0 0 -1 0 1705.3334)"
     >
-      <stop offset="0" style={{ stopColor: '#35B8F1' }} />
-      <stop offset="1" style={{ stopColor: '#28A8EA' }} />
+      <stop offset="0" stop-color="#35B8F1" />
+      <stop offset="1" stop-color="#28A8EA" />
     </linearGradient>
     <path
       fill="url(#SVGID_1_)"
@@ -136,9 +136,9 @@
       y2="324.2592"
       gradientTransform="matrix(1 0 0 -1 0 1705.3334)"
     >
-      <stop offset="0" style={{ stopColor: '#1784D9' }} />
-      <stop offset="0.5" style={{ stopColor: '#107AD5' }} />
-      <stop offset="1" style={{ stopColor: '#0A63C9' }} />
+      <stop offset="0" stop-color="#1784D9" />
+      <stop offset="0.5" stop-color="#107AD5" />
+      <stop offset="1" stop-color="#0A63C9" />
     </linearGradient>
     <path
       fill="url(#SVGID_2_)"
@@ -294,7 +294,7 @@
     viewBox="0 0 24 24"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
-    className="mr-[8px]"
+    class="mr-[8px]"
   >
     <path
       d="M3.47804 2.4043C3.2133 2.3274 2.92771 2.40193 2.73432 2.5984C2.54093 2.79487 2.47091 3.0816 2.55198 3.3451L4.98426 11.25H13.5C13.9142 11.25 14.25 11.5858 14.25 12C14.25 12.4142 13.9142 12.75 13.5 12.75H4.98427L2.55207 20.6546C2.471 20.9181 2.54102 21.2049 2.73441 21.4013C2.92781 21.5978 3.2134 21.6723 3.47814 21.5954C10.1767 19.6494 16.3974 16.5814 21.9233 12.6087C22.1193 12.4678 22.2355 12.2412 22.2355 11.9998C22.2355 11.7583 22.1193 11.5317 21.9233 11.3908C16.3974 7.41817 10.1767 4.35021 3.47804 2.4043Z"
@@ -937,10 +937,9 @@
     xmlns="http://www.w3.org/2000/svg"
     class={className}
   >
-    <g clipPath="url(#clip0_2827_15426)">
+    <g clip-path="url(#clip0_2827_15426)">
       <mask
         id="mask0_2827_15426"
-        mask-type="luminance"
         maskUnits="userSpaceOnUse"
         x="0"
         y="0"
