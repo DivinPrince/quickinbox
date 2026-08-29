@@ -7,6 +7,7 @@
 		t,
 		type Locale
 	} from '$lib/i18n';
+	import Tooltip from './Tooltip.svelte';
 
 	let {
 		open = $bindable(false),
@@ -66,18 +67,19 @@
 	{/each}
 {:else}
 	<div class="locale-switcher" bind:this={root}>
-		<button
-			type="button"
-			class="locale-trigger"
-			aria-haspopup="listbox"
-			aria-expanded={open}
-			aria-label={t('settings.language')}
-			title={t('settings.language')}
-			disabled={busy}
-			onclick={toggle}
-		>
-			{localeShortLabel(current)}
-		</button>
+		<Tooltip text={t('settings.language')}>
+			<button
+				type="button"
+				class="locale-trigger"
+				aria-haspopup="listbox"
+				aria-expanded={open}
+				aria-label={t('settings.language')}
+				disabled={busy}
+				onclick={toggle}
+			>
+				{localeShortLabel(current)}
+			</button>
+		</Tooltip>
 		{#if open}
 			<div class="locale-menu" role="listbox" aria-label={t('settings.language')}>
 				{#each LOCALE_OPTIONS as option (option.id)}

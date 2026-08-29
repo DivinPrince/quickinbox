@@ -30,7 +30,7 @@
 	let cc = $state(draft?.cc_addr ?? '');
 	let bcc = $state(draft?.bcc_addr ?? '');
 	let subject = $state(draft?.subject ?? '');
-	let html = $state(draft?.body_html ?? '');
+	let html = $state(draft?.body_html || draft?.body_text || '');
 	let attachments = $state<OutboundAttachmentInput[]>([]);
 	let showCopies = $state(Boolean(draft?.cc_addr || draft?.bcc_addr));
 	let error = $state('');

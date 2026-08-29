@@ -71,7 +71,8 @@
 		"addresses": "Adresses",
 		"addAddress": "Ajouter une adresse",
 		"moreAddresses": "Plus d’adresses",
-		"appTheme": "Thème de l’application",
+		"lightMode": "Mode clair",
+		"darkMode": "Mode sombre",
 		"account": "Compte"
 	},
 	"auth": {

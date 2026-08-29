@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import Tooltip from './Tooltip.svelte';
 	import { t } from '$lib/i18n';
 
 	let {
@@ -19,7 +20,24 @@
 		toolbarEnd?: import('svelte').Snippet;
 	} = $props();
 
-	let editor = $state<HTMLDivElement | null>(null);
+	let editor: HTMLDivElement | null = null;
+
+	/** Copy `html` into the live editor without resetting the caret on each keystroke. */
+	function hydrateEditor(node: HTMLDivElement, next: string) {
+		const apply = (value: string) => {
+			if (node.innerHTML !== value) node.innerHTML = value;
+		};
+		apply(next);
+		editor = node;
+		return {
+			update(value: string) {
+				apply(value);
+			},
+			destroy() {
+				if (editor === node) editor = null;
+			}
+		};
+	}
 
 	function exec(command: string, value?: string) {
 		editor?.focus();
@@ -66,15 +84,16 @@
 <div class="editor-shell" class:editor-shell-embedded={embedded} class:editor-shell-fill={fill}>
 	<div class="toolbar">
 		{#each tools as tool (tool.command)}
-			<button
-				type="button"
-				class="icon-btn"
-				title={tool.label}
-				aria-label={tool.label}
-				onclick={() => handleTool(tool)}
-			>
-				<Icon name={tool.icon} size={16} />
-			</button>
+			<Tooltip text={tool.label}>
+				<button
+					type="button"
+					class="icon-btn"
+					aria-label={tool.label}
+					onclick={() => handleTool(tool)}
+				>
+					<Icon name={tool.icon} size={16} />
+				</button>
+			</Tooltip>
 		{/each}
 		{#if toolbarEnd}
 			<div class="toolbar-end">
@@ -84,7 +103,7 @@
 	</div>
 
 	<div
-		bind:this={editor}
+		use:hydrateEditor={html}
 		contenteditable="true"
 		role="textbox"
 		aria-multiline="true"

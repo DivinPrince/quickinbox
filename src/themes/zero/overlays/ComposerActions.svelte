@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL } from '$lib/constants';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	import type { OutboundAttachmentInput } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import { t } from '$lib/i18n';
@@ -97,9 +98,11 @@
 				<span class="z-attach-chip">
 					<Icon name="Paper" size={12} />
 					<span class="z-attach-name">{file.filename}</span>
-					<button type="button" class="z-attach-remove" aria-label={t('common.remove')} onclick={() => remove(index)}>
-						<Icon name="X" size={12} />
-					</button>
+					<Tooltip text={t('common.remove')}>
+						<button type="button" class="z-attach-remove" aria-label={t('common.remove')} onclick={() => remove(index)}>
+							<Icon name="X" size={12} />
+						</button>
+					</Tooltip>
 				</span>
 			{/each}
 		</div>

@@ -433,6 +433,8 @@
 	position: relative;
 	display: flex;
 	align-items: center;
+	justify-content: flex-start;
+	gap: 0.5rem;
 	flex: 1;
 	min-width: 0;
 	height: 2rem;
@@ -447,11 +449,13 @@
 	text-align: left;
 }
 
-[data-ui-theme='zero'] .z-search > span {
-	margin-left: 0.75rem;
+[data-ui-theme='zero'] .z-search-label {
+	flex: 1;
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	text-align: left;
 	padding-right: 5rem;
 }
 
@@ -846,9 +850,8 @@
 	border: none;
 	border-radius: 0.5rem;
 	background: var(--z-chip);
-	color: var(--z-fg);
+	color: var(--icon-color);
 	cursor: pointer;
-	--icon-color: var(--icon-color);
 }
 
 [data-ui-theme='zero'] .z-thread-icon:hover,
@@ -1823,6 +1826,13 @@
 		background: none;
 		border: none;
 		color: var(--z-muted);
+		width: 100%;
+		height: 100%;
+	}
+
+	[data-ui-theme='zero'] .z-mobile-nav :global(.tip-wrap) {
+		flex: 1;
+		height: 100%;
 	}
 
 	[data-ui-theme='zero'] .z-root {
@@ -1840,6 +1850,10 @@
 	[data-ui-theme='zero'] .z-search kbd,
 	[data-ui-theme='zero'] .z-views {
 		display: none;
+	}
+
+	[data-ui-theme='zero'] .z-search-label {
+		padding-right: 0;
 	}
 
 	[data-ui-theme='zero'] .z-root.settings .z-mobile-nav {

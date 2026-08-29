@@ -1604,6 +1604,43 @@
       d="M0.5 3.5C0.5 1.84315 1.84315 0.5 3.5 0.5H4.87163C5.732 0.5 6.48197 1.08556 6.69064 1.92025L7.79644 6.34343C7.97941 7.0753 7.70594 7.84555 7.10242 8.29818L5.8088 9.2684C5.67447 9.36915 5.64527 9.51668 5.683 9.61969C6.81851 12.7195 9.28051 15.1815 12.3803 16.317C12.4833 16.3547 12.6309 16.3255 12.7316 16.1912L13.7018 14.8976C14.1545 14.2941 14.9247 14.0206 15.6566 14.2036L20.0798 15.3094C20.9144 15.518 21.5 16.268 21.5 17.1284V18.5C21.5 20.1569 20.1569 21.5 18.5 21.5H16.25C7.55151 21.5 0.5 14.4485 0.5 5.75V3.5Z"
     />
   </svg>
+{:else if name === 'Sun'}
+	<svg
+		width="24"
+		height="24"
+		viewBox="0 0 24 24"
+		fill="none"
+		xmlns="http://www.w3.org/2000/svg"
+		class={className}
+	>
+		<circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2" />
+		<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 2v2" />
+		<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 20v2" />
+		<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4.93 4.93l1.41 1.41" />
+		<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M17.66 17.66l1.41 1.41" />
+		<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M2 12h2" />
+		<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M20 12h2" />
+		<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4.93 19.07l1.41-1.41" />
+		<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M17.66 6.34l1.41-1.41" />
+	</svg>
+{:else if name === 'Moon'}
+	<svg
+		width="24"
+		height="24"
+		viewBox="0 0 24 24"
+		fill="none"
+		xmlns="http://www.w3.org/2000/svg"
+		class={className}
+	>
+		<path
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"
+		/>
+	</svg>
 {/if}
 </span>
 

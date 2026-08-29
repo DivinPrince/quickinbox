@@ -3,16 +3,17 @@
 	import { invalidateAll } from '$app/navigation';
 	import EmailBody from '$lib/components/EmailBody.svelte';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { formatMailDate, formatMailTime, shouldShowSeparateTime } from '$lib/utils/date';
 	import { attachmentHref } from '$lib/utils/attachments';
 	import { runMailAction } from '$lib/mail/client';
 	import { initials, parseAddressList, type AddressPart } from '$lib/mail/folders';
+	import { t } from '$lib/i18n';
 	import type { MailAddress, MailboxView, OutboundAttachmentInput, ThreadMessage } from '$lib/types';
 	import type { ZeroIconName } from '../icons/names';
 	import Icon from '../icons/Icon.svelte';
 	import ComposerActions from '../overlays/ComposerActions.svelte';
-	import { t } from '$lib/i18n';
 
 	let {
 		id,
@@ -357,9 +358,11 @@
 {:else if thread && latest}
 	<div class="z-thread">
 		<div class="z-thread-bar">
-			<button type="button" class="z-thread-icon" aria-label={t('thread.close')} onclick={onClose}>
-				<Icon name="X" size={14} />
-			</button>
+			<Tooltip text={t('thread.close')}>
+				<button type="button" class="z-thread-icon" aria-label={t('thread.close')} onclick={onClose}>
+					<Icon name="X" size={14} />
+				</button>
+			</Tooltip>
 			<div class="z-thread-bar-right">
 				<button
 					type="button"
@@ -369,40 +372,48 @@
 					<Icon name="Reply" size={14} />
 					<span>{t('thread.replyAll')}</span>
 				</button>
-				<button
-					type="button"
-					class="z-thread-icon"
-					aria-label={starred ? t('mailbox.unstar') : t('mailbox.star')}
-					onclick={toggleStar}
-				>
-					<Icon name="Star2" class={starred ? 'z-star-on' : ''} size={16} />
-				</button>
-				<button
-					type="button"
-					class="z-thread-icon"
-					aria-label={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}
-					onclick={() => act(view === 'archive' ? 'unarchive' : 'archive')}
-				>
-					<Icon name="Archive" size={16} />
-				</button>
-				{#if view !== 'trash'}
-					<button type="button" class="z-thread-trash" aria-label={t('nav.bin')} onclick={() => act('trash')}>
-						<Icon name="Trash" size={16} />
-					</button>
-				{/if}
-				<div class="z-thread-menu">
+				<Tooltip text={starred ? t('mailbox.unstar') : t('mailbox.star')}>
 					<button
 						type="button"
 						class="z-thread-icon"
-						aria-label={t('thread.more')}
-						onclick={(event) => {
-							event.stopPropagation();
-							menuFor = menuFor === 'thread' ? null : 'thread';
-							detailsFor = null;
-						}}
+						aria-label={starred ? t('mailbox.unstar') : t('mailbox.star')}
+						onclick={toggleStar}
 					>
-						<Icon name="ThreeDots" size={12} />
+						<Icon name="Star2" class={starred ? 'z-star-on' : ''} size={16} />
 					</button>
+				</Tooltip>
+				<Tooltip text={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}>
+					<button
+						type="button"
+						class="z-thread-icon"
+						aria-label={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}
+						onclick={() => act(view === 'archive' ? 'unarchive' : 'archive')}
+					>
+						<Icon name="Archive2" size={16} />
+					</button>
+				</Tooltip>
+				{#if view !== 'trash'}
+					<Tooltip text={t('nav.bin')}>
+						<button type="button" class="z-thread-trash" aria-label={t('nav.bin')} onclick={() => act('trash')}>
+							<Icon name="Trash" size={16} />
+						</button>
+					</Tooltip>
+				{/if}
+				<div class="z-thread-menu">
+					<Tooltip text={t('thread.more')}>
+						<button
+							type="button"
+							class="z-thread-icon"
+							aria-label={t('thread.more')}
+							onclick={(event) => {
+								event.stopPropagation();
+								menuFor = menuFor === 'thread' ? null : 'thread';
+								detailsFor = null;
+							}}
+						>
+							<Icon name="ThreeDots" size={12} />
+						</button>
+					</Tooltip>
 					{#if menuFor === 'thread'}
 						<div class="z-pop" role="menu" tabindex="-1" onpointerdown={(event) => event.stopPropagation()}>
 							{#if view === 'archive' || view === 'trash'}
@@ -412,7 +423,7 @@
 								</button>
 							{:else}
 								<button type="button" onclick={() => act('archive')}>
-									<Icon name="Archive" size={14} />
+									<Icon name="Archive2" size={14} />
 									{t('nav.archive')}
 								</button>
 							{/if}
@@ -494,18 +505,20 @@
 									{#if shouldShowSeparateTime(message.created_at)}
 										<time class="z-msg-time">{formatMailTime(message.created_at, $page.data.locale)}</time>
 									{/if}
-									<button
-										type="button"
-										class="z-thread-icon z-msg-more"
-										aria-label={t('thread.messageActions')}
-										onclick={(event) => {
-											event.stopPropagation();
-											menuFor = menuFor === message.id ? null : message.id;
-											detailsFor = null;
-										}}
-									>
-										<Icon name="ThreeDots" size={12} />
-									</button>
+									<Tooltip text={t('thread.messageActions')}>
+										<button
+											type="button"
+											class="z-thread-icon z-msg-more"
+											aria-label={t('thread.messageActions')}
+											onclick={(event) => {
+												event.stopPropagation();
+												menuFor = menuFor === message.id ? null : message.id;
+												detailsFor = null;
+											}}
+										>
+											<Icon name="ThreeDots" size={12} />
+										</button>
+									</Tooltip>
 									{#if menuFor === message.id}
 										<div class="z-pop z-pop-msg" role="menu" tabindex="-1" onpointerdown={(event) => event.stopPropagation()}>
 											<button type="button" onclick={() => startReply('reply', message)}>
@@ -585,14 +598,16 @@
 							<div class="z-composer-row-actions">
 								<button type="button" class="z-composer-link" onclick={() => (showCc = !showCc)}>{t('compose.cc')}</button>
 								<button type="button" class="z-composer-link" onclick={() => (showBcc = !showBcc)}>{t('compose.bcc')}</button>
-								<button
-									type="button"
-									class="z-composer-link"
-									aria-label={t('common.close')}
-									onclick={() => (replyOpen = false)}
-								>
-									<Icon name="X" size={14} />
-								</button>
+								<Tooltip text={t('common.close')}>
+									<button
+										type="button"
+										class="z-composer-link"
+										aria-label={t('common.close')}
+										onclick={() => (replyOpen = false)}
+									>
+										<Icon name="X" size={14} />
+									</button>
+								</Tooltip>
 							</div>
 						</div>
 						{#if showCc}

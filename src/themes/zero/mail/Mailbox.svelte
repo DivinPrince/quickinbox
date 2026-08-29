@@ -5,6 +5,7 @@
 	import { runMailAction } from '$lib/mail/client';
 	import { initials, participantName } from '$lib/mail/folders';
 	import { t } from '$lib/i18n';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import ThreadPane from './ThreadPane.svelte';
@@ -184,17 +185,21 @@
 	<section class="z-panel z-list">
 		<div class="z-list-head">
 			<div class="z-list-tools">
-				<button type="button" class="z-icon-btn" aria-label={t('nav.toggleSidebar')} onclick={toggleSidebar}>
-					<Icon name="PanelLeftOpen" size={16} />
-				</button>
-				<button type="button" class="z-search" onclick={openPalette}>
-					<Icon name="Search" size={16} />
-					<span>{t('common.search')}</span>
-					<kbd>
-						<span>{isMac ? '⌘' : 'Ctrl'}</span>
-						<span>K</span>
-					</kbd>
-				</button>
+				<Tooltip text={t('nav.toggleSidebar')}>
+					<button type="button" class="z-icon-btn" aria-label={t('nav.toggleSidebar')} onclick={toggleSidebar}>
+						<Icon name="PanelLeftOpen" size={16} />
+					</button>
+				</Tooltip>
+				<Tooltip text={t('common.search')} shortcut={isMac ? '⌘K' : 'Ctrl+K'} grow>
+					<button type="button" class="z-search" onclick={openPalette}>
+						<Icon name="Search" size={16} />
+						<span class="z-search-label">{t('common.search')}</span>
+						<kbd>
+							<span>{isMac ? '⌘' : 'Ctrl'}</span>
+							<span>K</span>
+						</kbd>
+					</button>
+				</Tooltip>
 				<div class="z-views">
 					<button
 						type="button"
@@ -223,15 +228,17 @@
 						</div>
 					{/if}
 				</div>
-				<button
-					type="button"
-					class="z-icon-btn"
-					class:spin={refreshing}
-					aria-label={t('common.refresh')}
-					onclick={refresh}
-				>
-					<Icon name="ArrowCircle" size={16} />
-				</button>
+				<Tooltip text={t('common.refresh')}>
+					<button
+						type="button"
+						class="z-icon-btn"
+						class:spin={refreshing}
+						aria-label={t('common.refresh')}
+						onclick={refresh}
+					>
+						<Icon name="ArrowCircle" size={16} />
+					</button>
+				</Tooltip>
 			</div>
 			<div class="z-load-bar" class:on={refreshing}></div>
 		</div>
@@ -289,37 +296,43 @@
 						}}
 					>
 						<div class="z-row-hover">
-							<button
-								type="button"
-								aria-label={t('mailbox.star')}
-								onclick={(event) => {
-									event.stopPropagation();
-									void act(thread.is_starred ? 'unstar' : 'star', [thread.latest_id]);
-								}}
-							>
-								<Icon name="Star2" class={thread.is_starred ? 'z-star-on' : ''} size={14} />
-							</button>
-							<button
-								type="button"
-								aria-label={t('nav.archive')}
-								onclick={(event) => {
-									event.stopPropagation();
-									void act(view === 'archive' ? 'unarchive' : 'archive', [thread.latest_id]);
-								}}
-							>
-								<Icon name="Archive2" size={14} />
-							</button>
-							<button
-								type="button"
-								class="danger"
-								aria-label={t('nav.bin')}
-								onclick={(event) => {
-									event.stopPropagation();
-									void act(view === 'trash' ? 'restore' : 'trash', [thread.latest_id]);
-								}}
-							>
-								<Icon name="Trash" size={14} />
-							</button>
+							<Tooltip text={thread.is_starred ? t('mailbox.unstar') : t('mailbox.star')}>
+								<button
+									type="button"
+									aria-label={thread.is_starred ? t('mailbox.unstar') : t('mailbox.star')}
+									onclick={(event) => {
+										event.stopPropagation();
+										void act(thread.is_starred ? 'unstar' : 'star', [thread.latest_id]);
+									}}
+								>
+									<Icon name="Star2" class={thread.is_starred ? 'z-star-on' : ''} size={14} />
+								</button>
+							</Tooltip>
+							<Tooltip text={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}>
+								<button
+									type="button"
+									aria-label={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}
+									onclick={(event) => {
+										event.stopPropagation();
+										void act(view === 'archive' ? 'unarchive' : 'archive', [thread.latest_id]);
+									}}
+								>
+									<Icon name="Archive2" size={14} />
+								</button>
+							</Tooltip>
+							<Tooltip text={view === 'trash' ? t('mailbox.restore') : t('nav.bin')}>
+								<button
+									type="button"
+									class="danger"
+									aria-label={view === 'trash' ? t('mailbox.restore') : t('nav.bin')}
+									onclick={(event) => {
+										event.stopPropagation();
+										void act(view === 'trash' ? 'restore' : 'trash', [thread.latest_id]);
+									}}
+								>
+									<Icon name="Trash" size={14} />
+								</button>
+							</Tooltip>
 						</div>
 						<span class="z-avatar">{initials(name)}</span>
 						<span class="z-row-main">

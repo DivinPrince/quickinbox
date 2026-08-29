@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import type { MailAddress, OutboundAttachmentInput } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
@@ -52,6 +53,8 @@
 					bcc_addr?: string | null;
 					subject?: string;
 					body_html?: string | null;
+					body_text?: string | null;
+					address_id?: string | null;
 					error?: string;
 				};
 				if (!response.ok || !draft.id) {
@@ -63,7 +66,8 @@
 				cc = draft.cc_addr ?? '';
 				bcc = draft.bcc_addr ?? '';
 				subject = draft.subject ?? '';
-				html = draft.body_html ?? '';
+				html = draft.body_html || draft.body_text || '';
+				if (draft.address_id) chosenAddressId = draft.address_id;
 				showCc = Boolean(draft.cc_addr);
 				showBcc = Boolean(draft.bcc_addr);
 			})
@@ -165,7 +169,7 @@
 
 <div class="z-overlay" onkeydown={onKey} role="dialog" aria-modal="true" tabindex="-1">
 	<div class="z-compose-stage">
-		<button type="button" class="z-esc" onclick={close}>
+		<button type="button" class="z-esc" aria-label={t('common.close')} onclick={close}>
 			<Icon name="X" size={14} />
 			<span>esc</span>
 		</button>
@@ -178,9 +182,11 @@
 					<div class="z-composer-row-actions">
 						<button type="button" class="z-composer-link" onclick={() => (showCc = !showCc)}>{t('compose.cc')}</button>
 						<button type="button" class="z-composer-link" onclick={() => (showBcc = !showBcc)}>{t('compose.bcc')}</button>
-						<button type="button" class="z-composer-link" aria-label={t('common.close')} onclick={close}>
-							<Icon name="X" size={14} />
-						</button>
+						<Tooltip text={t('common.close')}>
+							<button type="button" class="z-composer-link" aria-label={t('common.close')} onclick={close}>
+								<Icon name="X" size={14} />
+							</button>
+						</Tooltip>
 					</div>
 				</div>
 				{#if showCc}

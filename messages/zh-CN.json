@@ -71,7 +71,8 @@
 		"addresses": "地址",
 		"addAddress": "添加地址",
 		"moreAddresses": "更多地址",
-		"appTheme": "应用主题",
+		"lightMode": "浅色模式",
+		"darkMode": "深色模式",
 		"account": "账户"
 	},
 	"auth": {

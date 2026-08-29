@@ -5,6 +5,7 @@
 	import { initials } from '$lib/mail/folders';
 	import { setThemePreference } from '$lib/theme';
 	import { t } from '$lib/i18n';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	import type { MailAddress } from '$lib/types';
 	import type { ThemeShellData } from '$lib/ui-theme/types';
 	import Icon from './icons/Icon.svelte';
@@ -23,6 +24,11 @@
 	let extraOpen = $state(false);
 	let localeOpen = $state(false);
 	let switching = $state(false);
+	let darkMode = $state(false);
+
+	$effect(() => {
+		darkMode = document.documentElement.dataset.theme === 'dark';
+	});
 
 	const filteredId = $derived($page.url.searchParams.get('address'));
 	const active = $derived(
@@ -31,9 +37,8 @@
 			data.addresses[0] ??
 			null
 	);
-	const others = $derived(data.addresses.filter((address) => address.id !== active?.id));
-	const shownOthers = $derived(others.slice(0, 2));
-	const extra = $derived(others.slice(2));
+	const shown = $derived(data.addresses.slice(0, 3));
+	const extra = $derived(data.addresses.slice(3));
 	const displayName = $derived(active?.label || data.user.name || t('account.account'));
 	const displayEmail = $derived(active?.address ?? data.user.email);
 
@@ -44,6 +49,14 @@
 			return `${local[0] ?? '?'}${domain[0] ?? '?'}`.toUpperCase();
 		}
 		return (local ?? address.address).slice(0, 2).toUpperCase();
+	}
+
+	function addressTip(address: MailAddress): string {
+		const label = address.label?.trim();
+		if (label && label.toLowerCase() !== address.address.toLowerCase()) {
+			return `${label} · ${address.address}`;
+		}
+		return address.address;
 	}
 
 	function closeMenus() {
@@ -79,9 +92,10 @@
 		}
 	}
 
-	function toggleAppearance() {
-		const dark = document.documentElement.dataset.theme === 'dark';
-		setThemePreference(dark ? 'light' : 'dark');
+	function toggleMode() {
+		const next = darkMode ? 'light' : 'dark';
+		setThemePreference(next);
+		darkMode = next === 'dark';
 		closeMenus();
 	}
 
@@ -95,68 +109,74 @@
 
 <div class="z-account" class:collapsed>
 	{#if collapsed}
-		<button
-			type="button"
-			class="z-tile"
-			class:active
-			aria-label={displayEmail}
-			onclick={() => {
-				extraOpen = false;
-				localeOpen = false;
-				menuOpen = !menuOpen;
-			}}
-		>
-			{active ? tileLabel(active) : initials(data.user.name || data.user.email)}
-		</button>
+		<Tooltip text={displayEmail}>
+			<button
+				type="button"
+				class="z-tile"
+				class:active
+				aria-label={displayEmail}
+				aria-haspopup="menu"
+				aria-expanded={menuOpen}
+				onclick={() => {
+					extraOpen = false;
+					localeOpen = false;
+					menuOpen = !menuOpen;
+				}}
+			>
+				{active ? tileLabel(active) : initials(data.user.name || data.user.email)}
+			</button>
+		</Tooltip>
 	{:else}
 		<div class="z-account-row">
 			<div class="z-tiles">
-				{#if active}
+				{#each shown as address (address.id)}
+					{@const selected = address.id === active?.id}
 					<div class="z-tile-wrap">
-						<button
-							type="button"
-							class="z-tile active"
-							title={active.address}
-							aria-current="true"
-							onclick={() => selectAddress(active)}
-						>
-							{tileLabel(active)}
-						</button>
-						{#if others.length > 0}
+						<Tooltip text={addressTip(address)}>
+							<button
+								type="button"
+								class="z-tile"
+								class:active={selected}
+								aria-current={selected ? 'true' : undefined}
+								aria-label={addressTip(address)}
+								onclick={() => selectAddress(address)}
+							>
+								{tileLabel(address)}
+							</button>
+						</Tooltip>
+						{#if selected && data.addresses.length > 1}
 							<span class="z-tile-check" aria-hidden="true">
 								<Icon name="CircleCheck" size={16} />
 							</span>
 						{/if}
 					</div>
-				{/if}
-				{#each shownOthers as address (address.id)}
-					<button
-						type="button"
-						class="z-tile"
-						title={address.address}
-						onclick={() => selectAddress(address)}
-					>
-						{tileLabel(address)}
-					</button>
 				{/each}
 				{#if extra.length > 0}
 					<div class="z-extra">
-						<button
-							type="button"
-							class="z-tile extra"
-							aria-label={t('account.moreAddresses')}
-							onclick={() => {
-								menuOpen = false;
-								localeOpen = false;
-								extraOpen = !extraOpen;
-							}}
-						>
-							+{extra.length}
-						</button>
+						<Tooltip text={t('account.moreAddresses')} enabled={!extraOpen}>
+							<button
+								type="button"
+								class="z-tile extra"
+								aria-label={t('account.moreAddresses')}
+								aria-haspopup="menu"
+								aria-expanded={extraOpen}
+								onclick={() => {
+									menuOpen = false;
+									localeOpen = false;
+									extraOpen = !extraOpen;
+								}}
+							>
+								+{extra.length}
+							</button>
+						</Tooltip>
 						{#if extraOpen}
 							<div class="z-menu z-extra-menu">
 								{#each extra as address (address.id)}
-									<button type="button" onclick={() => selectAddress(address)}>
+									<button
+										type="button"
+										aria-current={address.id === active?.id ? 'true' : undefined}
+										onclick={() => selectAddress(address)}
+									>
 										<span class="z-tile">{tileLabel(address)}</span>
 										<span>
 											<strong>{address.label || address.address}</strong>
@@ -170,14 +190,11 @@
 						{/if}
 					</div>
 				{/if}
-				<a
-					href="/settings/connections"
-					class="z-tile add"
-					aria-label={t('account.addAddress')}
-					title={t('account.addAddress')}
-				>
-					<Icon name="Plus" size={14} />
-				</a>
+				<Tooltip text={t('account.addAddress')}>
+					<a href="/settings/connections" class="z-tile add" aria-label={t('account.addAddress')}>
+						<Icon name="Plus" size={14} />
+					</a>
+				</Tooltip>
 			</div>
 			<div class="z-account-actions">
 				<LocaleSwitcher
@@ -187,18 +204,22 @@
 						extraOpen = false;
 					}}
 				/>
-				<button
-					type="button"
-					class="z-dots"
-					aria-label={t('account.menu')}
-					onclick={() => {
-						extraOpen = false;
-						localeOpen = false;
-						menuOpen = !menuOpen;
-					}}
-				>
-					<Icon name="ThreeDots" size={16} />
-				</button>
+				<Tooltip text={t('account.menu')} enabled={!menuOpen}>
+					<button
+						type="button"
+						class="z-dots"
+						aria-label={t('account.menu')}
+						aria-haspopup="menu"
+						aria-expanded={menuOpen}
+						onclick={() => {
+							extraOpen = false;
+							localeOpen = false;
+							menuOpen = !menuOpen;
+						}}
+					>
+						<Icon name="ThreeDots" size={16} />
+					</button>
+				</Tooltip>
 			</div>
 		</div>
 
@@ -235,9 +256,14 @@
 				<Icon name="SettingsGear" size={16} />
 				{t('nav.settings')}
 			</a>
-			<button type="button" onclick={toggleAppearance}>
-				<Icon name="Stars" size={16} />
-				{t('account.appTheme')}
+			<button type="button" onclick={toggleMode}>
+				{#if darkMode}
+					<Icon name="Sun" size={16} />
+					{t('account.lightMode')}
+				{:else}
+					<Icon name="Moon" size={16} />
+					{t('account.darkMode')}
+				{/if}
 			</button>
 			<button type="button" class="logout" onclick={() => onLogout()}>
 				<Icon name="ArrowLeft" size={16} />
