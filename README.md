@@ -278,6 +278,10 @@ locales with [General Translation](https://generaltranslation.com):
 bun run translate
 ```
 
+CI does the same on pushes to `main` (and on a manual **CI** workflow run). Set
+repository secrets `GT_API_KEY` and `GT_PROJECT_ID` — never commit them. The
+translate job opens a PR with updated catalogs.
+
 ## How inbound routing works
 
 Both providers accept every address on a connected domain. The app then routes:

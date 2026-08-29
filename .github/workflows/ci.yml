@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: Verify the template
@@ -29,3 +32,30 @@ jobs:
 
       - name: Build
         run: bun run build
+
+  # Production catalogs: GT_API_KEY and GT_PROJECT_ID are repo Actions secrets.
+  # Skipped on pull requests so forks never see credentials. On main (or a manual
+  # run) the official GT action opens a PR with updated messages/*.json.
+  translate:
+    name: Translate catalogs
+    runs-on: ubuntu-latest
+    if: >-
+      github.actor != 'github-actions[bot]'
+      && !contains(github.event.head_commit.message || '', 'gt-translate/')
+      && (github.event_name == 'workflow_dispatch'
+        || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: generaltranslation/translate@v0
+        with:
+          gt_api_key: ${{ secrets.GT_API_KEY }}
+          gt_project_id: ${{ secrets.GT_PROJECT_ID }}
+          config: gt.config.json
+          inline: false
+          timeout: 3600
+          pr_branch: gt-translate/${{ github.ref_name }}
+          pr_title: Update UI translations from General Translation
