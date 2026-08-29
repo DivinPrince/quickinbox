@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import LocaleSwitcher from '$lib/components/LocaleSwitcher.svelte';
 	import { initials } from '$lib/mail/folders';
 	import { setThemePreference } from '$lib/theme';
+	import { t } from '$lib/i18n';
 	import type { MailAddress } from '$lib/types';
 	import type { ThemeShellData } from '$lib/ui-theme/types';
 	import Icon from './icons/Icon.svelte';
@@ -19,6 +21,7 @@
 
 	let menuOpen = $state(false);
 	let extraOpen = $state(false);
+	let localeOpen = $state(false);
 	let switching = $state(false);
 
 	const filteredId = $derived($page.url.searchParams.get('address'));
@@ -31,7 +34,7 @@
 	const others = $derived(data.addresses.filter((address) => address.id !== active?.id));
 	const shownOthers = $derived(others.slice(0, 2));
 	const extra = $derived(others.slice(2));
-	const displayName = $derived(active?.label || data.user.name || 'Account');
+	const displayName = $derived(active?.label || data.user.name || t('account.account'));
 	const displayEmail = $derived(active?.address ?? data.user.email);
 
 	function tileLabel(address: MailAddress): string {
@@ -46,6 +49,7 @@
 	function closeMenus() {
 		menuOpen = false;
 		extraOpen = false;
+		localeOpen = false;
 	}
 
 	async function selectAddress(address: MailAddress) {
@@ -96,7 +100,11 @@
 			class="z-tile"
 			class:active
 			aria-label={displayEmail}
-			onclick={() => (menuOpen = !menuOpen)}
+			onclick={() => {
+				extraOpen = false;
+				localeOpen = false;
+				menuOpen = !menuOpen;
+			}}
 		>
 			{active ? tileLabel(active) : initials(data.user.name || data.user.email)}
 		</button>
@@ -136,8 +144,12 @@
 						<button
 							type="button"
 							class="z-tile extra"
-							aria-label="More addresses"
-							onclick={() => (extraOpen = !extraOpen)}
+							aria-label={t('account.moreAddresses')}
+							onclick={() => {
+								menuOpen = false;
+								localeOpen = false;
+								extraOpen = !extraOpen;
+							}}
 						>
 							+{extra.length}
 						</button>
@@ -161,20 +173,33 @@
 				<a
 					href="/settings/connections"
 					class="z-tile add"
-					aria-label="Add address"
-					title="Add address"
+					aria-label={t('account.addAddress')}
+					title={t('account.addAddress')}
 				>
 					<Icon name="Plus" size={14} />
 				</a>
 			</div>
-			<button
-				type="button"
-				class="z-dots"
-				aria-label="Account menu"
-				onclick={() => (menuOpen = !menuOpen)}
-			>
-				<Icon name="ThreeDots" size={16} />
-			</button>
+			<div class="z-account-actions">
+				<LocaleSwitcher
+					bind:open={localeOpen}
+					onOpen={() => {
+						menuOpen = false;
+						extraOpen = false;
+					}}
+				/>
+				<button
+					type="button"
+					class="z-dots"
+					aria-label={t('account.menu')}
+					onclick={() => {
+						extraOpen = false;
+						localeOpen = false;
+						menuOpen = !menuOpen;
+					}}
+				>
+					<Icon name="ThreeDots" size={16} />
+				</button>
+			</div>
 		</div>
 
 		<div class="z-account-meta">
@@ -186,7 +211,7 @@
 	{#if menuOpen}
 		<div class="z-menu z-account-menu">
 			{#if collapsed && data.addresses.length > 0}
-				<p class="z-menu-label">Addresses</p>
+				<p class="z-menu-label">{t('account.addresses')}</p>
 				{#each data.addresses as address (address.id)}
 					<button type="button" onclick={() => selectAddress(address)}>
 						<span class="z-tile">{tileLabel(address)}</span>
@@ -200,20 +225,23 @@
 				{/each}
 				<a href="/settings/connections" onclick={closeMenus}>
 					<Icon name="Plus" size={16} />
-					Add address
+					{t('account.addAddress')}
 				</a>
+			{/if}
+			{#if collapsed}
+				<LocaleSwitcher embedded />
 			{/if}
 			<a href="/settings/general" onclick={closeMenus}>
 				<Icon name="SettingsGear" size={16} />
-				Settings
+				{t('nav.settings')}
 			</a>
 			<button type="button" onclick={toggleAppearance}>
 				<Icon name="Stars" size={16} />
-				App theme
+				{t('account.appTheme')}
 			</button>
 			<button type="button" class="logout" onclick={() => onLogout()}>
 				<Icon name="ArrowLeft" size={16} />
-				Log out
+				{t('nav.logOut')}
 			</button>
 		</div>
 	{/if}

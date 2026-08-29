@@ -5,6 +5,7 @@
 	import type { MailAddress, OutboundAttachmentInput } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import ComposerActions from './ComposerActions.svelte';
+	import { t } from '$lib/i18n';
 
 	let {
 		addresses,
@@ -54,7 +55,7 @@
 					error?: string;
 				};
 				if (!response.ok || !draft.id) {
-					error = draft.error ?? 'Could not load draft';
+					error = draft.error ?? t('compose.couldNotLoadDraft');
 					return;
 				}
 				activeDraft = draft.id;
@@ -67,7 +68,7 @@
 				showBcc = Boolean(draft.bcc_addr);
 			})
 			.catch(() => {
-				error = 'Could not load draft';
+				error = t('compose.couldNotLoadDraft');
 			});
 	});
 
@@ -94,13 +95,13 @@
 			});
 			const body = (await response.json()) as { id?: string; error?: string };
 			if (!response.ok) {
-				error = body.error ?? 'Could not save draft';
+				error = body.error ?? t('compose.couldNotSaveDraft');
 				return false;
 			}
 			activeDraft = body.id ?? activeDraft;
 			return true;
 		} catch {
-			error = 'Network error';
+			error = t('common.networkError');
 			return false;
 		} finally {
 			savingDraft = false;
@@ -110,7 +111,7 @@
 	async function send(event: SubmitEvent) {
 		event.preventDefault();
 		if (isHtmlEmpty(html)) {
-			error = 'Write a message';
+			error = t('compose.writeMessage');
 			return;
 		}
 		sending = true;
@@ -133,13 +134,13 @@
 			});
 			const body = (await response.json()) as { error?: string };
 			if (!response.ok) {
-				error = body.error ?? 'Failed to send';
+				error = body.error ?? t('compose.failedToSend');
 				return;
 			}
 			await invalidateAll();
 			onClose();
 		} catch {
-			error = 'Network error';
+			error = t('common.networkError');
 		} finally {
 			sending = false;
 		}
@@ -172,35 +173,35 @@
 		<form class="z-composer" onsubmit={send}>
 			<div class="z-composer-fields">
 				<div class="z-composer-row">
-					<span class="z-composer-label">To:</span>
-					<input class="z-composer-input" bind:value={to} required placeholder="Enter email address" />
+					<span class="z-composer-label">{t('compose.toColon')}</span>
+					<input class="z-composer-input" bind:value={to} required placeholder={t('compose.emailPlaceholder')} />
 					<div class="z-composer-row-actions">
-						<button type="button" class="z-composer-link" onclick={() => (showCc = !showCc)}>Cc</button>
-						<button type="button" class="z-composer-link" onclick={() => (showBcc = !showBcc)}>Bcc</button>
-						<button type="button" class="z-composer-link" aria-label="Close" onclick={close}>
+						<button type="button" class="z-composer-link" onclick={() => (showCc = !showCc)}>{t('compose.cc')}</button>
+						<button type="button" class="z-composer-link" onclick={() => (showBcc = !showBcc)}>{t('compose.bcc')}</button>
+						<button type="button" class="z-composer-link" aria-label={t('common.close')} onclick={close}>
 							<Icon name="X" size={14} />
 						</button>
 					</div>
 				</div>
 				{#if showCc}
 					<div class="z-composer-row">
-						<span class="z-composer-label">Cc:</span>
-						<input class="z-composer-input" bind:value={cc} placeholder="Enter email for Cc" />
+						<span class="z-composer-label">{t('compose.ccColon')}</span>
+						<input class="z-composer-input" bind:value={cc} placeholder={t('compose.ccPlaceholder')} />
 					</div>
 				{/if}
 				{#if showBcc}
 					<div class="z-composer-row">
-						<span class="z-composer-label">Bcc:</span>
-						<input class="z-composer-input" bind:value={bcc} placeholder="Enter email for Bcc" />
+						<span class="z-composer-label">{t('compose.bccColon')}</span>
+						<input class="z-composer-input" bind:value={bcc} placeholder={t('compose.bccPlaceholder')} />
 					</div>
 				{/if}
 				<div class="z-composer-row">
-					<span class="z-composer-label">Subject:</span>
-					<input class="z-composer-input" bind:value={subject} required placeholder="Subject" />
+						<span class="z-composer-label">{t('compose.subjectColon')}</span>
+						<input class="z-composer-input" bind:value={subject} required placeholder={t('compose.subject')} />
 				</div>
 				{#if addresses.length > 1}
 					<div class="z-composer-row">
-						<span class="z-composer-label">From:</span>
+						<span class="z-composer-label">{t('compose.fromColon')}</span>
 						<select
 							class="z-composer-input"
 							value={fromAddressId}
@@ -217,7 +218,7 @@
 			</div>
 
 			<div class="z-composer-body">
-				<RichTextEditor bind:html embedded minHeight={200} placeholder="Write your message…" />
+				<RichTextEditor bind:html embedded minHeight={200} placeholder={t('compose.writeMessagePlaceholder')} />
 			</div>
 
 			<ComposerActions bind:attachments sending={sending} error={error}>
@@ -228,7 +229,7 @@
 						onclick={saveDraft}
 						disabled={savingDraft || !hasDraftText}
 					>
-						{savingDraft ? 'Saving…' : 'Save draft'}
+						{savingDraft ? t('common.saving') : t('compose.saveDraft')}
 					</button>
 				{/snippet}
 			</ComposerActions>

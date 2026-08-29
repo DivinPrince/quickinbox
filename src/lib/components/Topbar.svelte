@@ -2,7 +2,9 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { haptic } from '$lib/app-chrome';
+	import { t } from '$lib/i18n';
 	import Icon from './Icon.svelte';
+	import LocaleSwitcher from './LocaleSwitcher.svelte';
 	import type { MailAddress } from '$lib/types';
 
 	let {
@@ -64,21 +66,24 @@
 		<input
 			type="search"
 			bind:value={query}
-			placeholder="Search messages"
-			aria-label="Search messages"
+			placeholder={t('mailbox.searchMessages')}
+			aria-label={t('mailbox.searchMessages')}
 		/>
 		{#if query}
-			<button type="button" class="search-clear" aria-label="Clear search" onclick={clearSearch}>
+			<button type="button" class="search-clear" aria-label={t('mailbox.clearSearch')} onclick={clearSearch}>
 				<Icon name="close-line" size={15} />
 			</button>
 		{/if}
 	</form>
 
 	<div class="topbar-actions">
+		<div class="locale-chip">
+			<LocaleSwitcher />
+		</div>
 		<a
 			href="/settings"
 			class="icon-btn"
-			aria-label="Settings"
+			aria-label={t('nav.settings')}
 			class:active={$page.url.pathname === '/settings'}
 		>
 			<Icon name="settings-3-line" size={17} />
@@ -106,7 +111,7 @@
 				<button
 					type="button"
 					class="menu-backdrop"
-					aria-label="Close account menu"
+					aria-label={t('account.menu')}
 					onclick={() => (menuOpen = false)}
 				></button>
 				<div class="menu" role="menu">
@@ -115,10 +120,10 @@
 						<span class="menu-address">{primaryAddress}</span>
 					</p>
 					<a href="/settings" class="menu-item" role="menuitem" onclick={() => (menuOpen = false)}>
-						<Icon name="user-settings-line" size={15} /> Settings
+						<Icon name="user-settings-line" size={15} /> {t('nav.settings')}
 					</a>
 					<button type="button" class="menu-item" role="menuitem" onclick={onLogout}>
-						<Icon name="logout-box-r-line" size={15} /> Log out
+						<Icon name="logout-box-r-line" size={15} /> {t('nav.logOut')}
 					</button>
 				</div>
 			{/if}
@@ -192,6 +197,19 @@
 		align-items: center;
 		gap: 0.5rem;
 		margin-left: auto;
+	}
+
+	.locale-chip {
+		display: flex;
+		align-items: center;
+	}
+
+	.locale-chip :global(.locale-trigger) {
+		width: 2rem;
+		height: 2rem;
+		min-width: 2rem;
+		border-radius: 0.5rem;
+		font-size: 0.6875rem;
 	}
 
 	:global(.topbar .icon-btn.active) {

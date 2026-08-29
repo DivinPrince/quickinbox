@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { buildEmailDocument, emailCss, isRichHtml } from '$lib/utils/email-html';
 	import { foldQuotedHtml } from '$lib/utils/quotes';
+	import { t } from '$lib/i18n';
 
 	const STYLE_ID = '__mail-frame-style';
 
@@ -123,7 +124,7 @@
 	class="frame"
 	class:rich
 	class:sized={height > 0}
-	title="Message content"
+	title={t('thread.messageContent')}
 	sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
 	referrerpolicy="no-referrer"
 	{srcdoc}

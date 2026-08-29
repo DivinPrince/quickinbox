@@ -1,6 +1,7 @@
 import type { LayoutServerLoad } from './$types';
 import { getMailboxCounts } from '$lib/server/mail-store';
 import { DEFAULT_UI_THEME } from '$lib/ui-theme/ids';
+import { DEFAULT_LOCALE } from '$lib/i18n/locales';
 import type { MailboxCounts } from '$lib/types';
 
 const EMPTY_COUNTS: MailboxCounts = {
@@ -28,6 +29,7 @@ export const load: LayoutServerLoad = async ({ locals, platform }) => {
 		addresses: locals.addresses,
 		activeDomainId: locals.activeDomainId,
 		counts,
-		uiTheme: locals.uiTheme ?? DEFAULT_UI_THEME
+		uiTheme: locals.uiTheme ?? DEFAULT_UI_THEME,
+		locale: locals.locale ?? DEFAULT_LOCALE
 	};
 };

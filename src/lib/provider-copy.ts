@@ -1,11 +1,13 @@
 import type { EmailProviderKind } from '$lib/types';
+import { DEFAULT_LOCALE } from '$lib/i18n/locales';
+import { translate } from '$lib/i18n/translate';
 
-export function providerName(kind: EmailProviderKind): string {
+export function providerName(kind: EmailProviderKind, locale: string = DEFAULT_LOCALE): string {
 	switch (kind) {
 		case 'resend':
-			return 'Resend';
+			return translate(locale, 'provider.resend');
 		case 'cloudflare':
-			return 'Cloudflare Email';
+			return translate(locale, 'provider.cloudflare');
 		default: {
 			const _never: never = kind;
 			return _never;
@@ -13,12 +15,12 @@ export function providerName(kind: EmailProviderKind): string {
 	}
 }
 
-export function missingProviderTitle(kind: EmailProviderKind): string {
+export function missingProviderTitle(kind: EmailProviderKind, locale: string = DEFAULT_LOCALE): string {
 	switch (kind) {
 		case 'resend':
-			return 'Resend API key missing';
+			return translate(locale, 'provider.missingTitle.resend');
 		case 'cloudflare':
-			return 'Cloudflare Email is not configured';
+			return translate(locale, 'provider.missingTitle.cloudflare');
 		default: {
 			const _never: never = kind;
 			return _never;
@@ -26,12 +28,12 @@ export function missingProviderTitle(kind: EmailProviderKind): string {
 	}
 }
 
-export function missingProviderHint(kind: EmailProviderKind): string {
+export function missingProviderHint(kind: EmailProviderKind, locale: string = DEFAULT_LOCALE): string {
 	switch (kind) {
 		case 'resend':
-			return 'wrangler secret put RESEND_API_KEY';
+			return translate(locale, 'provider.missingHint.resend');
 		case 'cloudflare':
-			return 'EMAIL_PROVIDER=cloudflare\nCLOUDFLARE_MAIL_DOMAINS=yourdomain.com';
+			return translate(locale, 'provider.missingHint.cloudflare');
 		default: {
 			const _never: never = kind;
 			return _never;
@@ -39,12 +41,12 @@ export function missingProviderHint(kind: EmailProviderKind): string {
 	}
 }
 
-export function noDomainsTitle(kind: EmailProviderKind): string {
+export function noDomainsTitle(kind: EmailProviderKind, locale: string = DEFAULT_LOCALE): string {
 	switch (kind) {
 		case 'resend':
-			return 'No domains in this Resend account';
+			return translate(locale, 'provider.noDomainsTitle.resend');
 		case 'cloudflare':
-			return 'No domains in CLOUDFLARE_MAIL_DOMAINS';
+			return translate(locale, 'provider.noDomainsTitle.cloudflare');
 		default: {
 			const _never: never = kind;
 			return _never;
@@ -52,12 +54,12 @@ export function noDomainsTitle(kind: EmailProviderKind): string {
 	}
 }
 
-export function noDomainsBody(kind: EmailProviderKind): string {
+export function noDomainsBody(kind: EmailProviderKind, locale: string = DEFAULT_LOCALE): string {
 	switch (kind) {
 		case 'resend':
-			return 'Add and verify a domain at resend.com/domains, then reload this page.';
+			return translate(locale, 'provider.noDomainsBody.resend');
 		case 'cloudflare':
-			return 'Onboard the domain in Cloudflare Email Service, then set CLOUDFLARE_MAIL_DOMAINS and reload.';
+			return translate(locale, 'provider.noDomainsBody.cloudflare');
 		default: {
 			const _never: never = kind;
 			return _never;
@@ -65,12 +67,12 @@ export function noDomainsBody(kind: EmailProviderKind): string {
 	}
 }
 
-export function domainPickerSubtitle(kind: EmailProviderKind): string {
+export function domainPickerSubtitle(kind: EmailProviderKind, locale: string = DEFAULT_LOCALE): string {
 	switch (kind) {
 		case 'resend':
-			return 'These are the domains your Resend account can send and receive on. Pick the one you want to use — you can add more later.';
+			return translate(locale, 'provider.domainPickerSubtitle.resend');
 		case 'cloudflare':
-			return 'These are the domains listed in CLOUDFLARE_MAIL_DOMAINS. Pick the one you want to use — you can add more later.';
+			return translate(locale, 'provider.domainPickerSubtitle.cloudflare');
 		default: {
 			const _never: never = kind;
 			return _never;
@@ -78,12 +80,12 @@ export function domainPickerSubtitle(kind: EmailProviderKind): string {
 	}
 }
 
-export function onboardingSubtitle(kind: EmailProviderKind): string {
+export function onboardingSubtitle(kind: EmailProviderKind, locale: string = DEFAULT_LOCALE): string {
 	switch (kind) {
 		case 'resend':
-			return 'Pick the domains from your Resend account that you want in this dashboard.';
+			return translate(locale, 'provider.onboardingSubtitle.resend');
 		case 'cloudflare':
-			return 'Pick the domains from CLOUDFLARE_MAIL_DOMAINS that you want in this dashboard.';
+			return translate(locale, 'provider.onboardingSubtitle.cloudflare');
 		default: {
 			const _never: never = kind;
 			return _never;
@@ -91,12 +93,16 @@ export function onboardingSubtitle(kind: EmailProviderKind): string {
 	}
 }
 
-export function receivingHint(kind: EmailProviderKind, domainName: string): string {
+export function receivingHint(
+	kind: EmailProviderKind,
+	domainName: string,
+	locale: string = DEFAULT_LOCALE
+): string {
 	switch (kind) {
 		case 'resend':
-			return `Receiving isn't enabled on ${domainName} yet — you can send, but inbound mail won't arrive until you add the MX record in Resend.`;
+			return translate(locale, 'provider.receivingHint.resend', { domain: domainName });
 		case 'cloudflare':
-			return `Receiving isn't enabled on ${domainName} yet — point Email Routing's catch-all at this Worker.`;
+			return translate(locale, 'provider.receivingHint.cloudflare', { domain: domainName });
 		default: {
 			const _never: never = kind;
 			return _never;

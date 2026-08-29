@@ -4,6 +4,7 @@
 	import { formatRelativeDate } from '$lib/utils/date';
 	import { runMailAction } from '$lib/mail/client';
 	import { initials, participantName } from '$lib/mail/folders';
+	import { t } from '$lib/i18n';
 	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import ThreadPane from './ThreadPane.svelte';
@@ -92,7 +93,7 @@
 	}
 
 	const viewLabel = $derived(
-		chip === 'unread' ? 'Unread' : chip === 'starred' ? 'Starred' : 'Views'
+		chip === 'unread' ? t('mailbox.unread') : chip === 'starred' ? t('nav.starred') : t('mailbox.views')
 	);
 
 	async function refresh() {
@@ -183,12 +184,12 @@
 	<section class="z-panel z-list">
 		<div class="z-list-head">
 			<div class="z-list-tools">
-				<button type="button" class="z-icon-btn" aria-label="Toggle sidebar" onclick={toggleSidebar}>
+				<button type="button" class="z-icon-btn" aria-label={t('nav.toggleSidebar')} onclick={toggleSidebar}>
 					<Icon name="PanelLeftOpen" size={16} />
 				</button>
 				<button type="button" class="z-search" onclick={openPalette}>
 					<Icon name="Search" size={16} />
-					<span>Search</span>
+					<span>{t('common.search')}</span>
 					<kbd>
 						<span>{isMac ? '⌘' : 'Ctrl'}</span>
 						<span>K</span>
@@ -208,15 +209,15 @@
 					{#if viewsOpen}
 						<div class="z-views-menu" role="menu">
 							<button type="button" role="menuitemcheckbox" aria-checked={chip === 'all'} onclick={() => setChip('all')}>
-								All mail
+								{t('mailbox.allMail')}
 								{#if chip === 'all'}<Icon name="Check" size={14} />{/if}
 							</button>
 							<button type="button" role="menuitemcheckbox" aria-checked={chip === 'unread'} onclick={() => setChip('unread')}>
-								Unread
+								{t('mailbox.unread')}
 								{#if chip === 'unread'}<Icon name="Check" size={14} />{/if}
 							</button>
 							<button type="button" role="menuitemcheckbox" aria-checked={chip === 'starred'} onclick={() => setChip('starred')}>
-								Starred
+								{t('nav.starred')}
 								{#if chip === 'starred'}<Icon name="Check" size={14} />{/if}
 							</button>
 						</div>
@@ -226,7 +227,7 @@
 					type="button"
 					class="z-icon-btn"
 					class:spin={refreshing}
-					aria-label="Refresh"
+					aria-label={t('common.refresh')}
 					onclick={refresh}
 				>
 					<Icon name="ArrowCircle" size={16} />
@@ -237,7 +238,7 @@
 
 		<div class="z-chips">
 			<button type="button" class="z-chip" class:active={chip === 'all'} data-chip="all" onclick={() => setChip('all')}>
-				All Mail
+				{t('mailbox.allMailChip')}
 			</button>
 			<button
 				type="button"
@@ -246,7 +247,7 @@
 				data-chip="unread"
 				onclick={() => setChip('unread')}
 			>
-				Unread
+				{t('mailbox.unread')}
 			</button>
 			<button
 				type="button"
@@ -255,7 +256,7 @@
 				data-chip="starred"
 				onclick={() => setChip('starred')}
 			>
-				Starred
+				{t('nav.starred')}
 			</button>
 		</div>
 
@@ -266,15 +267,15 @@
 						src={dark ? '/themes/zero/empty-state.svg' : '/themes/zero/empty-state-light.svg'}
 						alt=""
 					/>
-					<p class="z-empty-title">It's empty here</p>
+					<p class="z-empty-title">{t('mailbox.empty.zero')}</p>
 					<p class="z-empty-copy">
-						Search for another email or
-						<button type="button" class="z-empty-link" onclick={() => setChip('all')}>clear filters</button>
+						{t('mailbox.empty.zeroHint')}
+						<button type="button" class="z-empty-link" onclick={() => setChip('all')}>{t('mailbox.empty.clearFiltersLink')}</button>
 					</p>
 				</div>
 			{:else}
 				{#each items as thread (thread.thread_id)}
-					{@const name = participantName(thread.participants, view)}
+					{@const name = participantName(thread.participants, view, $page.data.locale)}
 					<div
 						class="z-row"
 						class:selected={thread.latest_id === threadId || selected.includes(thread.thread_id)}
@@ -290,7 +291,7 @@
 						<div class="z-row-hover">
 							<button
 								type="button"
-								aria-label="Star"
+								aria-label={t('mailbox.star')}
 								onclick={(event) => {
 									event.stopPropagation();
 									void act(thread.is_starred ? 'unstar' : 'star', [thread.latest_id]);
@@ -300,7 +301,7 @@
 							</button>
 							<button
 								type="button"
-								aria-label="Archive"
+								aria-label={t('nav.archive')}
 								onclick={(event) => {
 									event.stopPropagation();
 									void act(view === 'archive' ? 'unarchive' : 'archive', [thread.latest_id]);
@@ -311,7 +312,7 @@
 							<button
 								type="button"
 								class="danger"
-								aria-label="Bin"
+								aria-label={t('nav.bin')}
 								onclick={(event) => {
 									event.stopPropagation();
 									void act(view === 'trash' ? 'restore' : 'trash', [thread.latest_id]);
@@ -335,10 +336,10 @@
 										<Icon name="PencilCompose" size={12} />
 									{/if}
 								</span>
-								<span class="z-row-date">{formatRelativeDate(thread.created_at)}</span>
+								<span class="z-row-date">{formatRelativeDate(thread.created_at, $page.data.locale)}</span>
 							</span>
 							<span class="z-row-subject">
-								{thread.subject || '(no subject)'}
+								{thread.subject || t('mailbox.noSubject')}
 								{#if thread.has_attachments}
 									<Icon name="Paper" size={12} />
 								{/if}

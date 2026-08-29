@@ -88,6 +88,11 @@ html {
 	background: var(--color-surface);
 }
 
+html[lang='zh-CN'] {
+	--font-sans: 'Inter', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei',
+		ui-sans-serif, system-ui, sans-serif;
+}
+
 body {
 	@apply min-h-screen bg-[var(--color-bg)] font-sans text-[var(--color-text)] antialiased;
 

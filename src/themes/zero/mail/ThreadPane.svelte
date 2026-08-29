@@ -12,6 +12,7 @@
 	import type { ZeroIconName } from '../icons/names';
 	import Icon from '../icons/Icon.svelte';
 	import ComposerActions from '../overlays/ComposerActions.svelte';
+	import { t } from '$lib/i18n';
 
 	let {
 		id,
@@ -82,7 +83,7 @@
 				const body = (await response.json()) as ThreadPayload & { error?: string };
 				if (cancelled) return;
 				if (!response.ok) {
-					error = body.error ?? 'Could not load this conversation';
+					error = body.error ?? t('thread.couldNotLoad');
 					thread = null;
 					return;
 				}
@@ -92,7 +93,7 @@
 				void invalidateAll();
 			})
 			.catch(() => {
-				if (!cancelled) error = 'Network error';
+				if (!cancelled) error = t('common.networkError');
 			})
 			.finally(() => {
 				if (!cancelled) loading = false;
@@ -107,7 +108,7 @@
 	const people = $derived(thread ? threadPeople(thread.messages, selfEmails) : []);
 
 	function senderName(message: ThreadMessage): string {
-		if (message.direction === 'outbound') return 'me';
+		if (message.direction === 'outbound') return t('common.me');
 		return message.from_name || message.from_addr;
 	}
 
@@ -277,7 +278,7 @@
 		const message = replyTarget ?? latest;
 		if (!message || isHtmlEmpty(replyHtml)) return;
 		if (replyMode === 'forward' && !replyTo.trim()) {
-			sendError = 'Add a recipient';
+			sendError = t('thread.addRecipient');
 			return;
 		}
 		sending = true;
@@ -295,7 +296,7 @@
 				});
 				if (!response.ok) {
 					const body = (await response.json()) as { error?: string };
-					sendError = body.error ?? 'Could not forward';
+					sendError = body.error ?? t('thread.couldNotForward');
 					return;
 				}
 			} else {
@@ -313,7 +314,7 @@
 				});
 				if (!response.ok) {
 					const body = (await response.json()) as { error?: string };
-					sendError = body.error ?? 'Could not send reply';
+					sendError = body.error ?? t('thread.couldNotSendReply');
 					return;
 				}
 			}
@@ -340,23 +341,23 @@
 {#if !id}
 	<div class="z-empty">
 		<img src={dark ? '/themes/zero/empty-state.svg' : '/themes/zero/empty-state-light.svg'} alt="" />
-		<p class="z-empty-title">It's empty here</p>
-		<p class="z-empty-copy">Choose an email to view details</p>
+		<p class="z-empty-title">{t('mailbox.empty.zero')}</p>
+		<p class="z-empty-copy">{t('thread.chooseEmail')}</p>
 		{#if onCompose}
 			<button type="button" class="z-ghost-btn" onclick={onCompose}>
 				<Icon name="Mail" size={14} />
-				Send email
+				{t('thread.sendEmail')}
 			</button>
 		{/if}
 	</div>
 {:else if loading}
-	<div class="z-empty">Loading…</div>
+	<div class="z-empty">{t('common.loading')}</div>
 {:else if error}
 	<div class="z-empty">{error}</div>
 {:else if thread && latest}
 	<div class="z-thread">
 		<div class="z-thread-bar">
-			<button type="button" class="z-thread-icon" aria-label="Close" onclick={onClose}>
+			<button type="button" class="z-thread-icon" aria-label={t('thread.close')} onclick={onClose}>
 				<Icon name="X" size={14} />
 			</button>
 			<div class="z-thread-bar-right">
@@ -366,12 +367,12 @@
 					onclick={() => startReply('replyAll', latest)}
 				>
 					<Icon name="Reply" size={14} />
-					<span>Reply all</span>
+					<span>{t('thread.replyAll')}</span>
 				</button>
 				<button
 					type="button"
 					class="z-thread-icon"
-					aria-label={starred ? 'Unstar' : 'Star'}
+					aria-label={starred ? t('mailbox.unstar') : t('mailbox.star')}
 					onclick={toggleStar}
 				>
 					<Icon name="Star2" class={starred ? 'z-star-on' : ''} size={16} />
@@ -379,13 +380,13 @@
 				<button
 					type="button"
 					class="z-thread-icon"
-					aria-label={view === 'archive' ? 'Move to inbox' : 'Archive'}
+					aria-label={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}
 					onclick={() => act(view === 'archive' ? 'unarchive' : 'archive')}
 				>
 					<Icon name="Archive" size={16} />
 				</button>
 				{#if view !== 'trash'}
-					<button type="button" class="z-thread-trash" aria-label="Bin" onclick={() => act('trash')}>
+					<button type="button" class="z-thread-trash" aria-label={t('nav.bin')} onclick={() => act('trash')}>
 						<Icon name="Trash" size={16} />
 					</button>
 				{/if}
@@ -393,7 +394,7 @@
 					<button
 						type="button"
 						class="z-thread-icon"
-						aria-label="More"
+						aria-label={t('thread.more')}
 						onclick={(event) => {
 							event.stopPropagation();
 							menuFor = menuFor === 'thread' ? null : 'thread';
@@ -407,12 +408,12 @@
 							{#if view === 'archive' || view === 'trash'}
 								<button type="button" onclick={() => act(view === 'trash' ? 'restore' : 'unarchive')}>
 									<Icon name="Inbox" size={14} />
-									Move to inbox
+									{t('mailbox.moveToInbox')}
 								</button>
 							{:else}
 								<button type="button" onclick={() => act('archive')}>
 									<Icon name="Archive" size={14} />
-									Archive
+									{t('nav.archive')}
 								</button>
 							{/if}
 						</div>
@@ -424,7 +425,7 @@
 		<div class="z-thread-body">
 			<div class="z-thread-hero">
 				<h1 class="z-thread-subject">
-					{thread.subject || '(no subject)'}
+					{thread.subject || t('mailbox.noSubject')}
 					{#if thread.messages.length > 1}
 						<span class="z-thread-count">[{thread.messages.length}]</span>
 					{/if}
@@ -475,28 +476,28 @@
 											menuFor = null;
 										}}
 									>
-										Details
+										{t('thread.details')}
 									</button>
 									{#if detailsFor === message.id}
 										<div class="z-details-pop" role="dialog" onpointerdown={(event) => event.stopPropagation()}>
-											<div><span>From:</span> {senderName(message)} {senderEmail(message)}</div>
-											<div><span>To:</span> {message.to_addr}</div>
+											<div><span>{t('thread.fromColon')}</span> {senderName(message)} {senderEmail(message)}</div>
+											<div><span>{t('thread.toColon')}</span> {message.to_addr}</div>
 											{#if message.cc_addr}
-												<div><span>Cc:</span> {message.cc_addr}</div>
+												<div><span>{t('thread.ccColon')}</span> {message.cc_addr}</div>
 											{/if}
-											<div><span>Date:</span> {formatMailDate(message.created_at)} {formatMailTime(message.created_at)}</div>
+											<div><span>{t('thread.dateColon')}</span> {formatMailDate(message.created_at, $page.data.locale)} {formatMailTime(message.created_at, $page.data.locale)}</div>
 										</div>
 									{/if}
 								</div>
 								<div class="z-msg-when">
-									<time>{formatMailDate(message.created_at)}</time>
+									<time>{formatMailDate(message.created_at, $page.data.locale)}</time>
 									{#if shouldShowSeparateTime(message.created_at)}
-										<time class="z-msg-time">{formatMailTime(message.created_at)}</time>
+										<time class="z-msg-time">{formatMailTime(message.created_at, $page.data.locale)}</time>
 									{/if}
 									<button
 										type="button"
 										class="z-thread-icon z-msg-more"
-										aria-label="Message actions"
+										aria-label={t('thread.messageActions')}
 										onclick={(event) => {
 											event.stopPropagation();
 											menuFor = menuFor === message.id ? null : message.id;
@@ -509,17 +510,17 @@
 										<div class="z-pop z-pop-msg" role="menu" tabindex="-1" onpointerdown={(event) => event.stopPropagation()}>
 											<button type="button" onclick={() => startReply('reply', message)}>
 												<Icon name="Reply" size={14} />
-												Reply
+												{t('thread.reply')}
 											</button>
 											<button type="button" onclick={() => startReply('forward', message)}>
 												<Icon name="Forward" size={14} />
-												Forward
+												{t('thread.forward')}
 											</button>
 										</div>
 									{/if}
 								</div>
 							</div>
-							<p class="z-msg-to">To: {toLine(message)}</p>
+							<p class="z-msg-to">{t('thread.toColon')} {toLine(message)}</p>
 						</div>
 					</div>
 
@@ -550,17 +551,17 @@
 							<div class="z-msg-actions">
 								<button type="button" class="z-action-btn" onclick={() => startReply('reply', message)}>
 									<Icon name="Reply" size={14} />
-									<span class="z-action-label">Reply</span>
+									<span class="z-action-label">{t('thread.reply')}</span>
 									{#if last}<kbd>r</kbd>{/if}
 								</button>
 								<button type="button" class="z-action-btn" onclick={() => startReply('replyAll', message)}>
 									<Icon name="ReplyAll" size={14} />
-									<span class="z-action-label">Reply All</span>
+									<span class="z-action-label">{t('thread.replyAllLabel')}</span>
 									{#if last}<kbd>a</kbd>{/if}
 								</button>
 								<button type="button" class="z-action-btn" onclick={() => startReply('forward', message)}>
 									<Icon name="Forward" size={14} />
-									<span class="z-action-label">Forward</span>
+									<span class="z-action-label">{t('thread.forward')}</span>
 									{#if last}<kbd>f</kbd>{/if}
 								</button>
 							</div>
@@ -579,15 +580,15 @@
 				>
 					<div class="z-composer-fields">
 						<div class="z-composer-row">
-							<span class="z-composer-label">To:</span>
-							<input class="z-composer-input" bind:value={replyTo} placeholder="Enter email address" />
+							<span class="z-composer-label">{t('compose.toColon')}</span>
+							<input class="z-composer-input" bind:value={replyTo} placeholder={t('compose.emailPlaceholder')} />
 							<div class="z-composer-row-actions">
-								<button type="button" class="z-composer-link" onclick={() => (showCc = !showCc)}>Cc</button>
-								<button type="button" class="z-composer-link" onclick={() => (showBcc = !showBcc)}>Bcc</button>
+								<button type="button" class="z-composer-link" onclick={() => (showCc = !showCc)}>{t('compose.cc')}</button>
+								<button type="button" class="z-composer-link" onclick={() => (showBcc = !showBcc)}>{t('compose.bcc')}</button>
 								<button
 									type="button"
 									class="z-composer-link"
-									aria-label="Close"
+									aria-label={t('common.close')}
 									onclick={() => (replyOpen = false)}
 								>
 									<Icon name="X" size={14} />
@@ -596,19 +597,19 @@
 						</div>
 						{#if showCc}
 							<div class="z-composer-row">
-								<span class="z-composer-label">Cc:</span>
-								<input class="z-composer-input" bind:value={replyCc} placeholder="Enter email for Cc" />
+								<span class="z-composer-label">{t('compose.ccColon')}</span>
+								<input class="z-composer-input" bind:value={replyCc} placeholder={t('compose.ccPlaceholder')} />
 							</div>
 						{/if}
 						{#if showBcc}
 							<div class="z-composer-row">
-								<span class="z-composer-label">Bcc:</span>
-								<input class="z-composer-input" bind:value={replyBcc} placeholder="Enter email for Bcc" />
+								<span class="z-composer-label">{t('compose.bccColon')}</span>
+								<input class="z-composer-input" bind:value={replyBcc} placeholder={t('compose.bccPlaceholder')} />
 							</div>
 						{/if}
 					</div>
 					<div class="z-composer-body">
-						<RichTextEditor bind:html={replyHtml} embedded minHeight={80} placeholder="Write your reply…" />
+						<RichTextEditor bind:html={replyHtml} embedded minHeight={80} placeholder={t('compose.writeReplyPlaceholder')} />
 					</div>
 					<ComposerActions bind:attachments sending={sending} error={sendError} />
 				</form>

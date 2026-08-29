@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { disablePushForCurrentAccount } from '$lib/push-client';
+	import { t } from '$lib/i18n';
 	import type { ThemeShellProps } from '$lib/ui-theme/types';
 	import AccountHeader from './AccountHeader.svelte';
 	import Icon from './icons/Icon.svelte';
@@ -57,48 +58,48 @@
 
 	const mailNav = $derived<{ title: string; items: NavItem[] }[]>([
 		{
-			title: 'Core',
+			title: t('nav.core'),
 			items: [
 				{
 					href: '/inbox',
 					icon: 'Inbox',
-					label: 'Inbox',
+					label: t('nav.inbox'),
 					badge: data.counts.inbox_unread || undefined,
 					shortcut: 'g i'
 				},
 				{
 					href: '/drafts',
 					icon: 'Folder',
-					label: 'Drafts',
+					label: t('nav.drafts'),
 					badge: data.counts.drafts || undefined,
 					shortcut: 'g d'
 				},
-				{ href: '/sent', icon: 'Plane2', label: 'Sent', shortcut: 'g t' }
+				{ href: '/sent', icon: 'Plane2', label: t('nav.sent'), shortcut: 'g t' }
 			]
 		},
 		{
-			title: 'Management',
+			title: t('nav.management'),
 			items: [
 				{
 					href: '/archive',
 					icon: 'Archive',
-					label: 'Archive',
+					label: t('nav.archive'),
 					badge: data.counts.archive || undefined,
 					shortcut: 'g a'
 				},
-				{ href: '/trash', icon: 'Bin', label: 'Bin', badge: data.counts.trash || undefined, shortcut: 'g b' }
+				{ href: '/trash', icon: 'Bin', label: t('nav.bin'), badge: data.counts.trash || undefined, shortcut: 'g b' }
 			]
 		}
 	]);
 
 	const settingsNav = $derived<NavItem[]>([
-		{ href: '/inbox', icon: 'ArrowLeft', label: 'Back' },
-		{ href: '/settings/general', icon: 'SettingsGear', label: 'General', shortcut: 'g s' },
-		{ href: '/settings/appearance', icon: 'Stars', label: 'Appearance' },
-		{ href: '/settings/connections', icon: 'Users', label: 'Connections' },
-		{ href: '/settings/notifications', icon: 'Bell', label: 'Notifications' },
-		{ href: '/settings/shortcuts', icon: 'Tabs', label: 'Shortcuts', shortcut: '?' },
-		...(data.user.is_admin ? [{ href: '/admin', icon: 'SettingsGear', label: 'Admin' }] : [])
+		{ href: '/inbox', icon: 'ArrowLeft', label: t('common.back') },
+		{ href: '/settings/general', icon: 'SettingsGear', label: t('nav.general'), shortcut: 'g s' },
+		{ href: '/settings/appearance', icon: 'Stars', label: t('nav.appearance') },
+		{ href: '/settings/connections', icon: 'Users', label: t('nav.connections') },
+		{ href: '/settings/notifications', icon: 'Bell', label: t('nav.notifications') },
+		{ href: '/settings/shortcuts', icon: 'Tabs', label: t('nav.shortcuts'), shortcut: '?' },
+		...(data.user.is_admin ? [{ href: '/admin', icon: 'SettingsGear', label: t('nav.admin') }] : [])
 	]);
 
 	function isActive(href: string): boolean {
@@ -241,7 +242,7 @@
 	data-mobile-open={mobileOpen ? 'true' : 'false'}
 >
 	{#if mobileOpen}
-		<button type="button" class="z-mobile-scrim" aria-label="Close sidebar" onclick={() => (mobileOpen = false)}
+		<button type="button" class="z-mobile-scrim" aria-label={t('nav.closeSidebar')} onclick={() => (mobileOpen = false)}
 		></button>
 	{/if}
 
@@ -255,7 +256,7 @@
 				{:else}
 					<span class="z-compose-label">
 						<Icon name="PencilCompose" size={14} />
-						New email
+						{t('nav.newEmail')}
 					</span>
 				{/if}
 			</button>
@@ -291,7 +292,7 @@
 			{#if !settings}
 				<a href="/settings/general" class="z-nav-link" class:active={isActive('/settings')}>
 					<Icon name="SettingsGear" size={16} />
-					{#if !collapsed || mobileOpen}<span>Settings</span>{/if}
+					{#if !collapsed || mobileOpen}<span>{t('nav.settings')}</span>{/if}
 				</a>
 			{/if}
 		</div>
@@ -301,7 +302,7 @@
 		{#if settings}
 			<div class="z-settings-panel">
 				<div class="z-settings-bar">
-					<button type="button" class="z-icon-btn z-settings-toggle" aria-label="Open sidebar" onclick={toggleSidebar}>
+					<button type="button" class="z-icon-btn z-settings-toggle" aria-label={t('nav.openSidebar')} onclick={toggleSidebar}>
 						<Icon name="PanelLeftOpen" size={16} />
 					</button>
 				</div>
@@ -315,10 +316,10 @@
 	</div>
 
 	<nav class="z-mobile-nav">
-		<a href="/inbox" aria-label="Inbox"><Icon name="Inbox" size={18} /></a>
-		<button type="button" aria-label="Compose" onclick={openCompose}><Icon name="PencilCompose" size={16} /></button>
-		<a href="/sent" aria-label="Sent"><Icon name="Plane2" size={18} /></a>
-		<a href="/settings/general" aria-label="Settings"><Icon name="SettingsGear" size={18} /></a>
+		<a href="/inbox" aria-label={t('nav.inbox')}><Icon name="Inbox" size={18} /></a>
+		<button type="button" aria-label={t('nav.compose')} onclick={openCompose}><Icon name="PencilCompose" size={16} /></button>
+		<a href="/sent" aria-label={t('nav.sent')}><Icon name="Plane2" size={18} /></a>
+		<a href="/settings/general" aria-label={t('nav.settings')}><Icon name="SettingsGear" size={18} /></a>
 	</nav>
 </div>
 

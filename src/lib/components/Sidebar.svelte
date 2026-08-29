@@ -4,6 +4,7 @@
 	import Logo from './Logo.svelte';
 	import DomainSwitcher from './DomainSwitcher.svelte';
 	import { APP_NAME } from '$lib/constants';
+	import { t } from '$lib/i18n';
 	import type { Domain, MailboxCounts } from '$lib/types';
 
 	let {
@@ -30,22 +31,22 @@
 	};
 
 	const mailboxes = $derived<NavItem[]>([
-		{ href: '/inbox', icon: 'inbox-line', label: 'Inbox', badge: counts.inbox_unread },
+		{ href: '/inbox', icon: 'inbox-line', label: t('nav.inbox'), badge: counts.inbox_unread },
 		{
 			href: '/inbox?view=archive',
 			icon: 'archive-line',
-			label: 'Archive',
+			label: t('nav.archive'),
 			count: counts.archive
 		},
-		{ href: '/drafts', icon: 'draft-line', label: 'Drafts', count: counts.drafts },
-		{ href: '/sent', icon: 'send-plane-line', label: 'Sent' },
-		{ href: '/starred', icon: 'star-line', label: 'Starred', count: counts.starred },
-		{ href: '/trash', icon: 'delete-bin-line', label: 'Trash', count: counts.trash }
+		{ href: '/drafts', icon: 'draft-line', label: t('nav.drafts'), count: counts.drafts },
+		{ href: '/sent', icon: 'send-plane-line', label: t('nav.sent') },
+		{ href: '/starred', icon: 'star-line', label: t('nav.starred'), count: counts.starred },
+		{ href: '/trash', icon: 'delete-bin-line', label: t('nav.trash'), count: counts.trash }
 	]);
 
 	const tools = $derived<NavItem[]>([
-		{ href: '/settings', icon: 'user-settings-line', label: 'Settings' },
-		...(isAdmin ? [{ href: '/admin', icon: 'settings-3-line', label: 'Admin' }] : [])
+		{ href: '/settings', icon: 'user-settings-line', label: t('nav.settings') },
+		...(isAdmin ? [{ href: '/admin', icon: 'settings-3-line', label: t('nav.admin') }] : [])
 	]);
 
 	function isActive(href: string): boolean {
@@ -73,9 +74,9 @@
 		</a>
 	</div>
 
-	<a href="/compose" class="new-message" title="New message">
+	<a href="/compose" class="new-message" title={t('nav.newMessage')}>
 		<Icon name="pencil-line" size={collapsed ? 18 : 16} />
-		{#if !collapsed}<span>New message</span>{/if}
+		{#if !collapsed}<span>{t('nav.newMessage')}</span>{/if}
 	</a>
 
 	<nav class="nav">
@@ -103,7 +104,7 @@
 
 	{#if !collapsed && domains.length > 0}
 		<div class="section">
-			<p class="section-title">Domains</p>
+			<p class="section-title">{t('nav.domains')}</p>
 			<div class="section-body">
 				<DomainSwitcher {domains} {activeDomainId} block />
 			</div>
@@ -128,7 +129,7 @@
 		<button
 			type="button"
 			class="collapse-btn"
-			aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+			aria-label={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
 			onclick={() => (collapsed = !collapsed)}
 		>
 			<Icon name={collapsed ? 'arrow-right-double-line' : 'arrow-left-double-line'} size={15} />

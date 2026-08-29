@@ -1,39 +1,41 @@
 <script lang="ts">
-	const groups: { title: string; rows: { keys: string; label: string }[] }[] = [
+	import { t } from '$lib/i18n';
+
+	const groups = $derived([
 		{
-			title: 'General',
+			title: t('shortcuts.groupGeneral'),
 			rows: [
-				{ keys: '⌘K', label: 'Search' },
-				{ keys: 'C', label: 'Compose' },
-				{ keys: '?', label: 'Shortcuts' },
-				{ keys: 'Esc', label: 'Close' }
+				{ keys: '⌘K', label: t('shortcuts.search') },
+				{ keys: 'C', label: t('shortcuts.compose') },
+				{ keys: '?', label: t('shortcuts.shortcuts') },
+				{ keys: 'Esc', label: t('shortcuts.close') }
 			]
 		},
 		{
-			title: 'Mail',
+			title: t('shortcuts.groupMail'),
 			rows: [
-				{ keys: 'E', label: 'Archive' },
-				{ keys: 'D', label: 'Move to bin' },
-				{ keys: 'S', label: 'Star' },
-				{ keys: 'U', label: 'Mark unread' },
-				{ keys: 'R', label: 'Reply' },
-				{ keys: 'A', label: 'Reply all' },
-				{ keys: 'F', label: 'Forward' },
-				{ keys: '⌘↵', label: 'Send' }
+				{ keys: 'E', label: t('shortcuts.archive') },
+				{ keys: 'D', label: t('shortcuts.moveToBin') },
+				{ keys: 'S', label: t('shortcuts.star') },
+				{ keys: 'U', label: t('shortcuts.markUnread') },
+				{ keys: 'R', label: t('shortcuts.reply') },
+				{ keys: 'A', label: t('shortcuts.replyAll') },
+				{ keys: 'F', label: t('shortcuts.forward') },
+				{ keys: '⌘↵', label: t('shortcuts.send') }
 			]
 		},
 		{
-			title: 'Go to',
+			title: t('shortcuts.groupGoTo'),
 			rows: [
-				{ keys: 'G I', label: 'Inbox' },
-				{ keys: 'G D', label: 'Drafts' },
-				{ keys: 'G T', label: 'Sent' },
-				{ keys: 'G A', label: 'Archive' },
-				{ keys: 'G B', label: 'Bin' },
-				{ keys: 'G S', label: 'Settings' }
+				{ keys: 'G I', label: t('shortcuts.inbox') },
+				{ keys: 'G D', label: t('shortcuts.drafts') },
+				{ keys: 'G T', label: t('shortcuts.sent') },
+				{ keys: 'G A', label: t('nav.archive') },
+				{ keys: 'G B', label: t('nav.bin') },
+				{ keys: 'G S', label: t('nav.settings') }
 			]
 		}
-	];
+	]);
 
 	let { onClose }: { onClose: () => void } = $props();
 </script>
@@ -45,10 +47,10 @@
 		if (event.target === event.currentTarget) onClose();
 	}}
 >
-	<div class="z-sheet" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" tabindex="-1">
+	<div class="z-sheet" role="dialog" aria-modal="true" aria-label={t('shortcuts.title')} tabindex="-1">
 		<header class="z-sheet-head">
-			<h2>Keyboard shortcuts</h2>
-			<button type="button" class="z-icon-chip" onclick={onClose}>Close</button>
+			<h2>{t('shortcuts.title')}</h2>
+			<button type="button" class="z-icon-chip" onclick={onClose}>{t('common.close')}</button>
 		</header>
 		{#each groups as group (group.title)}
 			<h3 class="z-sheet-title">{group.title}</h3>

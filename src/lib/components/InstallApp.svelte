@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import { APP_NAME } from '$lib/constants';
+	import { t } from '$lib/i18n';
 	import {
 		clearInstallPrompt,
 		isIOS,
@@ -37,34 +38,34 @@
 <section class="surface-lg card">
 	<div class="card-head">
 		<div>
-			<h2><Icon name="smartphone-line" size={18} /> Home screen</h2>
+			<h2><Icon name="smartphone-line" size={18} /> {t('install.homeScreen')}</h2>
 			<p class="section-description">
 				{standalone
-					? `${APP_NAME} is installed on this device.`
-					: `Open ${APP_NAME} like a normal app, without browser chrome.`}
+					? t('install.installedOnDevice', { app: APP_NAME })
+					: t('install.openLikeApp', { app: APP_NAME })}
 			</p>
 		</div>
-		<span class="badge" class:on={standalone}>{standalone ? 'Installed' : 'Optional'}</span>
+		<span class="badge" class:on={standalone}>{standalone ? t('install.installed') : t('install.optional')}</span>
 	</div>
 
 	{#if standalone}
-		<p class="hint">Notifications and theme still apply while it runs on its own.</p>
+		<p class="hint">{t('install.stillApply')}</p>
 	{:else if ios}
 		<p class="hint">
 			<Icon name="share-forward-line" size={14} />
-			Tap Share, then Add to Home Screen.
+			{t('install.iosHint')}
 		</p>
 	{:else if deferred}
 		<div class="actions">
-			<p class="hint flush">Adds {APP_NAME} to the home screen or app drawer.</p>
+			<p class="hint flush">{t('install.addsToHome', { app: APP_NAME })}</p>
 			<button type="button" class="btn-primary" disabled={busy} onclick={install}>
-				{busy ? 'Installing…' : 'Install'}
+				{busy ? t('install.installing') : t('install.install')}
 			</button>
 		</div>
 	{:else}
 		<p class="hint">
 			<Icon name="information-line" size={14} />
-			Use the browser menu to install {APP_NAME} or add it to the home screen.
+			{t('install.browserMenu', { app: APP_NAME })}
 		</p>
 	{/if}
 </section>

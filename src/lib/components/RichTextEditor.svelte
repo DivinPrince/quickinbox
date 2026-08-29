@@ -1,9 +1,10 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { t } from '$lib/i18n';
 
 	let {
 		html = $bindable(''),
-		placeholder = 'Write your message…',
+		placeholder = t('compose.writeMessagePlaceholder'),
 		minHeight = 240,
 		embedded = false,
 		fill = false,
@@ -37,17 +38,24 @@
 		html = editor?.innerHTML ?? '';
 	}
 
-	const tools = [
-		{ icon: 'bold', command: 'bold', label: 'Bold' },
-		{ icon: 'italic', command: 'italic', label: 'Italic' },
-		{ icon: 'underline', command: 'underline', label: 'Underline' },
-		{ icon: 'list-unordered', command: 'insertUnorderedList', label: 'List' },
-		{ icon: 'link', command: 'createLink', label: 'Link', prompt: true }
-	] as const;
+	type EditorTool = {
+		icon: string;
+		command: string;
+		label: string;
+		prompt?: boolean;
+	};
 
-	function handleTool(tool: (typeof tools)[number]) {
-		if ('prompt' in tool && tool.prompt) {
-			const url = window.prompt('Link URL');
+	const tools = $derived<EditorTool[]>([
+		{ icon: 'bold', command: 'bold', label: t('editor.bold') },
+		{ icon: 'italic', command: 'italic', label: t('editor.italic') },
+		{ icon: 'underline', command: 'underline', label: t('editor.underline') },
+		{ icon: 'list-unordered', command: 'insertUnorderedList', label: t('editor.list') },
+		{ icon: 'link', command: 'createLink', label: t('editor.link'), prompt: true }
+	]);
+
+	function handleTool(tool: EditorTool) {
+		if (tool.prompt) {
+			const url = window.prompt(t('editor.linkUrl'));
 			if (url) exec('createLink', url);
 			return;
 		}

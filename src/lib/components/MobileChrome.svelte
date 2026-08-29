@@ -2,7 +2,9 @@
 	import { page } from '$app/stores';
 	import Icon from './Icon.svelte';
 	import DomainSwitcher from './DomainSwitcher.svelte';
+	import LocaleSwitcher from './LocaleSwitcher.svelte';
 	import { haptic, isMailboxPath, isMorePath } from '$lib/app-chrome';
+	import { t } from '$lib/i18n';
 	import type { Domain, MailboxCounts } from '$lib/types';
 
 	let {
@@ -51,9 +53,9 @@
 	});
 
 	const tabs = $derived([
-		{ href: '/inbox', icon: 'inbox-line', iconActive: 'inbox-fill', label: 'Inbox', badge: counts.inbox_unread },
-		{ href: '/starred', icon: 'star-line', iconActive: 'star-fill', label: 'Starred' },
-		{ href: '/sent', icon: 'send-plane-line', iconActive: 'send-plane-fill', label: 'Sent' }
+		{ href: '/inbox', icon: 'inbox-line', iconActive: 'inbox-fill', label: t('nav.inbox'), badge: counts.inbox_unread },
+		{ href: '/starred', icon: 'star-line', iconActive: 'star-fill', label: t('nav.starred') },
+		{ href: '/sent', icon: 'send-plane-line', iconActive: 'send-plane-fill', label: t('nav.sent') }
 	]);
 
 	function isTabActive(href: string): boolean {
@@ -64,7 +66,7 @@
 	const showFab = $derived(isMailboxPath($page.url.pathname));
 </script>
 
-<nav class="bottom-nav" aria-label="Primary">
+<nav class="bottom-nav" aria-label={t('common.primaryNav')}>
 	{#each tabs as tab (tab.href)}
 		<a
 			href={tab.href}
@@ -101,7 +103,7 @@
 				<span class="tab-dot"></span>
 			{/if}
 		</span>
-		<span class="tab-label">More</span>
+		<span class="tab-label">{t('common.more')}</span>
 	</button>
 </nav>
 
@@ -109,28 +111,28 @@
 	href="/compose"
 	class="compose-fab"
 	class:hidden={moreOpen || !showFab}
-	aria-label="New message"
+	aria-label={t('nav.newMessage')}
 	onclick={() => haptic(8)}
 >
 	<Icon name="pencil-fill" size={22} />
 </a>
 
 {#if moreOpen}
-	<button type="button" class="sheet-scrim" aria-label="Close menu" onclick={() => (moreOpen = false)}
+	<button type="button" class="sheet-scrim" aria-label={t('common.close')} onclick={() => (moreOpen = false)}
 	></button>
 	<div
 		bind:this={sheetEl}
 		class="sheet"
 		id="more-sheet"
 		role="dialog"
-		aria-label="More"
+		aria-label={t('common.more')}
 		aria-modal="true"
 	>
 		<div class="sheet-handle" aria-hidden="true"></div>
 		<nav class="sheet-nav">
 			<a href="/drafts" class="sheet-link" class:active={$page.url.pathname === '/drafts'}>
 				<Icon name="draft-line" size={20} />
-				<span>Drafts</span>
+				<span>{t('nav.drafts')}</span>
 				{#if counts.drafts}
 					<span class="sheet-count">{counts.drafts}</span>
 				{/if}
@@ -141,33 +143,33 @@
 				class:active={$page.url.pathname === '/archive' || $page.url.searchParams.get('view') === 'archive'}
 			>
 				<Icon name="archive-line" size={20} />
-				<span>Archive</span>
+				<span>{t('nav.archive')}</span>
 				{#if counts.archive}
 					<span class="sheet-count">{counts.archive}</span>
 				{/if}
 			</a>
 			<a href="/trash" class="sheet-link" class:active={$page.url.pathname === '/trash'}>
 				<Icon name="delete-bin-line" size={20} />
-				<span>Trash</span>
+				<span>{t('nav.trash')}</span>
 				{#if counts.trash}
 					<span class="sheet-count">{counts.trash}</span>
 				{/if}
 			</a>
 			<a href="/settings" class="sheet-link" class:active={$page.url.pathname === '/settings'}>
 				<Icon name="user-settings-line" size={20} />
-				<span>Settings</span>
+				<span>{t('nav.settings')}</span>
 			</a>
 			{#if isAdmin}
 				<a href="/admin" class="sheet-link" class:active={$page.url.pathname === '/admin'}>
 					<Icon name="settings-3-line" size={20} />
-					<span>Admin</span>
+					<span>{t('nav.admin')}</span>
 				</a>
 			{/if}
 		</nav>
 
 		{#if domains.length > 1}
 			<div class="sheet-section">
-				<p class="sheet-title">Domains</p>
+				<p class="sheet-title">{t('nav.domains')}</p>
 				<DomainSwitcher {domains} {activeDomainId} block />
 			</div>
 		{/if}
@@ -178,9 +180,16 @@
 			people go looking for it, there was no way to sign out at all.
 		-->
 		<div class="sheet-section">
+			<p class="sheet-title">{t('settings.language')}</p>
+			<div class="sheet-locales">
+				<LocaleSwitcher embedded />
+			</div>
+		</div>
+
+		<div class="sheet-section">
 			<button type="button" class="sheet-link sheet-logout" onclick={onLogout}>
 				<Icon name="logout-box-r-line" size={20} />
-				<span>Log out</span>
+				<span>{t('nav.logOut')}</span>
 			</button>
 		</div>
 	</div>
@@ -383,6 +392,32 @@
 			letter-spacing: 0.06em;
 			text-transform: uppercase;
 			color: var(--color-muted);
+		}
+
+		.sheet-locales :global(.locale-label) {
+			display: none;
+		}
+
+		.sheet-locales :global(button) {
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+			width: 100%;
+			min-height: 2.75rem;
+			padding: 0 0.75rem;
+			border: none;
+			border-radius: 0.75rem;
+			background: transparent;
+			font-size: 0.9375rem;
+			color: var(--color-text-secondary);
+			text-align: left;
+			cursor: pointer;
+		}
+
+		.sheet-locales :global(button[aria-selected='true']) {
+			background: var(--color-surface-hover);
+			color: var(--color-text);
+			font-weight: 500;
 		}
 
 		@keyframes sheet-up {

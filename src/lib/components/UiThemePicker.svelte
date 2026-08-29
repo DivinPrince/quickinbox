@@ -2,11 +2,12 @@
 	import { page } from '$app/stores';
 	import { switchUiTheme } from '$lib/ui-theme/apply';
 	import { BUILTIN_THEME_IDS } from '$lib/ui-theme/ids';
+	import { t } from '$lib/i18n';
 
-	const OPTIONS: { id: (typeof BUILTIN_THEME_IDS)[number]; name: string; hint: string }[] = [
-		{ id: 'zero', name: 'Zero', hint: 'Two-pane inbox' },
-		{ id: 'classic', name: 'Classic', hint: 'Stacked mailbox' }
-	];
+	const OPTIONS = $derived([
+		{ id: 'zero' as const, name: t('settings.themeZero'), hint: t('settings.themeZeroHint') },
+		{ id: 'classic' as const, name: t('settings.themeClassic'), hint: t('settings.themeClassicHint') }
+	]);
 
 	const current = $derived(($page.data.uiTheme as string | undefined) ?? 'zero');
 	let busy = $state(false);
@@ -22,7 +23,7 @@
 	}
 </script>
 
-<div class="ui-theme-options" role="radiogroup" aria-label="Interface">
+<div class="ui-theme-options" role="radiogroup" aria-label={t('settings.interface')}>
 	{#each OPTIONS as option (option.id)}
 		<button
 			type="button"

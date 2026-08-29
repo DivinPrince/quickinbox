@@ -117,6 +117,13 @@
 	pointer-events: none;
 }
 
+[data-ui-theme='zero'] .z-account-actions {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+	gap: 0.1rem;
+}
+
 [data-ui-theme='zero'] .z-dots {
 	display: grid;
 	place-items: center;
@@ -214,6 +221,10 @@
 [data-ui-theme='zero'] .z-menu button:hover,
 [data-ui-theme='zero'] .z-menu a:hover {
 	background: var(--z-hover);
+	opacity: 1;
+}
+
+[data-ui-theme='zero'] .z-menu button[aria-selected='true'] {
 	opacity: 1;
 }
 

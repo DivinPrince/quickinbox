@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { hasInAppHistory } from '$lib/app-chrome';
+	import { t } from '$lib/i18n';
 	import Icon from './Icon.svelte';
 
 	let {
@@ -36,7 +37,7 @@
 
 <header class="stack-header" class:no-back={!back}>
 	{#if back}
-		<button type="button" class="stack-back" aria-label={close ? 'Close' : 'Back'} onclick={goBack}>
+		<button type="button" class="stack-back" aria-label={close ? t('common.close') : t('common.back')} onclick={goBack}>
 			<Icon name={close ? 'close-line' : 'arrow-left-line'} size={22} />
 		</button>
 	{/if}

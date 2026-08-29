@@ -7,6 +7,8 @@
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { hasInAppHistory, requestSkipViewTransition } from '$lib/app-chrome';
 	import { APP_NAME } from '$lib/constants';
+	import { plural, t } from '$lib/i18n';
+	import { page } from '$app/stores';
 	import type { OutboundAttachmentInput } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -92,12 +94,12 @@
 		try {
 			const response = await patch({ archived: !data.archived });
 			if (!response?.ok) {
-				error = 'Could not update this conversation.';
+				error = t('mailbox.couldNotUpdateConversation');
 				return;
 			}
 			goto(data.archived ? '/inbox?view=archive' : '/inbox');
 		} catch {
-			error = 'Network error while updating this conversation.';
+			error = t('mailbox.conversationNetwork');
 		}
 	}
 
@@ -160,7 +162,7 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? 'Failed to forward';
+				error = body.error ?? t('thread.failedToForward');
 				return;
 			}
 
@@ -170,7 +172,7 @@
 			// The forward is our own message now, so the mailbox has changed.
 			await invalidateAll();
 		} catch {
-			error = 'Network error';
+			error = t('common.networkError');
 		} finally {
 			sending = false;
 		}
@@ -196,7 +198,7 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? 'Failed to send';
+				error = body.error ?? t('compose.failedToSend');
 				return;
 			}
 
@@ -206,7 +208,7 @@
 			// The sent reply is now part of this conversation.
 			await invalidateAll();
 		} catch {
-			error = 'Network error';
+			error = t('common.networkError');
 		} finally {
 			sending = false;
 		}
@@ -222,7 +224,7 @@
 		<a
 			href={backHref}
 			class="btn-ghost back-btn"
-			aria-label="Back"
+			aria-label={t('common.back')}
 			onclick={(event) => {
 				if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
 				event.preventDefault();
@@ -237,37 +239,37 @@
 				type="button"
 				class="icon-btn"
 				class:starred
-				aria-label={starred ? 'Remove star' : 'Add star'}
+				aria-label={starred ? t('mailbox.removeStar') : t('mailbox.addStar')}
 				onclick={toggleStar}
 			>
 				<Icon name={starred ? 'star-fill' : 'star-line'} size={16} />
 			</button>
 
 			{#if data.trashed}
-				<button type="button" class="icon-btn" aria-label="Restore" onclick={restore}>
+				<button type="button" class="icon-btn" aria-label={t('mailbox.restore')} onclick={restore}>
 					<Icon name="arrow-go-back-line" size={16} />
 				</button>
 				<button
 					type="button"
 					class="icon-btn danger"
-					aria-label="Delete permanently"
+					aria-label={t('mailbox.deletePermanently')}
 					onclick={destroy}
 				>
 					<Icon name="delete-bin-2-line" size={16} />
 				</button>
 			{:else}
-				<button type="button" class="icon-btn" aria-label="Mark as unread" onclick={markUnread}>
+				<button type="button" class="icon-btn" aria-label={t('mailbox.markUnread')} onclick={markUnread}>
 					<Icon name="mail-line" size={16} />
 				</button>
 				<button
 					type="button"
 					class="icon-btn"
-					aria-label={data.archived ? 'Move to inbox' : 'Archive'}
+					aria-label={data.archived ? t('mailbox.moveToInbox') : t('nav.archive')}
 					onclick={toggleArchive}
 				>
 					<Icon name={data.archived ? 'inbox-line' : 'archive-line'} size={16} />
 				</button>
-				<button type="button" class="icon-btn" aria-label="Move to trash" onclick={trash}>
+				<button type="button" class="icon-btn" aria-label={t('mailbox.moveToTrash')} onclick={trash}>
 					<Icon name="delete-bin-line" size={16} />
 				</button>
 			{/if}
@@ -276,7 +278,7 @@
 				type="button"
 				class="icon-btn"
 				class:active={forwardOpen}
-				aria-label="Forward"
+				aria-label={t('thread.forward')}
 				onclick={openForward}
 			>
 				<Icon name="share-forward-line" size={16} />
@@ -284,7 +286,7 @@
 
 			<button type="button" class="btn-primary reply-launch" onclick={openReply}>
 				<Icon name="reply-line" size={16} />
-				{replyOpen ? 'Close' : 'Reply'}
+				{replyOpen ? t('common.close') : t('thread.reply')}
 			</button>
 		</div>
 	</header>
@@ -297,13 +299,13 @@
 		<div class="subject-row">
 			<h1>{data.subject}</h1>
 			{#if messages.length > 1}
-				<span class="thread-count">{messages.length} messages</span>
+				<span class="thread-count">{plural($page.data.locale, 'thread.messagesCount', 'thread.messagesCount', messages.length)}</span>
 			{/if}
 		</div>
 
 		{#if collapsedCount > 0}
 			<button type="button" class="expand-all" onclick={expandAll}>
-				Expand all {messages.length} messages
+				{t('thread.expandAll', { count: messages.length })}
 			</button>
 		{/if}
 
@@ -322,12 +324,12 @@
 	{#if forwardOpen}
 		<form class="reply-section" onsubmit={sendForward}>
 			<div class="forward-row">
-				<label class="field-label" for="forward-to">To</label>
+				<label class="field-label" for="forward-to">{t('compose.to')}</label>
 				<input
 					id="forward-to"
 					type="text"
 					bind:value={forwardTo}
-					placeholder="recipient@example.com"
+					placeholder={t('compose.recipientPlaceholder')}
 					autocomplete="off"
 					autocapitalize="none"
 					spellcheck="false"
@@ -337,7 +339,7 @@
 			</div>
 			{#if data.replyFrom}
 				<p class="reply-from">
-					From
+					{t('compose.from')}
 					<strong>
 						{#if data.replyFromName}{data.replyFromName} · {/if}{data.replyFrom}
 					</strong>
@@ -348,24 +350,24 @@
 				bind:html={forwardHtml}
 				embedded
 				minHeight={140}
-				placeholder="Add a note…"
+				placeholder={t('thread.notePlaceholder')}
 			/>
 
 			{#if forwardFiles > 0}
 				<label class="forward-files">
 					<input type="checkbox" bind:checked={includeAttachments} />
-					Include {forwardFiles === 1 ? 'the attachment' : `all ${forwardFiles} attachments`}
+					{plural($page.data.locale, 'compose.includeAttachments', 'compose.includeAttachmentsPlural', forwardFiles)}
 				</label>
 			{/if}
 
 			<div class="reply-footer forward-footer">
 				<div class="reply-actions">
 					<button type="button" class="btn-ghost" onclick={() => (forwardOpen = false)}>
-						Cancel
+						{t('common.cancel')}
 					</button>
 					<button type="submit" class="btn-primary" disabled={sending}>
 						<Icon name="share-forward-line" size={16} />
-						{sending ? 'Sending…' : 'Forward'}
+						{sending ? t('common.sending') : t('thread.forward')}
 					</button>
 				</div>
 			</div>
@@ -377,31 +379,31 @@
 	{:else if replyOpen}
 		<form class="reply-section" onsubmit={sendReply}>
 			<p class="reply-to">
-				Replying to
+				{t('thread.replyingTo')}
 				<strong>
 					{latest?.direction === 'inbound' ? latest.from_addr : latest?.to_addr}
 				</strong>
 			</p>
 			{#if data.replyFrom}
 				<p class="reply-from">
-					From
+					{t('compose.from')}
 					<strong>
 						{#if data.replyFromName}{data.replyFromName} · {/if}{data.replyFrom}
 					</strong>
 				</p>
 			{/if}
 
-			<RichTextEditor bind:html={replyHtml} embedded minHeight={160} placeholder="Reply…" />
+			<RichTextEditor bind:html={replyHtml} embedded minHeight={160} placeholder={t('thread.replyPlaceholder')} />
 
 			<div class="reply-footer">
 				<AttachmentPicker bind:attachments={replyAttachments} />
 				<div class="reply-actions">
 					<button type="button" class="btn-ghost" onclick={() => (replyOpen = false)}>
-						Cancel
+						{t('common.cancel')}
 					</button>
 					<button type="submit" class="btn-primary" disabled={sending}>
 						<Icon name="send-plane-2-fill" size={16} />
-						{sending ? 'Sending…' : 'Send'}
+						{sending ? t('common.sending') : t('common.send')}
 					</button>
 				</div>
 			</div>
@@ -413,7 +415,7 @@
 	{:else}
 		<button type="button" class="reply-prompt" onclick={openReply}>
 			<Icon name="reply-line" size={15} />
-			Reply
+			{t('thread.reply')}
 		</button>
 	{/if}
 </div>

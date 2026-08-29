@@ -9,6 +9,7 @@
 		subscriptionUsesPublicKey,
 		supportsWebPush
 	} from '$lib/push-client';
+	import { t } from '$lib/i18n';
 
 	let {
 		configured,
@@ -32,18 +33,18 @@
 	let pushError = $state('');
 	const pushStatusLabel = $derived(
 		({
-			loading: 'Checking',
-			unsupported: 'Unsupported',
-			unconfigured: 'Setup required',
-			denied: 'Blocked',
-			disabled: 'Off',
-			enabled: 'On',
-			error: 'Error'
+			loading: t('notifications.checking'),
+			unsupported: t('notifications.unsupported'),
+			unconfigured: t('notifications.setupRequired'),
+			denied: t('notifications.blocked'),
+			disabled: t('notifications.off'),
+			enabled: t('notifications.on'),
+			error: t('notifications.error')
 		} satisfies Record<PushState, string>)[pushState]
 	);
 
 	function pushErrorMessage(error: unknown): string {
-		return error instanceof Error ? error.message : 'Could not update notifications';
+		return error instanceof Error ? error.message : t('notifications.updateFailed');
 	}
 
 	async function refreshPushState() {
@@ -93,8 +94,8 @@
 				pushState = permission === 'denied' ? 'denied' : 'disabled';
 				pushError =
 					permission === 'denied'
-						? 'Notifications are blocked in this browser. Allow them in site settings.'
-						: 'Notification permission was not granted.';
+						? t('notifications.blockedHint')
+						: t('notifications.notGranted');
 				return;
 			}
 
@@ -132,8 +133,8 @@
 <section class="surface-lg card">
 	<div class="card-head">
 		<div>
-			<h2><Icon name="notification-3-line" size={18} /> Notifications</h2>
-			<p class="section-description">Get an alert when new mail arrives, even after closing the app.</p>
+			<h2><Icon name="notification-3-line" size={18} /> {t('notifications.title')}</h2>
+			<p class="section-description">{t('notifications.description')}</p>
 		</div>
 		<span class="badge" class:notification-on={pushState === 'enabled'}>{pushStatusLabel}</span>
 	</div>
@@ -141,24 +142,24 @@
 	{#if pushState === 'unconfigured'}
 		<p class="hint">
 			<Icon name="information-line" size={14} />
-			The server needs VAPID keys before notifications can be enabled.
+			{t('notifications.unconfigured')}
 		</p>
 	{:else if pushState === 'unsupported'}
 		<p class="hint">
 			<Icon name="information-line" size={14} />
-			This browser does not support Web Push notifications.
+			{t('notifications.unsupportedHint')}
 		</p>
 	{:else if pushState === 'denied'}
 		<p class="hint">
 			<Icon name="information-line" size={14} />
-			Notifications are blocked. Allow them for this site in your browser settings.
+			{t('notifications.blockedSite')}
 		</p>
 	{:else}
 		<div class="notification-controls">
 			<p class="hint notification-hint">
 				{pushState === 'enabled'
-					? 'This browser will receive notifications for your account.'
-					: 'Permission is requested only when you enable notifications.'}
+					? t('notifications.enabledHint')
+					: t('notifications.permissionHint')}
 			</p>
 			{#if pushState === 'enabled'}
 				<button
@@ -167,7 +168,7 @@
 					disabled={pushBusy}
 					onclick={disableDesktopNotifications}
 				>
-					{pushBusy ? 'Disabling…' : 'Disable'}
+					{pushBusy ? t('notifications.disabling') : t('notifications.disable')}
 				</button>
 			{:else}
 				<button
@@ -176,7 +177,7 @@
 					disabled={pushBusy || pushState === 'loading'}
 					onclick={enableDesktopNotifications}
 				>
-					{pushBusy ? 'Enabling…' : pushState === 'loading' ? 'Checking…' : 'Enable'}
+					{pushBusy ? t('notifications.enabling') : pushState === 'loading' ? t('notifications.checkingAction') : t('notifications.enable')}
 				</button>
 			{/if}
 		</div>
