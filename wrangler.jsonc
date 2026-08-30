@@ -36,9 +36,9 @@
 
 	"vars": {
 		"EMAIL_PROVIDER": "resend",
-		// Only used when EMAIL_PROVIDER=cloudflare. Comma-separated domains
-		// onboarded in Email Service / Email Routing.
-		"CLOUDFLARE_MAIL_DOMAINS": ""
+		// Only used when EMAIL_PROVIDER=cloudflare. Leave commented so the
+		// dashboard deploy form does not require it for Resend.
+		// "CLOUDFLARE_MAIL_DOMAINS": "example.com"
 	},
 
 	"send_email": [

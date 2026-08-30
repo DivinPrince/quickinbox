@@ -92,6 +92,14 @@ if (!existsSync(wranglerPath)) {
 	if (route && !route[1].includes('example.com')) {
 		fail(`wrangler.jsonc has a live route pattern: ${route[1]} — it should stay commented out`);
 	}
+	// The Deploy to Cloudflare form treats every wrangler `vars` entry as a
+	// required HTML input. An empty CLOUDFLARE_MAIL_DOMAINS blocks Resend
+	// deploys; keep it commented unless EMAIL_PROVIDER=cloudflare.
+	if (/^\s*"CLOUDFLARE_MAIL_DOMAINS"\s*:\s*""/m.test(wrangler)) {
+		fail(
+			'wrangler.jsonc has an empty CLOUDFLARE_MAIL_DOMAINS var — comment it out so Resend deploys are not blocked'
+		);
+	}
 }
 
 // 4. The licence has to ship with the code.
