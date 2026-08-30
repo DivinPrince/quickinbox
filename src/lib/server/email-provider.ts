@@ -70,6 +70,9 @@ export function providerLabel(kind: EmailProviderKind): string {
 	}
 }
 
+/** IANA reserved names used as dashboard placeholders; not real mail domains. */
+const TEMPLATE_PLACEHOLDER_DOMAINS = new Set(['example.com', 'example.org', 'example.net']);
+
 export function parseMailDomains(value: string | undefined | null): string[] {
 	if (!value?.trim()) return [];
 	const seen = new Set<string>();
@@ -77,7 +80,7 @@ export function parseMailDomains(value: string | undefined | null): string[] {
 
 	for (const part of value.split(',')) {
 		const name = part.trim().toLowerCase().replace(/^@/, '');
-		if (!name || seen.has(name)) continue;
+		if (!name || seen.has(name) || TEMPLATE_PLACEHOLDER_DOMAINS.has(name)) continue;
 		seen.add(name);
 		domains.push(name);
 	}

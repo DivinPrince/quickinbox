@@ -92,12 +92,13 @@ if (!existsSync(wranglerPath)) {
 	if (route && !route[1].includes('example.com')) {
 		fail(`wrangler.jsonc has a live route pattern: ${route[1]} — it should stay commented out`);
 	}
-	// The Deploy to Cloudflare form treats every wrangler `vars` entry as a
-	// required HTML input. An empty CLOUDFLARE_MAIL_DOMAINS blocks Resend
-	// deploys; keep it commented unless EMAIL_PROVIDER=cloudflare.
-	if (/^\s*"CLOUDFLARE_MAIL_DOMAINS"\s*:\s*""/m.test(wrangler)) {
+	// The dashboard treats every wrangler var as a required HTML input.
+	// Prefill with example.com (never an empty string) so Resend can deploy
+	// and Cloudflare users can replace it on the form.
+	const domainsVar = wrangler.match(/^\s*"CLOUDFLARE_MAIL_DOMAINS"\s*:\s*"([^"]*)"/m);
+	if (!domainsVar || domainsVar[1] === '') {
 		fail(
-			'wrangler.jsonc has an empty CLOUDFLARE_MAIL_DOMAINS var — comment it out so Resend deploys are not blocked'
+			'wrangler.jsonc must set CLOUDFLARE_MAIL_DOMAINS to a non-empty placeholder such as example.com'
 		);
 	}
 }
