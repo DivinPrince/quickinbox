@@ -91,6 +91,7 @@ function addressesIn(value: string | null | undefined): string[] {
 export type ThreadLookup = {
 	/** Id already minted for the message being inserted; used as a new thread id. */
 	emailId: string;
+	direction: 'inbound' | 'outbound';
 	subject: string;
 	from: string;
 	to: string;
@@ -148,12 +149,14 @@ export async function resolveThreadId(
 
 	if (input.subjectMatch !== false) {
 		const threadKey = normalizeSubject(input.subject);
+		// Only the correspondent side identifies a conversation. Including both
+		// sides lets every message overlap through the user's own mailbox.
+		const correspondentAddresses =
+			input.direction === 'inbound'
+				? addressesIn(input.from)
+				: [...addressesIn(input.to), ...addressesIn(input.cc)];
 		const participants = [
-			...new Set([
-				...addressesIn(input.from),
-				...addressesIn(input.to),
-				...addressesIn(input.cc)
-			])
+			...new Set(correspondentAddresses)
 		].slice(0, MAX_PARTICIPANTS);
 
 		if (threadKey && threadKey !== '(no subject)' && participants.length > 0) {

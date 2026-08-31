@@ -60,6 +60,7 @@ export async function insertEmail(
 	// view never has to guess.
 	const threadId = await resolveThreadId(db, input.userId, {
 		emailId: id,
+		direction: input.direction,
 		subject: input.subject,
 		from: input.from,
 		to: input.to,
