@@ -57,3 +57,38 @@ describe('domain-scoped threading', () => {
 		assert.equal(threadId, 'earlier-thread');
 	});
 });
+
+describe('subject fallback', () => {
+	test('does not merge a forward through the sender mailbox when disabled', async () => {
+		let subjectLookupRan = false;
+		const db = {
+			prepare(sql: string) {
+				subjectLookupRan = subjectLookupRan || sql.includes('AND thread_key = ?');
+				return {
+					bind() {
+						return {
+							async first() {
+								return {
+									id: 'alice-message',
+									thread_id: 'alice-thread'
+								};
+							}
+						};
+					}
+				};
+			}
+		} as unknown as D1Database;
+
+		const threadId = await resolveThreadId(db, 'user-1', {
+			emailId: 'forward-to-bob',
+			subject: 'Fwd: Quarterly figures',
+			from: 'me@example.com',
+			to: 'bob@example.com',
+			domainId: 'example.com',
+			subjectMatch: false
+		});
+
+		assert.equal(threadId, 'forward-to-bob');
+		assert.equal(subjectLookupRan, false);
+	});
+});
