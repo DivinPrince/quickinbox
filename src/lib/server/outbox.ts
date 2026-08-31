@@ -2,7 +2,11 @@ import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { MailAddress, OutboundAttachmentInput, User } from '$lib/types';
 import { appendEmailSignature, pickEmailSignature } from '$lib/email-signature';
 import { base64ByteLength, insertAttachments } from './attachments';
-import { MAX_TOTAL_ATTACHMENT_BYTES } from './constants';
+import {
+	MAX_ATTACHMENT_BYTES,
+	MAX_ATTACHMENTS_PER_EMAIL,
+	MAX_TOTAL_ATTACHMENT_BYTES
+} from './constants';
 import {
 	getAddressForUser,
 	getDefaultAddress,
@@ -40,6 +44,28 @@ export function assertTotalAttachmentBytes(totalBytes: number): void {
 	if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
 		throw new Error('Attachments exceed the total size limit');
 	}
+}
+
+/** Reject attachment sets before provider delivery or Sent-folder persistence. */
+export function assertOutboundAttachments(
+	attachments: OutboundAttachmentInput[],
+	allowCombinedAttachments = false
+): void {
+	if (!allowCombinedAttachments && attachments.length > MAX_ATTACHMENTS_PER_EMAIL) {
+		throw new Error(`Maximum ${MAX_ATTACHMENTS_PER_EMAIL} attachments allowed`);
+	}
+
+	for (const attachment of attachments) {
+		const bytes = base64ByteLength(attachment.content);
+		if (bytes > MAX_ATTACHMENT_BYTES) {
+			const limitMb = MAX_ATTACHMENT_BYTES / (1024 * 1024);
+			throw new Error(`"${attachment.filename}" exceeds ${limitMb}MB limit`);
+		}
+	}
+
+	assertTotalAttachmentBytes(
+		attachments.reduce((sum, attachment) => sum + base64ByteLength(attachment.content), 0)
+	);
 }
 
 /**
@@ -132,11 +158,7 @@ export async function sendAndStore(
 	});
 
 	const attachments = input.attachments ?? [];
-	const totalBytes = attachments.reduce(
-		(sum, file) => sum + base64ByteLength(file.content),
-		0
-	);
-	assertTotalAttachmentBytes(totalBytes);
+	assertOutboundAttachments(attachments, input.allowCombinedAttachments);
 
 	const { providerId } = await sendOutboundEmail(provider, {
 		from,
