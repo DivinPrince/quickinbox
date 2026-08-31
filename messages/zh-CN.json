@@ -83,6 +83,20 @@
 		"signingIn": "正在登录…",
 		"loginFailed": "登录失败"
 	},
+	"accountSetup": {
+		"title": "完成账户设置 — {app}",
+		"heading": "设置你的账户",
+		"description": "请先更换临时密码，再进入邮箱。你也可以修改姓名。",
+		"name": "你的姓名",
+		"newPassword": "新密码",
+		"confirmPassword": "确认新密码",
+		"passwordHint": "请至少使用 8 个字符，并选择与临时密码不同的密码。",
+		"passwordMismatch": "两次输入的密码不一致",
+		"continue": "保存并继续",
+		"saving": "正在保存…",
+		"failed": "无法完成账户设置",
+		"complete": "账户设置已完成。请使用新密码登录。"
+	},
 	"setup": {
 		"title": "开始使用 — {app}",
 		"chooseDomain": "选择你的域名",
@@ -428,9 +442,10 @@
 		"goesTo": "发送到 {label}。",
 		"availableIn": "可在 {provider} 中使用",
 		"newUser": "新用户",
-		"newUserHint": "该地址即为其登录账号。",
+		"newUserHint": "该地址即为其登录账号。用户必须先更换临时密码，才能打开邮箱。",
 		"displayName": "显示名称",
 		"temporaryPassword": "临时密码",
+		"pendingAccountSetup": "等待首次登录设置",
 		"makeAdmin": "将此用户设为管理员",
 		"users": "用户",
 		"failedCreateUser": "创建用户失败",

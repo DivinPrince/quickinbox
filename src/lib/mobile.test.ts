@@ -112,7 +112,7 @@ test('stacked swipe wrapper does not become a phone column on desktop', () => {
 });
 
 test('compose is not a centred reading column on desktop', () => {
-	const source = readFileSync(join(root, 'src/routes/+layout.svelte'), 'utf8');
+	const source = readFileSync(join(root, 'src/themes/classic/Shell.svelte'), 'utf8');
 	assert.match(source, /const NARROW = \['\/mail', '\/settings'\]/);
 	assert.doesNotMatch(source, /NARROW = \[[^\]]*\/compose/);
 });

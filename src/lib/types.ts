@@ -3,6 +3,7 @@ export type User = {
 	email: string;
 	name: string;
 	is_admin: boolean;
+	must_change_password: boolean;
 	created_at: string;
 };
 

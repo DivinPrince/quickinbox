@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { authorizeApiRequest, authorizeMailAction } from './api-access';
+import {
+	authorizeApiRequest,
+	authorizeMailAction,
+	canAccessDuringFirstLogin
+} from './api-access';
 import { parseScopes } from './api-tokens';
 
 describe('API key access', () => {
@@ -259,5 +263,13 @@ describe('API key access', () => {
 			}),
 			{ ok: true }
 		);
+	});
+});
+
+describe('first-login API access', () => {
+	test('only permits the setup completion request', () => {
+		assert.equal(canAccessDuringFirstLogin('/api/auth/complete-setup', 'POST'), true);
+		assert.equal(canAccessDuringFirstLogin('/api/auth/complete-setup', 'GET'), false);
+		assert.equal(canAccessDuringFirstLogin('/api/mail', 'GET'), false);
 	});
 });

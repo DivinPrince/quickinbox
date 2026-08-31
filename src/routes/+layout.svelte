@@ -12,14 +12,18 @@
 	} from '$lib/app-chrome';
 	import { setupMobileViewTransitions } from '$lib/view-transitions';
 	import { persistUiTheme } from '$lib/ui-theme/apply';
-import { persistLocale } from '$lib/i18n';
+	import { persistLocale } from '$lib/i18n';
 	import { getTheme } from '$lib/ui-theme/registry';
 	import type { ThemeShellData } from '$lib/ui-theme/types';
 	import type { LayoutData } from './$types';
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
 
-	const showShell = $derived(Boolean(data.user) && $page.url.pathname !== '/onboarding');
+	const showShell = $derived(
+		Boolean(data.user) &&
+			$page.url.pathname !== '/onboarding' &&
+			$page.url.pathname !== '/account/setup'
+	);
 	const ThemeShell = $derived(getTheme(data.uiTheme).Shell);
 	const shellData = $derived.by((): ThemeShellData | null => {
 		if (!data.user) return null;

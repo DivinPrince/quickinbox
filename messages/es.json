@@ -83,6 +83,20 @@
 		"signingIn": "Iniciando sesión…",
 		"loginFailed": "Error al iniciar sesión"
 	},
+	"accountSetup": {
+		"title": "Completar cuenta — {app}",
+		"heading": "Configura tu cuenta",
+		"description": "Reemplaza la contraseña temporal antes de acceder al correo. También puedes cambiar tu nombre.",
+		"name": "Tu nombre",
+		"newPassword": "Nueva contraseña",
+		"confirmPassword": "Confirmar nueva contraseña",
+		"passwordHint": "Usa al menos 8 caracteres y elige una contraseña distinta de la temporal.",
+		"passwordMismatch": "Las contraseñas no coinciden",
+		"continue": "Guardar y continuar",
+		"saving": "Guardando…",
+		"failed": "No se pudo completar la configuración de la cuenta",
+		"complete": "Cuenta configurada. Inicia sesión con tu nueva contraseña."
+	},
 	"setup": {
 		"title": "Empezar — {app}",
 		"chooseDomain": "Elige tu dominio",
@@ -428,9 +442,10 @@
 		"goesTo": "Va a {label}.",
 		"availableIn": "Disponible en {provider}",
 		"newUser": "Nuevo usuario",
-		"newUserHint": "La dirección es su inicio de sesión.",
+		"newUserHint": "La dirección es su inicio de sesión. Debe reemplazar la contraseña temporal antes de abrir el correo.",
 		"displayName": "Nombre visible",
 		"temporaryPassword": "Contraseña temporal",
+		"pendingAccountSetup": "Esperando la configuración inicial",
 		"makeAdmin": "Hacer administrador a este usuario",
 		"users": "Usuarios",
 		"failedCreateUser": "Error al crear el usuario",
