@@ -1,3 +1,4 @@
+import type { OutboundAttachmentInput } from '$lib/types';
 import { base64ToBytes } from '../attachments';
 import { parseMailDomains, ProviderError, type EmailProvider, type ProviderDomain } from '../email-provider';
 import type { OutboundMailInput, OutboundMailResult } from '../send-mail';
@@ -21,14 +22,24 @@ export type CloudflareSendPayload = {
 	bcc?: string | string[];
 	replyTo?: string | { email: string; name?: string };
 	headers?: Record<string, string>;
-	attachments?: Array<{
-		content: string | ArrayBuffer | ArrayBufferView;
-		filename: string;
-		type?: string;
-		disposition?: 'attachment' | 'inline';
-		contentId?: string;
-	}>;
+	attachments?: CloudflareAttachment[];
 };
+
+type CloudflareAttachmentBase = {
+	content: string | ArrayBuffer | ArrayBufferView;
+	filename: string;
+	type?: string;
+};
+
+type CloudflareAttachment =
+	| (CloudflareAttachmentBase & {
+			disposition: 'inline';
+			contentId: string;
+	  })
+	| (CloudflareAttachmentBase & {
+			disposition: 'attachment';
+			contentId?: never;
+	  });
 
 export function createCloudflareProvider(
 	email: CloudflareSendEmailBinding,
@@ -52,12 +63,7 @@ export function createCloudflareProvider(
 						: {}),
 					...(input.attachments?.length
 						? {
-								attachments: input.attachments.map((file) => ({
-									filename: file.filename,
-									type: file.type,
-									content: base64ToArrayBuffer(file.content),
-									disposition: 'attachment' as const
-								}))
+								attachments: input.attachments.map(toCloudflareAttachment)
 							}
 						: {})
 				});
@@ -86,6 +92,26 @@ export function createCloudflareProvider(
 			}
 			return cloudflareDomain(match);
 		}
+	};
+}
+
+function toCloudflareAttachment(file: OutboundAttachmentInput): CloudflareAttachment {
+	const content = base64ToArrayBuffer(file.content);
+	if (file.disposition !== 'attachment' && file.contentId) {
+		return {
+			filename: file.filename,
+			type: file.type,
+			content,
+			disposition: 'inline',
+			contentId: file.contentId
+		};
+	}
+
+	return {
+		filename: file.filename,
+		type: file.type,
+		content,
+		disposition: 'attachment'
 	};
 }
 
