@@ -76,8 +76,24 @@ export function supportsDarkScheme(html: string): boolean {
  */
 const COLOUR_DECLARATION =
 	/\b(background(?:-color)?|color|border(?:-[a-z-]+)?|outline(?:-[a-z-]+)?)\s*:[^;}"'<>]*/gi;
-const COLOUR_LITERAL = /#[0-9a-f]{3,8}|rgba?\([^)]*\)/gi;
-const COLOUR_ATTRIBUTE = /\b(bgcolor|color)\s*=\s*(["']?)(#[0-9a-f]{3,8}|rgba?\([^)]*\))\2/gi;
+const NAMED_COLOUR = /\b(?:black|white|darkgray|darkgrey|lightgray|lightgrey)\b/;
+const COLOUR_LITERAL = new RegExp(
+	`#[0-9a-f]{3,8}|rgba?\\([^)]*\\)|${NAMED_COLOUR.source}`,
+	'gi'
+);
+const COLOUR_ATTRIBUTE = new RegExp(
+	`\\b(bgcolor|color)\\s*=\\s*(["']?)(#[0-9a-f]{3,8}|rgba?\\([^)]*\\)|${NAMED_COLOUR.source})\\2`,
+	'gi'
+);
+
+const NAMED_COLOUR_VALUES: Record<string, [number, number, number, number]> = {
+	black: [0, 0, 0, 1],
+	white: [1, 1, 1, 1],
+	darkgray: [169 / 255, 169 / 255, 169 / 255, 1],
+	darkgrey: [169 / 255, 169 / 255, 169 / 255, 1],
+	lightgray: [211 / 255, 211 / 255, 211 / 255, 1],
+	lightgrey: [211 / 255, 211 / 255, 211 / 255, 1]
+};
 
 function rgba(literal: string): [number, number, number, number] | null {
 	const value = literal.trim().toLowerCase();
@@ -104,15 +120,34 @@ function rgba(literal: string): [number, number, number, number] | null {
 		];
 	}
 
-	const numbers = value
+	const named = NAMED_COLOUR_VALUES[value];
+	if (named) return named;
+
+	const parts = value
 		.replace(/rgba?|\(|\)/g, '')
 		.split(/[,/\s]+/)
-		.map((part) => Number.parseFloat(part))
-		.filter((part) => !Number.isNaN(part));
-	if (numbers.length < 3) return null;
+		.filter(Boolean);
+	if (parts.length < 3) return null;
 
-	const clamp = (channel: number) => Math.min(1, Math.max(0, channel / 255));
-	return [clamp(numbers[0]), clamp(numbers[1]), clamp(numbers[2]), numbers[3] ?? 1];
+	const channel = (part: string) => {
+		const parsed = Number.parseFloat(part);
+		if (Number.isNaN(parsed)) return null;
+		const normalized = part.endsWith('%') ? parsed / 100 : parsed / 255;
+		return Math.min(1, Math.max(0, normalized));
+	};
+	const alpha = (part: string | undefined) => {
+		if (!part) return 1;
+		const parsed = Number.parseFloat(part);
+		if (Number.isNaN(parsed)) return null;
+		const normalized = part.endsWith('%') ? parsed / 100 : parsed;
+		return Math.min(1, Math.max(0, normalized));
+	};
+	const red = channel(parts[0]);
+	const green = channel(parts[1]);
+	const blue = channel(parts[2]);
+	const opacity = alpha(parts[3]);
+	if (red === null || green === null || blue === null || opacity === null) return null;
+	return [red, green, blue, opacity];
 }
 
 /**

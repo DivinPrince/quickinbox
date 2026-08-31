@@ -56,9 +56,12 @@
 	}
 
 	function markThreadRead(threadId: string) {
-		items = items.map((thread) =>
-			thread.thread_id === threadId ? { ...thread, is_read: true } : thread
-		);
+		items = filters.unreadOnly
+			? items.filter((thread) => thread.thread_id !== threadId)
+			: items.map((thread) =>
+					thread.thread_id === threadId ? { ...thread, is_read: true } : thread
+				);
+		void invalidateAll();
 	}
 
 	function setChip(next: 'all' | 'unread' | 'starred') {

@@ -32,8 +32,8 @@ export type ComposeInput = {
 	attachments?: OutboundAttachmentInput[];
 	/** Forward-all can legitimately combine the per-message attachment sets. */
 	allowCombinedAttachments?: boolean;
-	/** A forward must not be merged back into its source by subject fallback. */
-	startNewThread?: boolean;
+	/** Disable subject fallback for messages that intentionally start a thread. */
+	subjectMatch?: boolean;
 };
 
 export function assertTotalAttachmentBytes(totalBytes: number): void {
@@ -171,7 +171,7 @@ export async function sendAndStore(
 		providerId,
 		status: initialOutboundStatus(provider.kind),
 		isRead: true,
-		subjectMatch: !input.startNewThread
+		subjectMatch: input.subjectMatch
 	});
 
 	if (attachments.length > 0) {

@@ -71,7 +71,7 @@ export async function sendForwardedMessages(
 		html,
 		attachments,
 		allowCombinedAttachments: ordered.length > 1,
-		startNewThread: true
+		subjectMatch: false
 	});
 
 	return { emailId };

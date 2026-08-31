@@ -48,7 +48,7 @@ export async function insertEmail(
 		providerId?: string | null;
 		status?: MailStatus | null;
 		isRead?: boolean;
-		/** Disable participant/subject fallback for intentionally new conversations. */
+		/** Disable fallback grouping when this message must start a conversation. */
 		subjectMatch?: boolean;
 	}
 ): Promise<string> {
@@ -60,6 +60,7 @@ export async function insertEmail(
 	// view never has to guess.
 	const threadId = await resolveThreadId(db, input.userId, {
 		emailId: id,
+		direction: input.direction,
 		subject: input.subject,
 		from: input.from,
 		to: input.to,
@@ -68,7 +69,7 @@ export async function insertEmail(
 		references: input.references,
 		replyToEmailId: input.replyToEmailId,
 		domainId: input.domainId,
-		subjectMatch: input.subjectMatch ?? (input.status !== 'draft')
+		subjectMatch: input.subjectMatch ?? input.status !== 'draft'
 	});
 
 	await db
@@ -765,6 +766,7 @@ export async function listForwardThreadMessages(
 			 WHERE user_id = ?
 			   AND COALESCE(thread_id, id) = ?
 			   AND (status IS NULL OR status <> 'draft')
+			   AND deleted_at IS NULL
 			 ORDER BY datetime(created_at) ASC, id ASC`
 		)
 		.bind(userId, threadId)

@@ -90,12 +90,20 @@ test('forward-thread lookup rejects cross-user messages and returns the owned th
 		{ id: 'newer', user_id: 'user-1', thread_id: 'thread-1', created_at: '2026-02-02' },
 		{ id: 'other-user', user_id: 'user-2', thread_id: 'thread-1', created_at: '2026-01-01' },
 		{ id: 'older', user_id: 'user-1', thread_id: 'thread-1', created_at: '2026-02-01' },
+		{
+			id: 'trashed',
+			user_id: 'user-1',
+			thread_id: 'thread-1',
+			created_at: '2026-02-03',
+			deleted_at: '2026-02-04'
+		},
 		{ id: 'other-thread', user_id: 'user-1', thread_id: 'thread-2', created_at: '2026-01-01' }
 	] as EmailRow[];
 	const db = {
 		prepare(sql: string) {
 			assert.match(sql, /user_id = \?/);
 			assert.match(sql, /COALESCE\(thread_id, id\) = \?/);
+			assert.match(sql, /deleted_at IS NULL/);
 			return {
 				bind(userId: string, threadId: string) {
 					return {
@@ -104,7 +112,9 @@ test('forward-thread lookup rejects cross-user messages and returns the owned th
 								results: rows
 									.filter(
 										(row) =>
-											row.user_id === userId && (row.thread_id ?? row.id) === threadId
+											row.user_id === userId &&
+											(row.thread_id ?? row.id) === threadId &&
+											!row.deleted_at
 									)
 									.sort((a, b) => a.created_at.localeCompare(b.created_at))
 							};
