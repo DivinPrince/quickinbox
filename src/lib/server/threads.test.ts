@@ -29,6 +29,7 @@ describe('domain-scoped threading', () => {
 			'user-1',
 			{
 				emailId,
+				direction: 'inbound',
 				subject: 'Inbox test',
 				from: 'sender@external.test',
 				to: 'support@example.org',
@@ -47,6 +48,7 @@ describe('domain-scoped threading', () => {
 			'user-1',
 			{
 				emailId: 'new-reply',
+				direction: 'inbound',
 				subject: 'Re: Inbox test',
 				from: 'sender@external.test',
 				to: 'support@example.org',
@@ -55,5 +57,104 @@ describe('domain-scoped threading', () => {
 		);
 
 		assert.equal(threadId, 'earlier-thread');
+	});
+});
+
+describe('subject fallback', () => {
+	test('does not merge a forward through the sender mailbox when disabled', async () => {
+		let subjectLookupRan = false;
+		const db = {
+			prepare(sql: string) {
+				subjectLookupRan = subjectLookupRan || sql.includes('AND thread_key = ?');
+				return {
+					bind() {
+						return {
+							async first() {
+								return {
+									id: 'alice-message',
+									thread_id: 'alice-thread'
+								};
+							}
+						};
+					}
+				};
+			}
+		} as unknown as D1Database;
+
+		const threadId = await resolveThreadId(db, 'user-1', {
+			emailId: 'forward-to-bob',
+			direction: 'outbound',
+			subject: 'Fwd: Quarterly figures',
+			from: 'me@example.com',
+			to: 'bob@example.com',
+			domainId: 'example.com',
+			subjectMatch: false
+		});
+
+		assert.equal(threadId, 'forward-to-bob');
+		assert.equal(subjectLookupRan, false);
+	});
+
+	test('matches a reply to a forward through the external sender', async () => {
+		const db = {
+			prepare(sql: string) {
+				return {
+					bind(...values: unknown[]) {
+						return {
+							async first() {
+								if (!sql.includes('AND thread_key = ?')) return null;
+								assert.equal(values.at(-1), 'bob@example.com');
+								assert.equal(values.includes('me@example.com'), false);
+								return {
+									id: 'forward-to-bob',
+									thread_id: 'forward-to-bob'
+								};
+							}
+						};
+					}
+				};
+			}
+		} as unknown as D1Database;
+
+		const threadId = await resolveThreadId(db, 'user-1', {
+			emailId: 'reply-from-bob',
+			direction: 'inbound',
+			subject: 'Re: Fwd: Quarterly figures',
+			from: 'bob@example.com',
+			to: 'me@example.com',
+			domainId: 'example.com'
+		});
+
+		assert.equal(threadId, 'forward-to-bob');
+	});
+
+	test('does not match a reply to a forward through the user mailbox', async () => {
+		const db = {
+			prepare(sql: string) {
+				return {
+					bind(...values: unknown[]) {
+						return {
+							async first() {
+								if (!sql.includes('AND thread_key = ?')) return null;
+								assert.equal(values.at(-1), 'bob@example.com');
+								assert.equal(values.includes('me@example.com'), false);
+								return null;
+							}
+						};
+					}
+				};
+			}
+		} as unknown as D1Database;
+
+		const threadId = await resolveThreadId(db, 'user-1', {
+			emailId: 'reply-from-bob',
+			direction: 'inbound',
+			subject: 'Re: Fwd: Quarterly figures',
+			from: 'bob@example.com',
+			to: 'me@example.com',
+			domainId: 'example.com'
+		});
+
+		assert.equal(threadId, 'reply-from-bob');
 	});
 });

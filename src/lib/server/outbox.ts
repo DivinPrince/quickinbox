@@ -30,6 +30,8 @@ export type ComposeInput = {
 	references?: string | null;
 	replyToEmailId?: string | null;
 	attachments?: OutboundAttachmentInput[];
+	/** Disable subject fallback for messages that intentionally start a thread. */
+	subjectMatch?: boolean;
 };
 
 /**
@@ -162,7 +164,8 @@ export async function sendAndStore(
 		addressId: from.id,
 		providerId,
 		status: initialOutboundStatus(provider.kind),
-		isRead: true
+		isRead: true,
+		subjectMatch: input.subjectMatch
 	});
 
 	if (attachments.length > 0) {

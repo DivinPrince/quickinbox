@@ -63,6 +63,7 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 			subject,
 			text,
 			html,
+			subjectMatch: false,
 			attachments:
 				body.includeAttachments === false
 					? []
