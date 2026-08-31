@@ -19,12 +19,14 @@
 		id,
 		view,
 		onClose,
-		onCompose
+		onCompose,
+		onRead
 	}: {
 		id: string | null;
 		view: MailboxView;
 		onClose: () => void;
 		onCompose?: () => void;
+		onRead?: (threadId: string) => void;
 	} = $props();
 
 	type ThreadPayload = {
@@ -91,7 +93,7 @@
 				thread = body;
 				const last = body.messages[body.messages.length - 1];
 				opened = new Set(last ? [last.id] : []);
-				void invalidateAll();
+				onRead?.(body.threadId);
 			})
 			.catch(() => {
 				if (!cancelled) error = t('common.networkError');
