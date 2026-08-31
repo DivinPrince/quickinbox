@@ -76,15 +76,11 @@ export function supportsDarkScheme(html: string): boolean {
  */
 const COLOUR_DECLARATION =
 	/\b(background(?:-color)?|color|border(?:-[a-z-]+)?|outline(?:-[a-z-]+)?)\s*:[^;}"'<>]*/gi;
-const NAMED_COLOUR = /\b(?:black|white|darkgray|darkgrey|lightgray|lightgrey)\b/;
-const COLOUR_LITERAL = new RegExp(
-	`#[0-9a-f]{3,8}|rgba?\\([^)]*\\)|${NAMED_COLOUR.source}`,
-	'gi'
-);
-const COLOUR_ATTRIBUTE = new RegExp(
-	`\\b(bgcolor|color)\\s*=\\s*(["']?)(#[0-9a-f]{3,8}|rgba?\\([^)]*\\)|${NAMED_COLOUR.source})\\2`,
-	'gi'
-);
+const COLOUR_LITERAL =
+	/#[0-9a-f]{3,8}|rgba?\([^)]{1,160}\)|\b(?:black|white|darkgray|darkgrey|lightgray|lightgrey)\b/gi;
+const HTML_TAG = /<[a-z][^>]{0,8192}>/gi;
+const COLOUR_ATTRIBUTE =
+	/(^|\s)(bgcolor|color)\s*=\s*(["']?)(#[0-9a-f]{3,8}|rgba?\([^)]{1,160}\)|(?:black|white|darkgray|darkgrey|lightgray|lightgrey))\3/gi;
 
 const NAMED_COLOUR_VALUES: Record<string, [number, number, number, number]> = {
 	black: [0, 0, 0, 1],
@@ -179,17 +175,19 @@ function darkModeColour(literal: string, property: string): string {
 
 /** Rewrites colours in markup or a stylesheet for a dark page. */
 export function adaptDarkColours(source: string): string {
-	return source
-		.replace(COLOUR_DECLARATION, (declaration, property: string) =>
+	const declarationsAdapted = source.replace(COLOUR_DECLARATION, (declaration, property: string) =>
 			declaration.replace(COLOUR_LITERAL, (literal: string) =>
 				darkModeColour(literal, property)
 			)
-		)
-		.replace(
-			COLOUR_ATTRIBUTE,
-			(attribute, property: string, _quote: string, literal: string) =>
-				attribute.replace(literal, darkModeColour(literal, property))
 		);
+
+	return declarationsAdapted.replace(HTML_TAG, (tag) =>
+		tag.replace(
+			COLOUR_ATTRIBUTE,
+			(attribute, _prefix: string, property: string, _quote: string, literal: string) =>
+				attribute.replace(literal, darkModeColour(literal, property))
+		)
+	);
 }
 
 /** Applies to both modes: sizing, wrapping and the quote toggle. */

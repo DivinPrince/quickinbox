@@ -27,3 +27,20 @@ test('normalizes percentage rgb channels and alpha', () => {
 		'<div style="background:#1f1f23">Hello</div>'
 	);
 });
+
+test('leaves unrelated attributes and text untouched', () => {
+	assert.equal(
+		adaptDarkColours(
+			'<div data-color="black" title="color=black" color="black">color=black</div>'
+		),
+		'<div data-color="black" title="color=black" color="#f2f2f7">color=black</div>'
+	);
+});
+
+test('does not scan unbounded unterminated rgb functions', () => {
+	const malformed = `rgb(${'0 '.repeat(10_000)}`;
+	assert.equal(
+		adaptDarkColours(`<p style="color:${malformed}">Hello</p>`),
+		`<p style="color:${malformed}">Hello</p>`
+	);
+});
