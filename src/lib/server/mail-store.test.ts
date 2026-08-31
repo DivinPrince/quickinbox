@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import type { D1Database } from '@cloudflare/workers-types';
+import type { EmailRow } from '$lib/types';
 import { buildThreadParticipants } from './thread-participants';
+import { listForwardThreadMessages } from './mail-store';
 
 describe('thread participants', () => {
 	test('supplies a real inbound display name', () => {
@@ -80,4 +83,41 @@ describe('thread participants', () => {
 			]
 		);
 	});
+});
+
+test('forward-thread lookup rejects cross-user messages and returns the owned thread oldest first', async () => {
+	const rows = [
+		{ id: 'newer', user_id: 'user-1', thread_id: 'thread-1', created_at: '2026-02-02' },
+		{ id: 'other-user', user_id: 'user-2', thread_id: 'thread-1', created_at: '2026-01-01' },
+		{ id: 'older', user_id: 'user-1', thread_id: 'thread-1', created_at: '2026-02-01' },
+		{ id: 'other-thread', user_id: 'user-1', thread_id: 'thread-2', created_at: '2026-01-01' }
+	] as EmailRow[];
+	const db = {
+		prepare(sql: string) {
+			assert.match(sql, /user_id = \?/);
+			assert.match(sql, /COALESCE\(thread_id, id\) = \?/);
+			return {
+				bind(userId: string, threadId: string) {
+					return {
+						async all() {
+							return {
+								results: rows
+									.filter(
+										(row) =>
+											row.user_id === userId && (row.thread_id ?? row.id) === threadId
+									)
+									.sort((a, b) => a.created_at.localeCompare(b.created_at))
+							};
+						}
+					};
+				}
+			};
+		}
+	} as unknown as D1Database;
+
+	assert.deepEqual(
+		(await listForwardThreadMessages(db, 'user-1', 'thread-1')).map((row) => row.id),
+		['older', 'newer']
+	);
+	assert.deepEqual(await listForwardThreadMessages(db, 'user-3', 'thread-1'), []);
 });

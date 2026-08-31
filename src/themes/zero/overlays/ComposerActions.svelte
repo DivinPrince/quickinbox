@@ -9,12 +9,18 @@
 	let {
 		sending = false,
 		attachments = $bindable([]),
+		includeOriginalAttachments = $bindable(true),
 		error = '',
+		allowNewAttachments = true,
+		originalAttachmentCount = 0,
 		extra
 	}: {
 		sending?: boolean;
 		attachments?: OutboundAttachmentInput[];
+		includeOriginalAttachments?: boolean;
 		error?: string;
+		allowNewAttachments?: boolean;
+		originalAttachmentCount?: number;
 		extra?: import('svelte').Snippet;
 	} = $props();
 
@@ -79,17 +85,27 @@
 			<Icon name="CurvedArrow" size={14} />
 		</span>
 	</button>
-	<button type="button" class="z-add" onclick={() => input?.click()}>
-		<AttachmentIcon name="attachment-2" size={12} />
-		<span>{t('attach.attach')}</span>
-	</button>
-	<input
-		bind:this={input}
-		type="file"
-		multiple
-		class="hidden"
-		onchange={(event) => addFiles(event.currentTarget.files)}
-	/>
+	{#if allowNewAttachments}
+		<button type="button" class="z-add" onclick={() => input?.click()}>
+			<AttachmentIcon name="attachment-2" size={12} />
+			<span>{t('attach.attach')}</span>
+		</button>
+		<input
+			bind:this={input}
+			type="file"
+			multiple
+			class="hidden"
+			onchange={(event) => addFiles(event.currentTarget.files)}
+		/>
+	{/if}
+	{#if originalAttachmentCount > 0}
+		<label class="z-forward-files">
+			<input type="checkbox" bind:checked={includeOriginalAttachments} />
+			{t(originalAttachmentCount === 1 ? 'compose.includeAttachments' : 'compose.includeAttachmentsPlural', {
+				count: originalAttachmentCount
+			})}
+		</label>
+	{/if}
 	{#if extra}
 		{@render extra()}
 	{/if}

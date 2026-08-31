@@ -1246,6 +1246,14 @@
 	background: #202020;
 }
 
+[data-ui-theme='zero'] .z-forward-context {
+	margin: 0;
+	padding: 0.625rem 0.75rem 0;
+	font-size: 0.75rem;
+	font-weight: 500;
+	color: var(--z-muted);
+}
+
 [data-ui-theme='zero'] .z-overlay {
 	position: fixed;
 	inset: 0;
@@ -1458,6 +1466,15 @@
 
 [data-ui-theme='zero'] .z-add:hover {
 	background: var(--z-hover);
+}
+
+[data-ui-theme='zero'] .z-forward-files {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	font-size: 0.8125rem;
+	color: var(--z-muted);
+	cursor: pointer;
 }
 
 [data-ui-theme='zero'] .z-attach-chips {

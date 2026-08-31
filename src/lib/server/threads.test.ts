@@ -57,3 +57,21 @@ describe('domain-scoped threading', () => {
 		assert.equal(threadId, 'earlier-thread');
 	});
 });
+
+test('an intentional new conversation does not use subject fallback', async () => {
+	const db = {
+		prepare() {
+			throw new Error('subject lookup must not run');
+		}
+	} as unknown as D1Database;
+
+	const threadId = await resolveThreadId(db, 'user-1', {
+		emailId: 'forward-id',
+		subject: 'Fwd: Existing subject',
+		from: 'me@example.com',
+		to: 'recipient@example.com',
+		subjectMatch: false
+	});
+
+	assert.equal(threadId, 'forward-id');
+});

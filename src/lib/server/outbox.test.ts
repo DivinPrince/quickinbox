@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { User } from '$lib/types';
-import { resolveReplyFromAddress } from './outbox';
+import { MAX_TOTAL_ATTACHMENT_BYTES } from './constants';
+import { assertTotalAttachmentBytes, resolveReplyFromAddress } from './outbox';
 
 const user: User = {
 	id: 'user-1',
@@ -194,5 +195,15 @@ describe('resolveReplyFromAddress', () => {
 			inbound
 		);
 		assert.equal(identity, null);
+	});
+});
+
+describe('outbound attachment totals', () => {
+	test('accepts the exact limit and rejects an oversized combined forward', () => {
+		assert.doesNotThrow(() => assertTotalAttachmentBytes(MAX_TOTAL_ATTACHMENT_BYTES));
+		assert.throws(
+			() => assertTotalAttachmentBytes(MAX_TOTAL_ATTACHMENT_BYTES + 1),
+			/Attachments exceed the total size limit/
+		);
 	});
 });

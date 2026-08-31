@@ -20,7 +20,8 @@
 	let sending = $state(false);
 	let error = $state('');
 
-	let forwardOpen = $state(false);
+	type ForwardTarget = { kind: 'thread' } | { kind: 'message'; id: string };
+	let forwardTarget = $state<ForwardTarget | null>(null);
 	let forwardTo = $state('');
 	let forwardHtml = $state('');
 	let includeAttachments = $state(true);
@@ -28,9 +29,27 @@
 	const messages = $derived(data.messages);
 	const latest = $derived(messages[messages.length - 1]);
 	const starred = $derived(messages.some((message) => message.is_starred));
+	const forwardOpen = $derived(forwardTarget !== null);
+	const forwardedMessages = $derived.by(() => {
+		const target = forwardTarget;
+		if (target?.kind === 'message') {
+			return messages.filter((message) => message.id === target.id);
+		}
+		return target?.kind === 'thread' ? messages : [];
+	});
 
-	/** A forward carries the files of the message it copies. */
-	const forwardFiles = $derived(latest?.attachments.length ?? 0);
+	/** A forward carries the files of exactly the message(s) it copies. */
+	const forwardFiles = $derived(
+		forwardedMessages.reduce((count, message) => count + message.attachments.length, 0)
+	);
+	const forwardFrom = $derived.by(() => {
+		const selected = forwardedMessages[forwardedMessages.length - 1];
+		return selected
+			? selected.direction === 'inbound'
+				? selected.to_addr
+				: selected.from_addr
+			: null;
+	});
 
 	const backHref = $derived(
 		data.trashed
@@ -130,27 +149,36 @@
 
 	/** Reply and forward share the space below the thread, so only one is open. */
 	function openReply() {
-		forwardOpen = false;
+		forwardTarget = null;
 		replyOpen = !replyOpen;
 		error = '';
 	}
 
-	function openForward() {
+	function openForward(target: ForwardTarget) {
 		replyOpen = false;
-		forwardOpen = !forwardOpen;
+		const sameTarget =
+			forwardTarget?.kind === target.kind &&
+			(target.kind === 'thread' ||
+				(forwardTarget.kind === 'message' && forwardTarget.id === target.id));
+		forwardTarget = sameTarget ? null : target;
+		includeAttachments = true;
 		error = '';
 	}
 
-	/** Forwards the newest message in the conversation, files included. */
+	/** Forward the explicitly selected message, or the server-resolved whole thread. */
 	async function sendForward(event: SubmitEvent) {
 		event.preventDefault();
-		if (!latest || !forwardTo.trim()) return;
+		if (!forwardTarget || !forwardTo.trim()) return;
 
 		sending = true;
 		error = '';
 
 		try {
-			const res = await fetch(`/api/mail/${latest.id}/forward`, {
+			const endpoint =
+				forwardTarget.kind === 'thread'
+					? `/api/mail/thread/${encodeURIComponent(data.threadId)}/forward`
+					: `/api/mail/${encodeURIComponent(forwardTarget.id)}/forward`;
+			const res = await fetch(endpoint, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -168,7 +196,7 @@
 
 			forwardTo = '';
 			forwardHtml = '';
-			forwardOpen = false;
+			forwardTarget = null;
 			// The forward is our own message now, so the mailbox has changed.
 			await invalidateAll();
 		} catch {
@@ -276,12 +304,13 @@
 
 			<button
 				type="button"
-				class="icon-btn"
+				class="btn-ghost forward-all-launch"
 				class:active={forwardOpen}
-				aria-label={t('thread.forward')}
-				onclick={openForward}
+				aria-label={t('thread.forwardAll')}
+				onclick={() => openForward({ kind: 'thread' })}
 			>
 				<Icon name="share-forward-line" size={16} />
+				<span>{t('thread.forwardAll')}</span>
 			</button>
 
 			<button type="button" class="btn-primary reply-launch" onclick={openReply}>
@@ -316,6 +345,7 @@
 					receivedLabel={message.received_label}
 					expanded={opened.has(message.id)}
 					onToggle={() => toggleMessage(message.id)}
+					onForward={() => openForward({ kind: 'message', id: message.id })}
 				/>
 			{/each}
 		</div>
@@ -323,6 +353,11 @@
 
 	{#if forwardOpen}
 		<form class="reply-section" onsubmit={sendForward}>
+			<p class="forward-context">
+				{forwardTarget?.kind === 'thread'
+					? t('thread.forwardingAll', { count: forwardedMessages.length })
+					: t('thread.forwardingOne')}
+			</p>
 			<div class="forward-row">
 				<label class="field-label" for="forward-to">{t('compose.to')}</label>
 				<input
@@ -337,12 +372,10 @@
 					class="field-input"
 				/>
 			</div>
-			{#if data.replyFrom}
+			{#if forwardFrom}
 				<p class="reply-from">
 					{t('compose.from')}
-					<strong>
-						{#if data.replyFromName}{data.replyFromName} · {/if}{data.replyFrom}
-					</strong>
+					<strong>{forwardFrom}</strong>
 				</p>
 			{/if}
 
@@ -362,7 +395,7 @@
 
 			<div class="reply-footer forward-footer">
 				<div class="reply-actions">
-					<button type="button" class="btn-ghost" onclick={() => (forwardOpen = false)}>
+					<button type="button" class="btn-ghost" onclick={() => (forwardTarget = null)}>
 						{t('common.cancel')}
 					</button>
 					<button type="submit" class="btn-primary" disabled={sending}>
@@ -443,6 +476,18 @@
 		color: var(--color-accent-text);
 	}
 
+	.forward-all-launch {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		font-size: 0.8125rem;
+	}
+
+	.forward-all-launch.active {
+		background: var(--color-accent-soft);
+		color: var(--color-accent-text);
+	}
+
 	.toolbar-actions :global(.icon-btn.danger:hover) {
 		color: var(--color-danger);
 	}
@@ -498,6 +543,13 @@
 		margin: 0;
 		font-size: 0.8125rem;
 		color: var(--color-muted);
+	}
+
+	.forward-context {
+		margin: 0 0 0.5rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--color-text-secondary);
 	}
 
 	.reply-from {
@@ -608,6 +660,10 @@
 		}
 
 		.reply-launch {
+			display: none;
+		}
+
+		.forward-all-launch span {
 			display: none;
 		}
 

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
+import type { EmailRow } from '$lib/types';
 import { base64ByteLength, base64ToBytes, bytesToBase64 } from './attachments';
+import { readForwardedAttachments } from './forward-mail';
 
 describe('attachment encoding', () => {
 	test('bytes survive the trip to base64 and back', () => {
@@ -28,4 +31,60 @@ describe('attachment encoding', () => {
 			assert.equal(base64ByteLength(bytesToBase64(bytes)), length);
 		}
 	});
+});
+
+test('forward-all attachments include every message, can be excluded, and stay user-scoped', async () => {
+	const calls: Array<{ emailId: string; userId: string }> = [];
+	const db = {
+		prepare() {
+			return {
+				bind(emailId: string, userId: string) {
+					calls.push({ emailId, userId });
+					return {
+						async all() {
+							return {
+								results: [
+									{
+										id: `file-${emailId}`,
+										email_id: emailId,
+										filename: `${emailId}.txt`,
+										content_type: 'text/plain',
+										size_bytes: 1,
+										storage_key: null,
+										content_base64: 'YQ==',
+										created_at: '2026-01-01'
+									}
+								]
+							};
+						}
+					};
+				}
+			};
+		}
+	} as unknown as D1Database;
+	const bucket = {} as R2Bucket;
+	const originals = [{ id: 'older' }, { id: 'newer' }] as EmailRow[];
+
+	const included = await readForwardedAttachments(
+		{ DB: db, ATTACHMENTS: bucket },
+		'user-1',
+		originals
+	);
+	assert.deepEqual(included.map((file) => file.filename), ['older.txt', 'newer.txt']);
+	assert.deepEqual(calls, [
+		{ emailId: 'older', userId: 'user-1' },
+		{ emailId: 'newer', userId: 'user-1' }
+	]);
+
+	calls.length = 0;
+	assert.deepEqual(
+		await readForwardedAttachments(
+			{ DB: db, ATTACHMENTS: bucket },
+			'user-1',
+			originals,
+			false
+		),
+		[]
+	);
+	assert.deepEqual(calls, []);
 });

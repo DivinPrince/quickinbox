@@ -11,10 +11,11 @@ export async function insertAttachments(
 	db: D1Database,
 	bucket: R2Bucket,
 	emailId: string,
-	attachments: OutboundAttachmentInput[]
+	attachments: OutboundAttachmentInput[],
+	options: { enforceCountLimit?: boolean } = {}
 ): Promise<void> {
 	if (attachments.length === 0) return;
-	if (attachments.length > MAX_ATTACHMENTS_PER_EMAIL) {
+	if (options.enforceCountLimit !== false && attachments.length > MAX_ATTACHMENTS_PER_EMAIL) {
 		throw new Error(`Maximum ${MAX_ATTACHMENTS_PER_EMAIL} attachments allowed`);
 	}
 
@@ -109,7 +110,7 @@ export async function readOutboundAttachments(
 
 	const attachments: OutboundAttachmentInput[] = [];
 
-	for (const row of results.slice(0, MAX_ATTACHMENTS_PER_EMAIL)) {
+	for (const row of results) {
 		const bytes = await readAttachmentBytes(bucket, row);
 		if (!bytes) continue;
 

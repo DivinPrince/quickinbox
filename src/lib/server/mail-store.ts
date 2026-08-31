@@ -48,6 +48,8 @@ export async function insertEmail(
 		providerId?: string | null;
 		status?: MailStatus | null;
 		isRead?: boolean;
+		/** Disable participant/subject fallback for intentionally new conversations. */
+		subjectMatch?: boolean;
 	}
 ): Promise<string> {
 	const id = crypto.randomUUID();
@@ -66,7 +68,7 @@ export async function insertEmail(
 		references: input.references,
 		replyToEmailId: input.replyToEmailId,
 		domainId: input.domainId,
-		subjectMatch: input.status !== 'draft'
+		subjectMatch: input.subjectMatch ?? (input.status !== 'draft')
 	});
 
 	await db
@@ -745,6 +747,30 @@ export async function getEmailForUser(
 		.first<EmailRow>();
 
 	return row ?? null;
+}
+
+/**
+ * Resolve a forwarding target entirely on the server. The client supplies only
+ * the conversation id; ownership and membership are enforced by this query,
+ * and the order is the order used in the forwarded copy.
+ */
+export async function listForwardThreadMessages(
+	db: D1Database,
+	userId: string,
+	threadId: string
+): Promise<EmailRow[]> {
+	const { results } = await db
+		.prepare(
+			`SELECT * FROM emails
+			 WHERE user_id = ?
+			   AND COALESCE(thread_id, id) = ?
+			   AND (status IS NULL OR status <> 'draft')
+			 ORDER BY datetime(created_at) ASC, id ASC`
+		)
+		.bind(userId, threadId)
+		.all<EmailRow>();
+
+	return results;
 }
 
 /**

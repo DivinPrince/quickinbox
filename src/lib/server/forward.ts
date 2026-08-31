@@ -23,6 +23,20 @@ export type ForwardedOriginal = {
 	created_at: string;
 };
 
+function forwardTimestamp(value: string): number {
+	const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value.trim())
+		? `${value.trim().replace(' ', 'T')}Z`
+		: value;
+	const timestamp = new Date(normalized).getTime();
+	return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+export function orderForwardedMessages<T extends ForwardedOriginal>(messages: T[]): T[] {
+	return [...messages].sort(
+		(left, right) => forwardTimestamp(left.created_at) - forwardTimestamp(right.created_at)
+	);
+}
+
 export function forwardSubject(subject: string): string {
 	const trimmed = subject.trim();
 	if (!trimmed) return 'Fwd:';
@@ -54,49 +68,77 @@ export type ForwardNote = {
 	html?: string | null;
 };
 
-/** The message as it arrived, ready to sit under whatever the sender adds. */
-export function buildForwardedMessage(
-	original: ForwardedOriginal,
-	options: { note?: ForwardNote } = {}
-): { subject: string; text: string; html: string } {
+function forwardedHeaders(original: ForwardedOriginal): Array<[string, string]> {
 	const headers: Array<[string, string]> = [
 		['From', original.from_addr],
 		['Date', formatForwardDate(original.created_at)],
-		['Subject', original.subject],
 		['To', original.to_addr]
 	];
 
 	if (original.cc_addr?.trim()) headers.push(['Cc', original.cc_addr.trim()]);
+	headers.push(['Subject', original.subject]);
+	return headers;
+}
+
+/**
+ * One or more messages as they arrived, oldest first, ready to sit under the
+ * sender's note. Bcc is intentionally absent from ForwardedOriginal so it can
+ * never leak into either rendered form.
+ */
+export function buildForwardedMessages(
+	originals: ForwardedOriginal[],
+	options: { note?: ForwardNote } = {}
+): { subject: string; text: string; html: string } {
+	if (originals.length === 0) throw new Error('At least one message is required to forward');
+	const ordered = orderForwardedMessages(originals);
 
 	// The two forms fill in for each other: a note written in one still reaches a
 	// recipient whose client shows the other.
 	const writtenHtml = options.note?.html?.trim() || null;
 	const noteText = options.note?.text?.trim() || (writtenHtml ? stripHtml(writtenHtml) : '');
 	const noteHtml = writtenHtml ?? (noteText ? asHtmlParagraph(noteText) : '');
-	const originalText = original.body_text?.trim() || stripHtml(original.body_html ?? '');
-	const originalHtml = original.body_html?.trim() || null;
+	const textMessages = ordered.map((original) => {
+		const headers = forwardedHeaders(original);
+		const originalText = original.body_text?.trim() || stripHtml(original.body_html ?? '');
+		return [
+			'---------- Forwarded message ----------\n',
+			headers.map(([label, value]) => `${label}: ${value}`).join('\n'),
+			'\n\n',
+			originalText
+		].join('');
+	});
 
-	const text = [
-		noteText ? `${noteText}\n\n` : '',
-		'---------- Forwarded message ----------\n',
-		headers.map(([label, value]) => `${label}: ${value}`).join('\n'),
-		'\n\n',
-		originalText
-	].join('');
+	const text = `${noteText ? `${noteText}\n\n` : ''}${textMessages.join('\n\n')}`;
 
 	// `gmail_quote` is what mail clients — this one included — fold a forwarded
 	// message behind, so the reader sees the note first rather than the history.
-	const html = [
-		noteHtml,
-		'<div class="gmail_quote">',
-		'<div class="gmail_attr">---------- Forwarded message ----------<br>',
-		headers
-			.map(([label, value]) => `<b>${label}:</b> ${escapeHtml(value)}`)
-			.join('<br>'),
-		'</div><br>',
-		originalHtml ?? asHtmlParagraph(originalText),
-		'</div>'
-	].join('');
+	const htmlMessages = ordered.map((original) => {
+		const headers = forwardedHeaders(original);
+		const originalText = original.body_text?.trim() || stripHtml(original.body_html ?? '');
+		const originalHtml = original.body_html?.trim() || null;
+		return [
+			'<div class="gmail_quote">',
+			'<div class="gmail_attr">---------- Forwarded message ----------<br>',
+			headers
+				.map(([label, value]) => `<b>${label}:</b> ${escapeHtml(value)}`)
+				.join('<br>'),
+			'</div><br>',
+			originalHtml ?? asHtmlParagraph(originalText),
+			'</div>'
+		].join('');
+	});
 
-	return { subject: forwardSubject(original.subject), text, html };
+	return {
+		subject: forwardSubject(ordered[0].subject),
+		text,
+		html: `${noteHtml}${htmlMessages.join('<br>')}`
+	};
+}
+
+/** Backwards-compatible single-message builder used by the existing endpoint. */
+export function buildForwardedMessage(
+	original: ForwardedOriginal,
+	options: { note?: ForwardNote } = {}
+): { subject: string; text: string; html: string } {
+	return buildForwardedMessages([original], options);
 }

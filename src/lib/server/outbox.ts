@@ -30,7 +30,17 @@ export type ComposeInput = {
 	references?: string | null;
 	replyToEmailId?: string | null;
 	attachments?: OutboundAttachmentInput[];
+	/** Forward-all can legitimately combine the per-message attachment sets. */
+	allowCombinedAttachments?: boolean;
+	/** A forward must not be merged back into its source by subject fallback. */
+	startNewThread?: boolean;
 };
+
+export function assertTotalAttachmentBytes(totalBytes: number): void {
+	if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
+		throw new Error('Attachments exceed the total size limit');
+	}
+}
 
 /**
  * Pick the identity a message is sent from: the one the composer chose, or the
@@ -126,9 +136,7 @@ export async function sendAndStore(
 		(sum, file) => sum + base64ByteLength(file.content),
 		0
 	);
-	if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
-		throw new Error('Attachments exceed the total size limit');
-	}
+	assertTotalAttachmentBytes(totalBytes);
 
 	const { providerId } = await sendOutboundEmail(provider, {
 		from,
@@ -162,11 +170,14 @@ export async function sendAndStore(
 		addressId: from.id,
 		providerId,
 		status: initialOutboundStatus(provider.kind),
-		isRead: true
+		isRead: true,
+		subjectMatch: !input.startNewThread
 	});
 
 	if (attachments.length > 0) {
-		await insertAttachments(env.DB, env.ATTACHMENTS, emailId, attachments);
+		await insertAttachments(env.DB, env.ATTACHMENTS, emailId, attachments, {
+			enforceCountLimit: !input.allowCombinedAttachments
+		});
 	}
 
 	return { emailId, providerId, from };

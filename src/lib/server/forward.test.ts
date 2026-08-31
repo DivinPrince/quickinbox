@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { buildForwardedMessage, formatForwardDate, forwardSubject } from './forward';
+import {
+	buildForwardedMessage,
+	buildForwardedMessages,
+	formatForwardDate,
+	forwardSubject
+} from './forward';
 
 const original = {
 	from_addr: 'ada@example.com',
@@ -127,5 +132,47 @@ describe('forwarding a message', () => {
 		});
 
 		assert.match(html, /Line one<br>\nLine two/);
+	});
+
+	test('forward all includes each message once in chronological order', () => {
+		const older = { ...original, subject: 'Original subject', body_text: 'OLDER-BODY' };
+		const newer = {
+			...original,
+			from_addr: 'grace@example.com',
+			to_addr: 'ada@example.com',
+			cc_addr: null,
+			subject: 'Re: Original subject',
+			body_text: 'NEWER-BODY',
+			body_html: null,
+			created_at: '2026-08-24 09:30:00'
+		};
+		const { subject, text, html } = buildForwardedMessages([newer, older]);
+
+		assert.equal(subject, 'Fwd: Original subject');
+		assert.ok(text.indexOf('OLDER-BODY') < text.indexOf('NEWER-BODY'));
+		assert.ok(html.indexOf('The numbers are attached.') < html.indexOf('NEWER-BODY'));
+		assert.equal(text.split('OLDER-BODY').length - 1, 1);
+		assert.equal(text.split('NEWER-BODY').length - 1, 1);
+		assert.equal(text.split('---------- Forwarded message ----------').length - 1, 2);
+	});
+
+	test('forward all preserves visible headers and never exposes Bcc', () => {
+		const withBcc = { ...original, bcc_addr: 'secret@example.com' };
+		const { text, html } = buildForwardedMessages([withBcc]);
+
+		for (const expected of [
+			'From: ada@example.com',
+			'Date: Mon, 24 Aug 2026 08:30:00 GMT',
+			'To: support@ourdomain.test',
+			'Cc: grace@example.com',
+			'Subject: Quarterly figures',
+			'The numbers are attached.'
+		]) {
+			assert.match(text, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+		}
+		assert.equal(text.includes('Bcc:'), false);
+		assert.equal(html.includes('Bcc:'), false);
+		assert.equal(text.includes('secret@example.com'), false);
+		assert.equal(html.includes('secret@example.com'), false);
 	});
 });
