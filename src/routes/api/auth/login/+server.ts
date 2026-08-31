@@ -2,7 +2,7 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { login, logout, readSessionToken, sessionCookieOptions, SESSION_COOKIE } from '$lib/server/auth';
 import { SESSION_DAYS } from '$lib/server/constants';
 
-export const POST: RequestHandler = async ({ request, cookies, platform }) => {
+export const POST: RequestHandler = async ({ request, cookies, platform, url }) => {
 	const db = platform?.env.DB;
 	if (!db) return json({ error: 'Database unavailable' }, { status: 503 });
 
@@ -16,7 +16,7 @@ export const POST: RequestHandler = async ({ request, cookies, platform }) => {
 		return json({ error: 'Invalid email or password' }, { status: 401 });
 	}
 
-	cookies.set(SESSION_COOKIE, result.token, sessionCookieOptions(SESSION_DAYS * 24 * 60 * 60));
+	cookies.set(SESSION_COOKIE, result.token, sessionCookieOptions(SESSION_DAYS * 24 * 60 * 60, url));
 
 	return json({ user: result.user });
 };

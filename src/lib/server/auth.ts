@@ -593,11 +593,18 @@ export async function getUserFromSession(db: D1Database, token: string | undefin
 	return (await getAuthenticatedSession(db, token))?.user ?? null;
 }
 
-export function sessionCookieOptions(maxAgeSeconds: number) {
+/**
+ * `secure` follows the scheme rather than being pinned on: Chrome makes an
+ * exception for http://localhost and stores the cookie anyway, but WebKit does
+ * not, so a hardcoded flag logs in successfully and then drops the session on
+ * every `bun run dev` visit in Safari. Deployments are https, so they still get
+ * the flag.
+ */
+export function sessionCookieOptions(maxAgeSeconds: number, url: URL) {
 	return {
 		path: '/',
 		httpOnly: true,
-		secure: true,
+		secure: url.protocol === 'https:',
 		sameSite: 'lax' as const,
 		maxAge: maxAgeSeconds
 	};

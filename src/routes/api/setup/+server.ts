@@ -35,7 +35,7 @@ export const GET: RequestHandler = async ({ platform }) => {
  * First-run bootstrap, done in one shot: connect the chosen provider domain,
  * create the admin, claim their address, make them the catch-all, sign them in.
  */
-export const POST: RequestHandler = async ({ request, cookies, platform }) => {
+export const POST: RequestHandler = async ({ request, cookies, platform, url }) => {
 	const db = platform?.env.DB;
 	if (!db) return json({ error: 'Database unavailable' }, { status: 503 });
 
@@ -89,7 +89,7 @@ export const POST: RequestHandler = async ({ request, cookies, platform }) => {
 			cookies.set(
 				SESSION_COOKIE,
 				session.token,
-				sessionCookieOptions(SESSION_DAYS * 24 * 60 * 60)
+				sessionCookieOptions(SESSION_DAYS * 24 * 60 * 60, url)
 			);
 		}
 
