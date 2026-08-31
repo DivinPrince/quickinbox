@@ -2,7 +2,16 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { User } from '$lib/types';
-import { resolveReplyFromAddress } from './outbox';
+import {
+	MAX_ATTACHMENT_BYTES,
+	MAX_ATTACHMENTS_PER_EMAIL,
+	MAX_TOTAL_ATTACHMENT_BYTES
+} from './constants';
+import {
+	assertOutboundAttachments,
+	assertTotalAttachmentBytes,
+	resolveReplyFromAddress
+} from './outbox';
 
 const user: User = {
 	id: 'user-1',
@@ -194,5 +203,48 @@ describe('resolveReplyFromAddress', () => {
 			inbound
 		);
 		assert.equal(identity, null);
+	});
+});
+
+describe('outbound attachment totals', () => {
+	test('accepts the exact limit and rejects an oversized combined forward', () => {
+		assert.doesNotThrow(() => assertTotalAttachmentBytes(MAX_TOTAL_ATTACHMENT_BYTES));
+		assert.throws(
+			() => assertTotalAttachmentBytes(MAX_TOTAL_ATTACHMENT_BYTES + 1),
+			/Attachments exceed the total size limit/
+		);
+	});
+
+	test('rejects attachment count and per-file size before sending', () => {
+		const attachment = {
+			filename: 'note.txt',
+			type: 'text/plain',
+			content: Buffer.from('ok').toString('base64')
+		};
+		assert.throws(
+			() =>
+				assertOutboundAttachments(
+					Array.from({ length: MAX_ATTACHMENTS_PER_EMAIL + 1 }, () => attachment)
+				),
+			/Maximum 5 attachments allowed/
+		);
+		assert.doesNotThrow(() =>
+			assertOutboundAttachments(
+				Array.from({ length: MAX_ATTACHMENTS_PER_EMAIL + 1 }, () => attachment),
+				true
+			)
+		);
+
+		assert.throws(
+			() =>
+				assertOutboundAttachments([
+					{
+						filename: 'large.bin',
+						type: 'application/octet-stream',
+						content: Buffer.alloc(MAX_ATTACHMENT_BYTES + 1).toString('base64')
+					}
+				]),
+			/exceeds 5MB limit/
+		);
 	});
 });

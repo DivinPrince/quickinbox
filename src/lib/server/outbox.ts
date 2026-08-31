@@ -2,7 +2,11 @@ import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { MailAddress, OutboundAttachmentInput, User } from '$lib/types';
 import { appendEmailSignature, pickEmailSignature } from '$lib/email-signature';
 import { base64ByteLength, insertAttachments } from './attachments';
-import { MAX_TOTAL_ATTACHMENT_BYTES } from './constants';
+import {
+	MAX_ATTACHMENT_BYTES,
+	MAX_ATTACHMENTS_PER_EMAIL,
+	MAX_TOTAL_ATTACHMENT_BYTES
+} from './constants';
 import {
 	getAddressForUser,
 	getDefaultAddress,
@@ -30,9 +34,39 @@ export type ComposeInput = {
 	references?: string | null;
 	replyToEmailId?: string | null;
 	attachments?: OutboundAttachmentInput[];
+	/** Forward-all can legitimately combine the per-message attachment sets. */
+	allowCombinedAttachments?: boolean;
 	/** Disable subject fallback for messages that intentionally start a thread. */
 	subjectMatch?: boolean;
 };
+
+export function assertTotalAttachmentBytes(totalBytes: number): void {
+	if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
+		throw new Error('Attachments exceed the total size limit');
+	}
+}
+
+/** Reject attachment sets before provider delivery or Sent-folder persistence. */
+export function assertOutboundAttachments(
+	attachments: OutboundAttachmentInput[],
+	allowCombinedAttachments = false
+): void {
+	if (!allowCombinedAttachments && attachments.length > MAX_ATTACHMENTS_PER_EMAIL) {
+		throw new Error(`Maximum ${MAX_ATTACHMENTS_PER_EMAIL} attachments allowed`);
+	}
+
+	for (const attachment of attachments) {
+		const bytes = base64ByteLength(attachment.content);
+		if (bytes > MAX_ATTACHMENT_BYTES) {
+			const limitMb = MAX_ATTACHMENT_BYTES / (1024 * 1024);
+			throw new Error(`"${attachment.filename}" exceeds ${limitMb}MB limit`);
+		}
+	}
+
+	assertTotalAttachmentBytes(
+		attachments.reduce((sum, attachment) => sum + base64ByteLength(attachment.content), 0)
+	);
+}
 
 /**
  * Pick the identity a message is sent from: the one the composer chose, or the
@@ -124,13 +158,7 @@ export async function sendAndStore(
 	});
 
 	const attachments = input.attachments ?? [];
-	const totalBytes = attachments.reduce(
-		(sum, file) => sum + base64ByteLength(file.content),
-		0
-	);
-	if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
-		throw new Error('Attachments exceed the total size limit');
-	}
+	assertOutboundAttachments(attachments, input.allowCombinedAttachments);
 
 	const { providerId } = await sendOutboundEmail(provider, {
 		from,
@@ -169,7 +197,9 @@ export async function sendAndStore(
 	});
 
 	if (attachments.length > 0) {
-		await insertAttachments(env.DB, env.ATTACHMENTS, emailId, attachments);
+		await insertAttachments(env.DB, env.ATTACHMENTS, emailId, attachments, {
+			enforceCountLimit: !input.allowCombinedAttachments
+		});
 	}
 
 	return { emailId, providerId, from };

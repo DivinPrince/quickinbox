@@ -58,6 +58,19 @@ function render(
 export const handle: Handle = async ({ event, resolve }) => {
 	const db = event.platform?.env.DB;
 	const { pathname } = event.url;
+	const forwardedProtocol = event.request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+	const effectiveProtocol = forwardedProtocol ? `${forwardedProtocol}:` : event.url.protocol;
+	const isLocalDevelopment =
+		event.url.hostname === 'localhost' ||
+		event.url.hostname === '127.0.0.1' ||
+		event.url.hostname === '[::1]';
+
+	if (effectiveProtocol === 'http:' && !isLocalDevelopment) {
+		const secureUrl = new URL(event.url);
+		secureUrl.protocol = 'https:';
+		throw redirect(308, secureUrl.toString());
+	}
+
 	event.locals.user = null;
 	event.locals.authMethod = null;
 	event.locals.apiScopes = [];

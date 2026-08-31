@@ -55,6 +55,15 @@
 		});
 	}
 
+	function markThreadRead(threadId: string) {
+		items = filters.unreadOnly
+			? items.filter((thread) => thread.thread_id !== threadId)
+			: items.map((thread) =>
+					thread.thread_id === threadId ? { ...thread, is_read: true } : thread
+				);
+		void invalidateAll();
+	}
+
 	function setChip(next: 'all' | 'unread' | 'starred') {
 		const url = new URL($page.url);
 		url.searchParams.delete('unread');
@@ -368,6 +377,12 @@
 	</section>
 
 	<section class="z-panel z-read">
-		<ThreadPane id={threadId} view={view} onClose={() => setThread(null)} onCompose={openCompose} />
+		<ThreadPane
+			id={threadId}
+			view={view}
+			onClose={() => setThread(null)}
+			onCompose={openCompose}
+			onRead={markThreadRead}
+		/>
 	</section>
 </div>

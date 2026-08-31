@@ -28,6 +28,38 @@ const QUOTE_SELECTORS = [
 const ATTRIBUTION = /^\s*on\b[\s\S]{0,300}\bwrote:\s*$/i;
 
 /**
+ * A whole document or a table layout uses these same wrappers as ordinary
+ * structure, so folding on them there hides the message rather than its
+ * history. Left intact instead — the native clients make the same call.
+ */
+export function canFoldQuotes(html: string): boolean {
+	return !/<(?:html|table)\b/i.test(html);
+}
+
+/** Text and images that survive the fold, so we can tell if any would. */
+function remainsVisible(container: HTMLElement, hidden: Element[]): boolean {
+	const folded = new Set<Element>(hidden);
+	let text = '';
+	let image = false;
+
+	const walk = (node: Node) => {
+		if (node.nodeType === Node.ELEMENT_NODE) {
+			const element = node as Element;
+			if (folded.has(element)) return;
+			if (element.tagName === 'IMG') image = true;
+		}
+		if (node.nodeType === Node.TEXT_NODE) {
+			text += node.textContent ?? '';
+			return;
+		}
+		for (const child of Array.from(node.childNodes)) walk(child);
+	};
+	walk(container);
+
+	return image || text.trim() !== '';
+}
+
+/**
  * Where quoted history starts in a plain-text body. Used for list previews and
  * for messages that arrived without HTML.
  */
@@ -66,12 +98,27 @@ export function stripQuotedText(text: string): string {
 	return splitQuotedText(text).body;
 }
 
-export function foldQuotedHtml(container: HTMLElement): void {
-	if (container.dataset.quotesFolded === 'true') return;
+/**
+ * Hides the quoted history and hands the folded elements back, so the caller
+ * can offer a control that reveals them again.
+ *
+ * The control deliberately lives outside this function: the message frame has
+ * scripting disabled by its sandbox, and WebKit will not run a listener bound
+ * to a node in such a document even when the listener itself comes from out
+ * here. A button placed in the frame is therefore dead in Safari. Callers own
+ * the toggle in their own document instead; mutating the frame's DOM from the
+ * outside — which is all revealing takes — works everywhere.
+ */
+export function foldQuotedHtml(container: HTMLElement): Element[] {
+	// The nodes belong to another document, so `instanceof HTMLElement` would be
+	// false for every one of them. They stay typed as Element throughout.
+	if (container.dataset.quotesFolded === 'true') {
+		return Array.from(container.querySelectorAll('.quote-hidden'));
+	}
 	container.dataset.quotesFolded = 'true';
 
 	const quote = container.querySelector<HTMLElement>(QUOTE_SELECTORS);
-	if (!quote) return;
+	if (!quote) return [];
 
 	// Anything after the first quote belongs to the history too, as does the
 	// "On … wrote:" line that introduces it.
@@ -87,23 +134,11 @@ export function foldQuotedHtml(container: HTMLElement): void {
 		hidden.push(node);
 	}
 
-	if (hidden.length === 0) return;
+	// A bare forward is all quote and no words. Folding it would leave an empty
+	// message behind a toggle, so it is shown whole instead.
+	if (!remainsVisible(container, hidden)) return [];
 
-	// The container may live in the message frame's document, not this one.
-	const toggle = (container.ownerDocument ?? document).createElement('button');
-	toggle.type = 'button';
-	toggle.className = 'quote-toggle';
-	toggle.textContent = '···';
-	toggle.setAttribute('aria-label', 'Show quoted text');
-	toggle.setAttribute('aria-expanded', 'false');
-
-	anchor.parentNode?.insertBefore(toggle, anchor);
 	for (const node of hidden) node.classList.add('quote-hidden');
 
-	toggle.addEventListener('click', () => {
-		const showing = toggle.getAttribute('aria-expanded') === 'true';
-		for (const node of hidden) node.classList.toggle('quote-hidden', showing);
-		toggle.setAttribute('aria-expanded', showing ? 'false' : 'true');
-		toggle.setAttribute('aria-label', showing ? 'Show quoted text' : 'Hide quoted text');
-	});
+	return hidden;
 }

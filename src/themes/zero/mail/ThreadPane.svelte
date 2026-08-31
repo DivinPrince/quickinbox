@@ -19,12 +19,14 @@
 		id,
 		view,
 		onClose,
-		onCompose
+		onCompose,
+		onRead
 	}: {
 		id: string | null;
 		view: MailboxView;
 		onClose: () => void;
 		onCompose?: () => void;
+		onRead?: (threadId: string) => void;
 	} = $props();
 
 	type ThreadPayload = {
@@ -33,7 +35,7 @@
 		messages: ThreadMessage[];
 	};
 
-	type ReplyMode = 'reply' | 'replyAll' | 'forward';
+	type ReplyMode = 'reply' | 'replyAll' | 'forward' | 'forwardAll';
 
 	let thread = $state<ThreadPayload | null>(null);
 	let loading = $state(false);
@@ -49,6 +51,7 @@
 	let showBcc = $state(false);
 	let replyBcc = $state('');
 	let attachments = $state<OutboundAttachmentInput[]>([]);
+	let includeOriginalAttachments = $state(true);
 	let sending = $state(false);
 	let sendError = $state('');
 	let dark = $state(false);
@@ -91,7 +94,7 @@
 				thread = body;
 				const last = body.messages[body.messages.length - 1];
 				opened = new Set(last ? [last.id] : []);
-				void invalidateAll();
+				onRead?.(body.threadId);
 			})
 			.catch(() => {
 				if (!cancelled) error = t('common.networkError');
@@ -107,6 +110,17 @@
 	const latest = $derived(thread?.messages[thread.messages.length - 1] ?? null);
 	const starred = $derived(thread?.messages.some((message) => message.is_starred) ?? false);
 	const people = $derived(thread ? threadPeople(thread.messages, selfEmails) : []);
+	const forwarding = $derived(replyMode === 'forward' || replyMode === 'forwardAll');
+	const forwardedMessages = $derived(
+		replyMode === 'forwardAll'
+			? (thread?.messages ?? [])
+			: replyMode === 'forward' && replyTarget
+				? [replyTarget]
+				: []
+	);
+	const forwardedAttachmentCount = $derived(
+		forwardedMessages.reduce((count, message) => count + message.attachments.length, 0)
+	);
 
 	function senderName(message: ThreadMessage): string {
 		if (message.direction === 'outbound') return t('common.me');
@@ -170,6 +184,7 @@
 	function recipientsFor(mode: ReplyMode, message: ThreadMessage): { to: string; cc: string } {
 		switch (mode) {
 			case 'forward':
+			case 'forwardAll':
 				return { to: '', cc: '' };
 			case 'reply': {
 				const to =
@@ -237,9 +252,15 @@
 		replyHtml = '';
 		sendError = '';
 		attachments = [];
+		includeOriginalAttachments = true;
 		const nextOpened = new Set(opened);
 		nextOpened.add(message.id);
 		opened = nextOpened;
+	}
+
+	function startForwardAll() {
+		if (!latest) return;
+		startReply('forwardAll', latest);
 	}
 
 	function toggleOpened(messageId: string) {
@@ -277,22 +298,29 @@
 
 	async function sendReply() {
 		const message = replyTarget ?? latest;
-		if (!message || isHtmlEmpty(replyHtml)) return;
-		if (replyMode === 'forward' && !replyTo.trim()) {
+		if (!message || (!forwarding && isHtmlEmpty(replyHtml))) return;
+		if (forwarding && !replyTo.trim()) {
 			sendError = t('thread.addRecipient');
 			return;
 		}
 		sending = true;
 		sendError = '';
 		try {
-			if (replyMode === 'forward') {
-				const response = await fetch(`/api/mail/${message.id}/forward`, {
+			if (forwarding) {
+				const endpoint =
+					replyMode === 'forwardAll' && thread
+						? `/api/mail/thread/${encodeURIComponent(thread.threadId)}/forward`
+						: `/api/mail/${encodeURIComponent(message.id)}/forward`;
+				const response = await fetch(endpoint, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
 						to: replyTo,
-						html: replyHtml,
-						text: htmlToPlainText(replyHtml)
+						cc: replyCc.trim() || undefined,
+						bcc: replyBcc.trim() || undefined,
+						html: isHtmlEmpty(replyHtml) ? undefined : replyHtml,
+						text: isHtmlEmpty(replyHtml) ? undefined : htmlToPlainText(replyHtml),
+						includeAttachments: includeOriginalAttachments
 					})
 				});
 				if (!response.ok) {
@@ -323,6 +351,8 @@
 			replyHtml = '';
 			attachments = [];
 			await invalidateAll();
+		} catch {
+			sendError = t('common.networkError');
 		} finally {
 			sending = false;
 		}
@@ -364,6 +394,10 @@
 				</button>
 			</Tooltip>
 			<div class="z-thread-bar-right">
+				<button type="button" class="z-thread-replyall" onclick={startForwardAll}>
+					<Icon name="Forward" size={14} />
+					<span>{t('thread.forwardAll')}</span>
+				</button>
 				<button
 					type="button"
 					class="z-thread-replyall"
@@ -591,6 +625,13 @@
 						void sendReply();
 					}}
 				>
+					{#if forwarding}
+						<p class="z-forward-context">
+							{replyMode === 'forwardAll'
+								? t('thread.forwardingAll', { count: forwardedMessages.length })
+								: t('thread.forwardingOne')}
+						</p>
+					{/if}
 					<div class="z-composer-fields">
 						<div class="z-composer-row">
 							<span class="z-composer-label">{t('compose.toColon')}</span>
@@ -624,9 +665,21 @@
 						{/if}
 					</div>
 					<div class="z-composer-body">
-						<RichTextEditor bind:html={replyHtml} embedded minHeight={80} placeholder={t('compose.writeReplyPlaceholder')} />
+						<RichTextEditor
+							bind:html={replyHtml}
+							embedded
+							minHeight={80}
+							placeholder={t(forwarding ? 'thread.notePlaceholder' : 'compose.writeReplyPlaceholder')}
+						/>
 					</div>
-					<ComposerActions bind:attachments sending={sending} error={sendError} />
+					<ComposerActions
+						bind:attachments
+						bind:includeOriginalAttachments
+						sending={sending}
+						error={sendError}
+						allowNewAttachments={!forwarding}
+						originalAttachmentCount={forwardedAttachmentCount}
+					/>
 				</form>
 			{/if}
 		</div>

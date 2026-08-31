@@ -13,13 +13,15 @@
 		message,
 		receivedLabel = null,
 		expanded = false,
-		onToggle
+		onToggle,
+		onForward
 	}: {
 		message: ThreadMessage;
 		/** Name of the mailbox identity that received this message, when known. */
 		receivedLabel?: string | null;
 		expanded?: boolean;
 		onToggle: () => void;
+		onForward: () => void;
 	} = $props();
 
 	const outbound = $derived(message.direction === 'outbound');
@@ -154,6 +156,13 @@
 		</div>
 
 		<AttachmentList emailId={message.id} attachments={message.attachments} compact />
+
+		<div class="message-actions">
+			<button type="button" class="btn-ghost" onclick={onForward}>
+				<Icon name="share-forward-line" size={14} />
+				{t('thread.forward')}
+			</button>
+		</div>
 
 		{#if message.status === 'bounced' || message.status === 'failed'}
 			<p class="failure">
@@ -320,6 +329,19 @@
 		font-size: 0.75rem;
 		line-height: 1.5;
 		color: var(--color-danger);
+	}
+
+	.message-actions {
+		display: flex;
+		justify-content: flex-end;
+		margin-top: 0.75rem;
+	}
+
+	.message-actions .btn-ghost {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		font-size: 0.8125rem;
 	}
 
 	/* --- collapsed row --- */
