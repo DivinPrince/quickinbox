@@ -5,6 +5,7 @@ type SetupErrorCode =
 	| 'unauthorized'
 	| 'already_complete'
 	| 'database_unavailable'
+	| 'invalid_request'
 	| 'name_required'
 	| 'name_too_long'
 	| 'password_too_short'
@@ -28,7 +29,17 @@ export const POST: RequestHandler = async ({ request, locals, cookies, platform 
 	const db = platform?.env.DB;
 	if (!db) return setupError('database_unavailable', 503);
 
-	const body = (await request.json()) as {
+	let parsed: unknown;
+	try {
+		parsed = await request.json();
+	} catch {
+		return setupError('invalid_request', 400);
+	}
+	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+		return setupError('invalid_request', 400);
+	}
+
+	const body = parsed as {
 		name?: unknown;
 		password?: unknown;
 		confirmPassword?: unknown;
@@ -69,6 +80,6 @@ export const POST: RequestHandler = async ({ request, locals, cookies, platform 
 				return setupError('password_reused', 400);
 			}
 		}
-		return setupError('unknown', 400);
+		return setupError('unknown', 500);
 	}
 };

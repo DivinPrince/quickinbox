@@ -29,6 +29,7 @@
 				return t('accountSetup.passwordReused');
 			case 'already_complete':
 				return t('accountSetup.alreadyComplete');
+			case 'invalid_request':
 			case 'unauthorized':
 			case 'database_unavailable':
 			case 'unknown':
