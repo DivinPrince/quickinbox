@@ -13,6 +13,30 @@
 	let error = $state('');
 	let loading = $state(false);
 
+	function setupErrorMessage(code: unknown): string {
+		switch (code) {
+			case 'name_required':
+				return t('accountSetup.nameRequired');
+			case 'name_too_long':
+				return t('accountSetup.nameTooLong');
+			case 'password_too_short':
+				return t('accountSetup.passwordTooShort');
+			case 'password_too_long':
+				return t('accountSetup.passwordTooLong');
+			case 'password_mismatch':
+				return t('accountSetup.passwordMismatch');
+			case 'password_reused':
+				return t('accountSetup.passwordReused');
+			case 'already_complete':
+				return t('accountSetup.alreadyComplete');
+			case 'unauthorized':
+			case 'database_unavailable':
+			case 'unknown':
+			default:
+				return t('accountSetup.failed');
+		}
+	}
+
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		error = '';
@@ -31,7 +55,7 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? t('accountSetup.failed');
+				error = setupErrorMessage(body.code);
 				return;
 			}
 			window.location.href = '/login?setup=complete';
