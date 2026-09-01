@@ -170,6 +170,7 @@ type TokenUserRow = {
 	email: string;
 	name: string;
 	is_admin: number;
+	must_change_password: number;
 	created_at: string;
 	token_id: string;
 	scopes: string;
@@ -186,7 +187,7 @@ export async function getUserByApiToken(db: D1Database, token: string): Promise<
 	const hash = await hashToken(token);
 	const row = await db
 		.prepare(
-			`SELECT u.id, u.email, u.name, u.is_admin, u.created_at,
+			`SELECT u.id, u.email, u.name, u.is_admin, u.must_change_password, u.created_at,
 			        t.id AS token_id, t.scopes, t.last_used_at
 			 FROM api_tokens t
 			 JOIN users u ON u.id = t.user_id
@@ -196,6 +197,7 @@ export async function getUserByApiToken(db: D1Database, token: string): Promise<
 		.first<TokenUserRow>();
 
 	if (!row) return null;
+	if (row.must_change_password === 1) return null;
 
 	const lastUsed = row.last_used_at ? Date.parse(row.last_used_at) : 0;
 	if (!lastUsed || Date.now() - lastUsed >= LAST_USED_THROTTLE_MS) {
@@ -211,6 +213,7 @@ export async function getUserByApiToken(db: D1Database, token: string): Promise<
 			email: row.email,
 			name: row.name,
 			is_admin: row.is_admin === 1,
+			must_change_password: row.must_change_password === 1,
 			created_at: row.created_at
 		},
 		tokenId: row.token_id,

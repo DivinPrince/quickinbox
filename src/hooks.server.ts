@@ -1,5 +1,5 @@
 import { redirect, type Handle } from '@sveltejs/kit';
-import { authorizeApiRequest } from '$lib/server/api-access';
+import { authorizeApiRequest, canAccessDuringFirstLogin } from '$lib/server/api-access';
 import { getUserByApiToken, readBearerToken } from '$lib/server/api-tokens';
 import {
 	countUsers,
@@ -119,20 +119,32 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (db && event.locals.user) {
-		const [domains, addresses] = await Promise.all([
-			listDomains(db),
-			listAddressesForUser(db, event.locals.user.id)
-		]);
+		if (event.locals.user.must_change_password) {
+			event.locals.domains = [];
+			event.locals.addresses = [];
+		} else {
+			const [domains, addresses] = await Promise.all([
+				listDomains(db),
+				listAddressesForUser(db, event.locals.user.id)
+			]);
 
-		event.locals.domains = domains;
-		event.locals.addresses = addresses;
+			event.locals.domains = domains;
+			event.locals.addresses = addresses;
 
-		// Scripts pass `?domain=`; the dashboard uses a cookie.
-		const requested = pathname.startsWith('/api/')
-			? event.url.searchParams.get('domain')
-			: event.cookies.get(DOMAIN_COOKIE);
-		event.locals.activeDomainId =
-			requested && domains.some((domain) => domain.id === requested) ? requested : null;
+			// Scripts pass `?domain=`; the dashboard uses a cookie.
+			const requested = pathname.startsWith('/api/')
+				? event.url.searchParams.get('domain')
+				: event.cookies.get(DOMAIN_COOKIE);
+			event.locals.activeDomainId =
+				requested && domains.some((domain) => domain.id === requested) ? requested : null;
+		}
+	}
+
+	if (event.locals.user?.must_change_password && event.locals.authMethod === 'api_token') {
+		event.locals.user = null;
+		event.locals.authMethod = null;
+		event.locals.apiScopes = [];
+		event.locals.apiTokenId = null;
 	}
 
 	if (pathname.startsWith('/api/')) {
@@ -141,6 +153,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 		if (!event.locals.user || !event.locals.authMethod) {
 			return jsonError('Unauthorized', 401);
+		}
+		if (
+			event.locals.user.must_change_password &&
+			!canAccessDuringFirstLogin(pathname, event.request.method)
+		) {
+			return jsonError('Complete account setup before continuing', 403);
+		}
+		if (canAccessDuringFirstLogin(pathname, event.request.method)) {
+			return render(event, resolve);
 		}
 
 		const access = authorizeApiRequest({
@@ -156,7 +177,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return render(event, resolve);
 	}
 
-	if (db && event.locals.user) {
+	if (db && event.locals.user && !event.locals.user.must_change_password) {
 		const [storedTheme, storedLocale] = await Promise.all([
 			getUserUiTheme(db, event.locals.user.id),
 			getUserLocale(db, event.locals.user.id)
@@ -203,7 +224,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	if (pathname === '/login') {
 		if (event.locals.user) {
-			throw redirect(303, '/inbox');
+			throw redirect(303, event.locals.user.must_change_password ? '/account/setup' : '/inbox');
 		}
 		return render(event, resolve);
 	}
@@ -214,6 +235,17 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	if (!event.locals.user) {
 		throw redirect(303, '/login');
+	}
+
+	if (event.locals.user.must_change_password) {
+		if (pathname !== '/account/setup') {
+			throw redirect(303, '/account/setup');
+		}
+		return render(event, resolve);
+	}
+
+	if (pathname === '/account/setup') {
+		throw redirect(303, '/inbox');
 	}
 
 	// Nothing works until a provider domain is connected and the user owns an

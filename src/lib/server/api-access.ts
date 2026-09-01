@@ -150,6 +150,10 @@ const MOBILE_SESSION_ROUTES: Array<Pick<RouteRule, 'method' | 'match'>> = [
 	{ method: 'PATCH', match: (pathname) => pathname === '/api/settings/signature' }
 ];
 
+export function canAccessDuringFirstLogin(pathname: string, method: string): boolean {
+	return method.toUpperCase() === 'POST' && pathname === '/api/auth/complete-setup';
+}
+
 /** Bulk mailbox actions. Per-action scopes are enforced in `authorizeMailAction`. */
 export const MAIL_ACTIONS = [
 	'read',

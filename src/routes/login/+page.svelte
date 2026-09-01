@@ -3,6 +3,7 @@
 	import { APP_NAME } from '$lib/constants';
 	import { discardPushSubscriptionFromAnotherAccount } from '$lib/push-client';
 	import { t } from '$lib/i18n';
+	import { page } from '$app/stores';
 
 	let email = $state('');
 	let password = $state('');
@@ -30,7 +31,7 @@
 			} catch (pushError) {
 				console.warn('Could not reconcile the existing push subscription after login', pushError);
 			}
-			window.location.href = '/inbox';
+			window.location.href = data.user.must_change_password ? '/account/setup' : '/inbox';
 		} catch {
 			error = t('common.networkError');
 		} finally {
@@ -51,6 +52,9 @@
 		</div>
 
 		<form class="mt-8 space-y-4" onsubmit={submit}>
+			{#if $page.url.searchParams.get('setup') === 'complete'}
+				<p class="setup-complete">{t('accountSetup.complete')}</p>
+			{/if}
 			<div>
 				<label for="email" class="text-sm text-[var(--color-text-secondary)]">{t('auth.email')}</label>
 				<input id="email" type="email" bind:value={email} required autocomplete="username" class="auth-input" />
@@ -92,5 +96,14 @@
 		/* Matches the mark's own corner radius so the shadow hugs the tile. */
 		border-radius: 0.775rem;
 		box-shadow: var(--shadow-sm);
+	}
+
+	.setup-complete {
+		border: 1px solid var(--color-border);
+		border-radius: 0.625rem;
+		padding: 0.75rem;
+		font-size: 0.8125rem;
+		color: var(--color-text-secondary);
+		background: var(--color-surface-raised);
 	}
 </style>

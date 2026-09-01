@@ -13,6 +13,7 @@ type UserRow = {
 	email: string;
 	name: string;
 	is_admin: number;
+	must_change_password: number;
 	created_at: string;
 };
 
@@ -22,6 +23,7 @@ function mapUser(row: UserRow): User {
 		email: row.email,
 		name: row.name,
 		is_admin: row.is_admin === 1,
+		must_change_password: row.must_change_password === 1,
 		created_at: row.created_at
 	};
 }
@@ -33,7 +35,9 @@ export async function countUsers(db: D1Database): Promise<number> {
 
 export async function getUserByEmail(db: D1Database, email: string): Promise<(User & { password_hash: string }) | null> {
 	const row = await db
-		.prepare('SELECT id, email, name, password_hash, is_admin, created_at FROM users WHERE email = ?')
+		.prepare(
+			'SELECT id, email, name, password_hash, is_admin, must_change_password, created_at FROM users WHERE email = ?'
+		)
 		.bind(email.toLowerCase())
 		.first<UserRow & { password_hash: string }>();
 
@@ -42,7 +46,9 @@ export async function getUserByEmail(db: D1Database, email: string): Promise<(Us
 
 export async function getUserById(db: D1Database, id: string): Promise<User | null> {
 	const row = await db
-		.prepare('SELECT id, email, name, is_admin, created_at FROM users WHERE id = ?')
+		.prepare(
+			'SELECT id, email, name, is_admin, must_change_password, created_at FROM users WHERE id = ?'
+		)
 		.bind(id)
 		.first<UserRow>();
 
@@ -51,7 +57,9 @@ export async function getUserById(db: D1Database, id: string): Promise<User | nu
 
 export async function listUsers(db: D1Database): Promise<User[]> {
 	const { results } = await db
-		.prepare('SELECT id, email, name, is_admin, created_at FROM users ORDER BY created_at ASC')
+		.prepare(
+			'SELECT id, email, name, is_admin, must_change_password, created_at FROM users ORDER BY created_at ASC'
+		)
 		.all<UserRow>();
 
 	return results.map(mapUser);
@@ -59,7 +67,13 @@ export async function listUsers(db: D1Database): Promise<User[]> {
 
 export async function createUser(
 	db: D1Database,
-	input: { email: string; name: string; password: string; isAdmin?: boolean }
+	input: {
+		email: string;
+		name: string;
+		password: string;
+		isAdmin?: boolean;
+		mustChangePassword?: boolean;
+	}
 ): Promise<User> {
 	// This is a login identity only. Mail identities live in `addresses` and are
 	// bound to connected Resend domains, so an operator can sign in with any
@@ -79,14 +93,31 @@ export async function createUser(
 
 	await db
 		.prepare(
-			'INSERT INTO users (id, email, name, password_hash, is_admin) VALUES (?, ?, ?, ?, ?)'
+			`INSERT INTO users
+			 (id, email, name, password_hash, is_admin, must_change_password)
+			 VALUES (?, ?, ?, ?, ?, ?)`
 		)
-		.bind(id, email, input.name.trim(), password_hash, input.isAdmin ? 1 : 0)
+		.bind(
+			id,
+			email,
+			input.name.trim(),
+			password_hash,
+			input.isAdmin ? 1 : 0,
+			input.mustChangePassword ? 1 : 0
+		)
 		.run();
 
 	const user = await getUserById(db, id);
 	if (!user) throw new Error('Failed to create user');
 	return user;
+}
+
+/** Roll back an admin-created login when its mailbox could not be created. */
+export async function deletePendingUser(db: D1Database, userId: string): Promise<void> {
+	await db
+		.prepare('DELETE FROM users WHERE id = ? AND must_change_password = 1')
+		.bind(userId)
+		.run();
 }
 
 export async function bootstrapAdmin(
@@ -397,6 +428,74 @@ export async function setUserPassword(
 	]);
 }
 
+export async function completeFirstLogin(
+	db: D1Database,
+	userId: string,
+	input: { name: string; password: string }
+): Promise<void> {
+	const name = input.name.trim();
+	if (!name) {
+		throw new Error('Name is required');
+	}
+	if (name.length > 128) {
+		throw new Error('Name must be 128 characters or fewer');
+	}
+	if (input.password.length < 8 || input.password.length > 1024) {
+		if (input.password.length > 1024) {
+			throw new Error('Password must be 1024 characters or fewer');
+		}
+		throw new Error('Password must be at least 8 characters');
+	}
+
+	const current = await db
+		.prepare(
+			'SELECT password_hash FROM users WHERE id = ? AND must_change_password = 1'
+		)
+		.bind(userId)
+		.first<{ password_hash: string }>();
+	if (!current) {
+		throw new Error('Account setup is already complete');
+	}
+	if (await verifyPassword(input.password, current.password_hash)) {
+		throw new Error('Choose a password different from the temporary password');
+	}
+
+	const password_hash = await hashPassword(input.password);
+	const [result] = await db.batch([
+		db
+			.prepare(
+				`UPDATE users
+				 SET name = ?, password_hash = ?, must_change_password = 0
+				 WHERE id = ? AND must_change_password = 1`
+			)
+			.bind(name, password_hash, userId),
+		db
+			.prepare(
+				`DELETE FROM sessions
+				 WHERE user_id = ?
+				   AND EXISTS (
+					SELECT 1 FROM users
+					WHERE id = ? AND password_hash = ? AND must_change_password = 0
+				   )`
+			)
+			.bind(userId, userId, password_hash),
+		db
+			.prepare(
+				`DELETE FROM api_tokens
+				 WHERE user_id = ?
+				   AND EXISTS (
+					SELECT 1 FROM users
+					WHERE id = ? AND password_hash = ? AND must_change_password = 0
+				   )`
+			)
+			.bind(userId, userId, password_hash)
+	]);
+
+	if ((result.meta.changes ?? 0) === 0) {
+		throw new Error('Account setup is already complete');
+	}
+}
+
 /**
  * Grant or withdraw admin.
  *
@@ -502,6 +601,7 @@ export async function deleteUser(
 		db.prepare(`DELETE FROM addresses WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM sessions WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM api_tokens WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM pairing_codes WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db
 			.prepare(`DELETE FROM push_subscriptions WHERE user_id = ? AND ${gone}`)
 			.bind(targetId, targetId),
@@ -553,7 +653,8 @@ export async function getAuthenticatedSession(
 	const token_hash = await hashToken(token);
 	const row = await db
 		.prepare(
-			`SELECT s.id AS session_id, s.device_platform, s.last_seen_at, u.id, u.email, u.name, u.is_admin, u.created_at
+			`SELECT s.id AS session_id, s.device_platform, s.last_seen_at,
+			        u.id, u.email, u.name, u.is_admin, u.must_change_password, u.created_at
 			 FROM sessions s
 			 JOIN users u ON u.id = s.user_id
 			 WHERE s.token_hash = ? AND datetime(s.expires_at) > datetime('now')`
@@ -564,6 +665,7 @@ export async function getAuthenticatedSession(
 		>();
 
 	if (!row) return null;
+	if (row.must_change_password === 1 && row.device_platform) return null;
 
 	const lastSeenAt = row.last_seen_at
 		? Date.parse(toIsoTimestamp(row.last_seen_at))
