@@ -214,11 +214,17 @@ export type EmailAttachmentMeta = {
 	filename: string;
 	content_type: string;
 	size_bytes: number;
+	content_disposition: AttachmentDisposition | null;
+	content_id: string | null;
 	created_at: string;
 };
+
+export type AttachmentDisposition = 'attachment' | 'inline';
 
 export type OutboundAttachmentInput = {
 	filename: string;
 	type: string;
 	content: string;
+	disposition?: AttachmentDisposition;
+	contentId?: string;
 };

@@ -89,6 +89,38 @@ describe('API key access', () => {
 		);
 	});
 
+	test('forward routes allow mobile sessions and send-scoped API keys', () => {
+		for (const pathname of ['/api/mail/message-1/forward', '/api/mail/thread/thread-1/forward']) {
+			assert.deepEqual(
+				authorizeApiRequest({
+					pathname,
+					method: 'POST',
+					authMethod: 'mobile_session',
+					scopes: []
+				}),
+				{ ok: true }
+			);
+			assert.deepEqual(
+				authorizeApiRequest({
+					pathname,
+					method: 'POST',
+					authMethod: 'api_token',
+					scopes: ['mail:send']
+				}),
+				{ ok: true }
+			);
+			assert.equal(
+				authorizeApiRequest({
+					pathname,
+					method: 'POST',
+					authMethod: 'api_token',
+					scopes: ['mail:read']
+				}).ok,
+				false
+			);
+		}
+	});
+
 	test('admin routes stay off mail keys', () => {
 		assert.equal(
 			authorizeApiRequest({

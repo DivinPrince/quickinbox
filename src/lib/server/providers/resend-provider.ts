@@ -1,3 +1,4 @@
+import type { OutboundAttachmentInput } from '$lib/types';
 import {
 	createResendClient,
 	isDomainReceivable,
@@ -33,11 +34,7 @@ export function createResendProvider(apiKey: string): EmailProvider {
 							: {}),
 						...(input.attachments?.length
 							? {
-									attachments: input.attachments.map((file) => ({
-										filename: file.filename,
-										content: file.content,
-										content_type: file.type
-									}))
+									attachments: input.attachments.map(toResendAttachment)
 								}
 							: {})
 					},
@@ -64,6 +61,20 @@ export function createResendProvider(apiKey: string): EmailProvider {
 				throw wrapResendError(error);
 			}
 		}
+	};
+}
+
+function toResendAttachment(file: OutboundAttachmentInput) {
+	// Resend represents inline MIME parts with content_id rather than a
+	// separate disposition field. Explicit attachment parts must not receive
+	// content_id, because Resend would treat them as inline content.
+	const contentId = file.disposition !== 'attachment' ? file.contentId : undefined;
+
+	return {
+		filename: file.filename,
+		content: file.content,
+		content_type: file.type,
+		...(contentId ? { content_id: contentId } : {})
 	};
 }
 

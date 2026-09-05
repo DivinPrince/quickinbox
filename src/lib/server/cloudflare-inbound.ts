@@ -7,6 +7,7 @@ import { collectInboundRecipients, parseEmailAddress } from './email-address';
 import { emailExistsByProviderId, insertEmail } from './mail-store';
 import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
 import { normalizeMessageId } from './send-mail';
+import { inboundAttachmentMetadata } from './inbound';
 
 export type CloudflareInboundMessage = {
 	readonly from: string;
@@ -110,10 +111,16 @@ async function storeInboundAttachments(
 		}
 
 		try {
+			const metadata = inboundAttachmentMetadata({
+				disposition: attachment.disposition,
+				contentId: attachment.contentId,
+				related: attachment.related
+			});
 			await insertAttachmentBytes(env.DB, env.ATTACHMENTS, emailId, {
 				filename: attachment.filename || 'attachment',
 				type: attachment.mimeType || 'application/octet-stream',
-				bytes
+				bytes,
+				...metadata
 			});
 		} catch (error) {
 			console.error('Failed to store inbound Cloudflare attachment', attachment.filename, error);

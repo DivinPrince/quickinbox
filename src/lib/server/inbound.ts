@@ -21,6 +21,36 @@ export type WebhookOutcome = {
 
 type InboundEnv = PushNotificationEnv & { ATTACHMENTS: R2Bucket };
 
+export type InboundAttachmentMetadata = {
+	disposition?: 'attachment' | 'inline';
+	contentId?: string;
+};
+
+/**
+ * Keep the MIME metadata that is meaningful when the attachment is sent again.
+ * Unknown or absent dispositions are intentionally omitted so regular
+ * attachments continue through the existing default path unchanged.
+ */
+export function inboundAttachmentMetadata(input: {
+	disposition?: string | null;
+	contentId?: string | null;
+	related?: boolean;
+}): InboundAttachmentMetadata {
+	const contentId = input.contentId?.trim() || undefined;
+	const dispositionValue = input.disposition?.trim().toLowerCase().split(';', 1)[0];
+	const disposition =
+		dispositionValue === 'attachment' || dispositionValue === 'inline'
+			? dispositionValue
+			: input.related && contentId
+				? 'inline'
+				: undefined;
+
+	return {
+		...(disposition ? { disposition } : {}),
+		...(contentId ? { contentId } : {})
+	};
+}
+
 /** Resend delivery events → the status we display on a sent message. */
 const STATUS_BY_EVENT: Record<string, DeliveryStatus> = {
 	'email.sent': 'sent',
@@ -174,10 +204,15 @@ async function storeInboundAttachments(
 			const bytes = await client.downloadAttachment(attachment.download_url);
 			if (bytes.byteLength > MAX_ATTACHMENT_BYTES) continue;
 
+			const metadata = inboundAttachmentMetadata({
+				disposition: attachment.content_disposition,
+				contentId: attachment.content_id
+			});
 			await insertAttachmentBytes(env.DB, env.ATTACHMENTS, emailId, {
 				filename: attachment.filename || 'attachment',
 				type: attachment.content_type || 'application/octet-stream',
-				bytes
+				bytes,
+				...metadata
 			});
 		} catch (error) {
 			// One bad attachment shouldn't cost us the message.
