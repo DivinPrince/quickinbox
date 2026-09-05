@@ -3,7 +3,11 @@ import { describe, test } from 'node:test';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { EmailRow } from '$lib/types';
 import { buildThreadParticipants } from './thread-participants';
-import { listForwardThreadMessages } from './mail-store';
+import {
+	encodeMailboxCursor,
+	getMailboxCursor,
+	listForwardThreadMessages
+} from './mail-store';
 
 describe('thread participants', () => {
 	test('supplies a real inbound display name', () => {
@@ -130,4 +134,32 @@ test('forward-thread lookup rejects cross-user messages and returns the owned th
 		['older', 'newer']
 	);
 	assert.deepEqual(await listForwardThreadMessages(db, 'user-3', 'thread-1'), []);
+});
+
+test('mailbox cursor is a count plus latest rowid and can scope to a domain', async () => {
+	const binds: unknown[][] = [];
+	const db = {
+		prepare(sql: string) {
+			assert.match(sql, /COUNT\(\*\)/);
+			assert.match(sql, /MAX\(rowid\)/);
+			return {
+				bind(...values: unknown[]) {
+					binds.push(values);
+					return {
+						async first() {
+							return {
+								message_count: values.length === 2 ? 4 : 9,
+								latest_rowid: 41
+							};
+						}
+					};
+				}
+			};
+		}
+	} as unknown as D1Database;
+
+	assert.equal(encodeMailboxCursor(0, 0), '0:0');
+	assert.equal(await getMailboxCursor(db, 'user-1'), '9:41');
+	assert.equal(await getMailboxCursor(db, 'user-1', 'domain-9'), '4:41');
+	assert.deepEqual(binds, [['user-1'], ['user-1', 'domain-9']]);
 });

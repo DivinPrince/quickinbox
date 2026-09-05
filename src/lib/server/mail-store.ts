@@ -432,6 +432,38 @@ export async function listEmails(
 }
 
 /**
+ * Cheap "has anything been inserted or deleted?" fingerprint. Flag changes
+ * (read, star, archive) do not move this, so a live poll can refresh on new
+ * mail without fighting the user's current selection.
+ */
+export function encodeMailboxCursor(messageCount: number, latestRowid: number): string {
+	return `${messageCount}:${latestRowid}`;
+}
+
+export async function getMailboxCursor(
+	db: D1Database,
+	userId: string,
+	domainId?: string | null
+): Promise<string> {
+	const bindings: unknown[] = [userId];
+	let scope = 'user_id = ?';
+	if (domainId) {
+		scope += ' AND domain_id = ?';
+		bindings.push(domainId);
+	}
+
+	const row = await db
+		.prepare(
+			`SELECT COUNT(*) AS message_count, COALESCE(MAX(rowid), 0) AS latest_rowid
+			 FROM emails WHERE ${scope}`
+		)
+		.bind(...bindings)
+		.first<{ message_count: number | string | null; latest_rowid: number | string | null }>();
+
+	return encodeMailboxCursor(Number(row?.message_count ?? 0), Number(row?.latest_rowid ?? 0));
+}
+
+/**
  * Row counts behind every sidebar entry, in one round trip. Counted in
  * conversations so the badges agree with what the lists actually show.
  */
