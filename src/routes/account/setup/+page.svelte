@@ -153,6 +153,7 @@
 	.brand-icon {
 		display: flex;
 		margin-bottom: 1rem;
+		overflow: hidden;
 		border-radius: 0.775rem;
 		box-shadow: var(--shadow-sm);
 	}

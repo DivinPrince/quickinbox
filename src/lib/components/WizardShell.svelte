@@ -74,6 +74,7 @@
 	.brand-icon {
 		display: flex;
 		margin-bottom: 1rem;
+		overflow: hidden;
 		/* Matches the mark's own corner radius so the shadow hugs the tile. */
 		border-radius: 0.775rem;
 		box-shadow: var(--shadow-sm);
