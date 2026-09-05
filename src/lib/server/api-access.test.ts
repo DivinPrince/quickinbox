@@ -62,6 +62,24 @@ describe('API key access', () => {
 	test('a read key can list and open threads', () => {
 		assert.deepEqual(
 			authorizeApiRequest({
+				pathname: '/api/mail/sync',
+				method: 'GET',
+				authMethod: 'api_token',
+				scopes: ['mail:read']
+			}),
+			{ ok: true }
+		);
+		assert.deepEqual(
+			authorizeApiRequest({
+				pathname: '/api/mail/sync',
+				method: 'GET',
+				authMethod: 'mobile_session',
+				scopes: []
+			}),
+			{ ok: true }
+		);
+		assert.deepEqual(
+			authorizeApiRequest({
 				pathname: '/api/mail',
 				method: 'GET',
 				authMethod: 'api_token',

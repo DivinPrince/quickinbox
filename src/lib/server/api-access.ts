@@ -27,6 +27,11 @@ const BEARER_ROUTES: RouteRule[] = [
 		scopes: ['mail:read']
 	},
 	{
+		method: 'GET',
+		match: (pathname) => pathname === '/api/mail/sync',
+		scopes: ['mail:read']
+	},
+	{
 		method: 'POST',
 		match: (pathname) => pathname === '/api/mail',
 		scopes: ['mail:send']
@@ -132,6 +137,7 @@ const MOBILE_SESSION_ROUTES: Array<Pick<RouteRule, 'method' | 'match'>> = [
 	{ method: 'GET', match: (pathname) => pathname === '/api/auth/me' },
 	{ method: 'DELETE', match: (pathname) => pathname === '/api/auth/session' },
 	{ method: 'GET', match: (pathname) => pathname === '/api/mail' },
+	{ method: 'GET', match: (pathname) => pathname === '/api/mail/sync' },
 	{ method: 'POST', match: (pathname) => pathname === '/api/mail' },
 	{ method: 'POST', match: (pathname) => pathname === '/api/mail/actions' },
 	{

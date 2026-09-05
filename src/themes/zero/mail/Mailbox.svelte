@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { formatRelativeDate } from '$lib/utils/date';
@@ -27,7 +28,10 @@
 	let viewsOpen = $state(false);
 
 	$effect(() => {
-		items = mailbox.threads;
+		const next = mailbox.threads;
+		items = next;
+		const ids = new Set(next.map((thread) => thread.thread_id));
+		selected = untrack(() => selected).filter((id) => ids.has(id));
 	});
 
 	$effect(() => {

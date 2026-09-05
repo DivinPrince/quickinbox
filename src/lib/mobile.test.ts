@@ -129,7 +129,20 @@ test('service worker is a classic worker, not a Vite module', () => {
 	const source = readFileSync(join(root, 'src/service-worker.ts'), 'utf8');
 	assert.match(source, /addEventListener\('install'/);
 	assert.match(source, /addEventListener\('push'/);
+	assert.match(source, /postMessage/);
+	assert.match(source, /mail:changed/);
 	assert.doesNotMatch(source, /import\s+['"]\/@fs/);
+});
+
+test('signed-in shell refreshes the mailbox without a manual reload', () => {
+	const layout = readFileSync(join(root, 'src/routes/+layout.svelte'), 'utf8');
+	assert.match(layout, /MailboxLiveSync/);
+	const live = readFileSync(join(root, 'src/lib/mail/live.ts'), 'utf8');
+	assert.match(live, /mailboxSyncUrl/);
+	assert.match(live, /startMailboxLiveSync/);
+	assert.match(live, /MAIL_CHANGED_MESSAGE/);
+	const sync = readFileSync(join(root, 'src/lib/mail/sync.ts'), 'utf8');
+	assert.match(sync, /\/api\/mail\/sync/);
 });
 
 test('PWA manifest is standalone and points at real icons', () => {
