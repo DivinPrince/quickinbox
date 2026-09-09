@@ -10,6 +10,7 @@ import {
 import {
 	assertOutboundAttachments,
 	assertTotalAttachmentBytes,
+	persistableAddressId,
 	resolveReplyFromAddress
 } from './outbox';
 
@@ -204,6 +205,25 @@ describe('resolveReplyFromAddress', () => {
 			inbound
 		);
 		assert.equal(identity, null);
+	});
+});
+
+describe('persistableAddressId', () => {
+	test('keeps a real address id', () => {
+		assert.equal(persistableAddressId('addr-hello'), 'addr-hello');
+	});
+
+	test('drops the synthetic id a catch-all reply carries', () => {
+		// `emails.address_id` references `addresses(id)`; storing the synthetic
+		// id raised SQLITE_CONSTRAINT_FOREIGNKEY after the mail had already been
+		// handed to the provider.
+		assert.equal(persistableAddressId('reply:hello@example.com'), null);
+	});
+
+	test('treats a missing id as null', () => {
+		assert.equal(persistableAddressId(null), null);
+		assert.equal(persistableAddressId(undefined), null);
+		assert.equal(persistableAddressId(''), null);
 	});
 });
 
