@@ -28,6 +28,7 @@ export const load: LayoutServerLoad = async ({ locals, platform }) => {
 		domains: locals.domains,
 		addresses: locals.addresses,
 		activeDomainId: locals.activeDomainId,
+		accounts: locals.accounts,
 		counts,
 		uiTheme: locals.uiTheme ?? DEFAULT_UI_THEME,
 		locale: locals.locale ?? DEFAULT_LOCALE

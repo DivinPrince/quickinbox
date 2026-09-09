@@ -5,19 +5,53 @@
 	import { t } from '$lib/i18n';
 	import Icon from './Icon.svelte';
 	import LocaleSwitcher from './LocaleSwitcher.svelte';
-	import type { MailAddress } from '$lib/types';
+	import { ADD_ACCOUNT_HREF, switchAccount } from '$lib/account-switch';
+	import type { LinkedAccount, MailAddress } from '$lib/types';
 
 	let {
 		userName,
 		userEmail,
 		addresses,
-		onLogout
+		accounts = [],
+		onLogout,
+		onLogoutAll
 	}: {
 		userName: string;
 		userEmail: string;
 		addresses: MailAddress[];
+		/** Every account signed in on this browser, active first. */
+		accounts?: LinkedAccount[];
 		onLogout: () => void;
+		onLogoutAll?: () => void;
 	} = $props();
+
+	const otherAccounts = $derived(accounts.filter((account) => !account.current));
+	let switching = $state(false);
+	let switchError = $state('');
+
+	function initialsOf(name: string): string {
+		return (
+			name
+				.split(/\s+/)
+				.filter(Boolean)
+				.slice(0, 2)
+				.map((part) => part[0]!.toUpperCase())
+				.join('') || '?'
+		);
+	}
+
+	async function switchTo(account: LinkedAccount) {
+		if (switching) return;
+		switching = true;
+		switchError = '';
+		haptic(8);
+		try {
+			await switchAccount(account.id);
+		} catch (error) {
+			switchError = error instanceof Error ? error.message : t('account.switchFailed');
+			switching = false;
+		}
+	}
 
 	// Search applies to whichever mailbox is open; anywhere else it lands in Inbox.
 	const MAILBOXES = ['/inbox', '/sent', '/starred', '/drafts', '/trash'];
@@ -38,14 +72,7 @@
 		addresses.find((address) => address.is_default)?.address ?? addresses[0]?.address ?? userEmail
 	);
 
-	const initials = $derived(
-		userName
-			.split(/\s+/)
-			.filter(Boolean)
-			.slice(0, 2)
-			.map((part) => part[0]!.toUpperCase())
-			.join('') || '?'
-	);
+	const initials = $derived(initialsOf(userName));
 
 	function submitSearch(event: SubmitEvent) {
 		event.preventDefault();
@@ -119,12 +146,45 @@
 						<span class="menu-name">{userName}</span>
 						<span class="menu-address">{primaryAddress}</span>
 					</p>
+
+					{#if otherAccounts.length > 0}
+						<p class="menu-label">{t('account.accounts')}</p>
+						{#each otherAccounts as account (account.id)}
+							<button
+								type="button"
+								class="menu-item menu-account"
+								role="menuitem"
+								disabled={switching}
+								aria-label={t('account.switchTo', { name: account.name })}
+								onclick={() => switchTo(account)}
+							>
+								<span class="avatar avatar-sm">{initialsOf(account.name)}</span>
+								<span class="menu-account-text">
+									<span class="menu-account-name">{account.name}</span>
+									<span class="menu-account-address">{account.address ?? account.email}</span>
+								</span>
+							</button>
+						{/each}
+						{#if switchError}
+							<p class="menu-error" role="alert">{switchError}</p>
+						{/if}
+					{/if}
+					<a href={ADD_ACCOUNT_HREF} class="menu-item" role="menuitem" onclick={() => (menuOpen = false)}>
+						<Icon name="user-add-line" size={15} /> {t('account.addAccount')}
+					</a>
+
+					<div class="menu-divider"></div>
 					<a href="/settings" class="menu-item" role="menuitem" onclick={() => (menuOpen = false)}>
 						<Icon name="user-settings-line" size={15} /> {t('nav.settings')}
 					</a>
 					<button type="button" class="menu-item" role="menuitem" onclick={onLogout}>
 						<Icon name="logout-box-r-line" size={15} /> {t('nav.logOut')}
 					</button>
+					{#if otherAccounts.length > 0 && onLogoutAll}
+						<button type="button" class="menu-item" role="menuitem" onclick={onLogoutAll}>
+							<Icon name="logout-circle-r-line" size={15} /> {t('account.logOutAll')}
+						</button>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -324,6 +384,64 @@
 	.menu-item:hover {
 		background: var(--color-surface-muted);
 		color: var(--color-text);
+	}
+
+	.menu-item:disabled {
+		opacity: 0.6;
+	}
+
+	.menu-label {
+		padding: 0.5rem 0.625rem 0.125rem;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--color-muted);
+	}
+
+	.menu-divider {
+		height: 1px;
+		margin: 0.375rem 0.25rem 0.25rem;
+		background: var(--color-line);
+	}
+
+	.menu-account {
+		gap: 0.625rem;
+	}
+
+	.avatar-sm {
+		flex-shrink: 0;
+		width: 1.625rem;
+		height: 1.625rem;
+		font-size: 0.5625rem;
+	}
+
+	.menu-account-text {
+		display: flex;
+		flex: 1;
+		min-width: 0;
+		flex-direction: column;
+		line-height: 1.25;
+	}
+
+	.menu-account-name {
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--color-text);
+	}
+
+	.menu-account-address {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: 0.6875rem;
+		color: var(--color-muted);
+	}
+
+	.menu-error {
+		padding: 0.25rem 0.625rem;
+		font-size: 0.75rem;
+		color: var(--color-danger, var(--color-text-secondary));
 	}
 
 	@media (min-width: 901px) {

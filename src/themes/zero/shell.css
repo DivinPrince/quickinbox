@@ -244,16 +244,33 @@
 	opacity: 1;
 }
 
-[data-ui-theme='zero'] .z-extra-menu strong {
+[data-ui-theme='zero'] .z-extra-menu strong,
+[data-ui-theme='zero'] .z-account-menu strong {
 	display: block;
 	font-size: 12px;
 	font-weight: 500;
 }
 
-[data-ui-theme='zero'] .z-extra-menu small {
+[data-ui-theme='zero'] .z-extra-menu small,
+[data-ui-theme='zero'] .z-account-menu small {
 	display: block;
+	max-width: 12rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 	font-size: 11px;
 	color: var(--z-muted);
+}
+
+[data-ui-theme='zero'] .z-menu-error {
+	margin: 0.25rem 0.5rem 0;
+	font-size: 12px;
+	color: var(--color-danger, var(--z-muted));
+}
+
+[data-ui-theme='zero'] .z-menu button:disabled {
+	opacity: 0.5;
+	cursor: default;
 }
 
 [data-ui-theme='zero'] .z-compose {

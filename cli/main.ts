@@ -1,24 +1,40 @@
 import { writeFile } from 'node:fs/promises';
 import { stdin as stdinStream } from 'node:process';
 import {
+	listThreadsAcross,
 	QuickInboxClient,
 	QuickInboxError,
 	safeDownloadName,
+	type AccountClient,
 	type MailboxView,
 	type ThreadSummary
 } from './client.ts';
-import { clearConfig, envFlag, loadConfig, saveConfig } from './config.ts';
+import {
+	clearConfig,
+	envFlag,
+	loadAccounts,
+	removeAccount,
+	resolveAccount,
+	saveAccount,
+	setDefaultAccount
+} from './config.ts';
 
-const HELP = `quickinbox — operate a Quickinbox instance from the terminal
+const HELP = `quickinbox — operate one or more Quickinbox instances from the terminal
 
 Usage:
-  quickinbox login --url <https://mail.example.com> --token <qi_live_…>
-  quickinbox logout
-  quickinbox whoami
+  quickinbox login --url <https://mail.example.com> --token <qi_live_…> [--account <name>] [--default]
+  quickinbox logout [--account <name> | --all]
+  quickinbox whoami [--account <name>]
+
+Accounts:
+  quickinbox accounts                      list saved accounts (* marks the default)
+  quickinbox accounts use <name>           make <name> the default account
+  quickinbox accounts remove <name>
+  Every command accepts --account <name> (-a) to act on a specific account.
 
 Mail:
-  quickinbox inbox [--page N] [--unread] [--domain ID]
-  quickinbox search <query> [--view inbox|sent|drafts|starred|trash]
+  quickinbox inbox [--page N] [--unread] [--domain ID] [--all-accounts]
+  quickinbox search <query> [--view inbox|sent|drafts|starred|trash] [--all-accounts]
   quickinbox read <thread-or-message-id>
   quickinbox send --to <addr> --subject <text> [--body <text>] [--from <address-id>]
   quickinbox reply <id> [--body <text>]
@@ -40,10 +56,12 @@ Admin:
 MCP:
   quickinbox mcp
 
-Auth is a Settings → API keys bearer token. QUICKINBOX_URL and QUICKINBOX_TOKEN
-override the saved config (`QUICKMAIL_URL` / `QUICKMAIL_TOKEN` still work).
-The `quickmail` command is an alias for `quickinbox`. Use --json on mail/admin
-commands for raw output.
+Auth is a Settings → API keys bearer token. Log in once per instance; each
+login is saved as an account named after its host unless --account is given.
+QUICKINBOX_URL and QUICKINBOX_TOKEN add an account that becomes the default
+(QUICKMAIL_URL / QUICKMAIL_TOKEN still work); QUICKINBOX_ACCOUNT picks the
+default among saved accounts. The "quickmail" command is an alias for
+"quickinbox". Use --json on mail/admin commands for raw output.
 `;
 
 type Flags = Record<string, string | boolean>;
@@ -101,6 +119,8 @@ function alias(key: string): string {
 			return 'help';
 		case 'u':
 			return 'url';
+		case 'a':
+			return 'account';
 		default:
 			return key;
 	}
@@ -134,28 +154,62 @@ function terminalSafe(value: string): string {
 	return value.replace(/[\u0000-\u001f\u007f-\u009f]/g, '');
 }
 
-function printThreads(page: { threads: ThreadSummary[]; total: number; page: number; pageCount: number }): void {
-	if (page.threads.length === 0) {
-		console.log('No conversations.');
-		return;
-	}
-
-	for (const thread of page.threads) {
+function printThreadRows(threads: (ThreadSummary & { account?: string })[]): void {
+	for (const thread of threads) {
 		const who = thread.participants
 			.map((participant) =>
 				participant.self ? 'me' : terminalSafe(participant.label || participant.address)
 			)
 			.join(', ');
 		const unread = thread.is_read ? ' ' : '*';
-		console.log(`${unread} ${thread.thread_id}  ${who}`);
-		console.log(`  ${thread.subject || '(no subject)'}  — ${thread.preview}`);
+		const tag = thread.account ? `[${terminalSafe(thread.account)}] ` : '';
+		console.log(`${unread} ${tag}${thread.thread_id}  ${who}`);
+		console.log(`  ${terminalSafe(thread.subject || '(no subject)')}  — ${terminalSafe(thread.preview)}`);
 	}
+}
+
+function printThreads(page: { threads: ThreadSummary[]; total: number; page: number; pageCount: number }): void {
+	if (page.threads.length === 0) {
+		console.log('No conversations.');
+		return;
+	}
+	printThreadRows(page.threads);
 	console.log(`\n${page.total} conversation${page.total === 1 ? '' : 's'}  page ${page.page}/${page.pageCount}`);
 }
 
-async function clientFromConfig(): Promise<QuickInboxClient> {
-	const config = await loadConfig();
-	return new QuickInboxClient(config.url, config.token);
+function printMultiAccountThreads(result: Awaited<ReturnType<typeof listThreadsAcross>>): void {
+	if (result.threads.length === 0) console.log('No conversations.');
+	else printThreadRows(result.threads);
+	console.log('');
+	for (const account of result.accounts) {
+		if (account.error) {
+			console.log(`[${terminalSafe(account.account)}] error: ${terminalSafe(account.error)}`);
+			continue;
+		}
+		console.log(
+			`[${terminalSafe(account.account)}] ${account.total} conversation${account.total === 1 ? '' : 's'}  page ${account.page}/${account.pageCount}`
+		);
+	}
+}
+
+/** The client for `--account <name>`, or the default account. */
+async function clientFromConfig(flags: Flags = {}): Promise<QuickInboxClient> {
+	const account = await resolveAccount(flagString(flags, 'account'));
+	return new QuickInboxClient(account.url, account.token);
+}
+
+/** Clients for `--all-accounts`, or just the one selected by `--account` / the default. */
+async function clientsFromConfig(flags: Flags): Promise<AccountClient[]> {
+	if (flagBool(flags, 'all-accounts')) {
+		const { accounts } = await loadAccounts();
+		if (accounts.length === 0) await resolveAccount(); // throws the "not logged in" message
+		return accounts.map((account) => ({
+			name: account.name,
+			client: new QuickInboxClient(account.url, account.token)
+		}));
+	}
+	const account = await resolveAccount(flagString(flags, 'account'));
+	return [{ name: account.name, client: new QuickInboxClient(account.url, account.token) }];
 }
 
 async function resolveUserId(client: QuickInboxClient, idOrEmail: string): Promise<string> {
@@ -205,29 +259,78 @@ async function run(argv: string[]): Promise<number> {
 			}
 			const client = new QuickInboxClient(url, token);
 			const user = await client.whoami();
-			const path = await saveConfig({ url, token });
-			console.log(`Logged in as ${user.email} (${path})`);
+			const saved = await saveAccount({
+				url,
+				token,
+				name: flagString(flags, 'account'),
+				makeDefault: flagBool(flags, 'default')
+			});
+			const { accounts, defaultName } = await loadAccounts();
+			const isDefault = defaultName === saved.name;
+			console.log(
+				`Logged in as ${user.email} on account "${saved.name}"${isDefault ? ' (default)' : ''} (${saved.path})`
+			);
+			if (accounts.length > 1) {
+				console.log(
+					`${accounts.length} accounts saved: ${accounts.map((account) => account.name).join(', ')}. Use --account <name> or --all-accounts.`
+				);
+			}
 			return 0;
 		}
-		case 'logout':
-			await clearConfig();
-			console.log('Logged out.');
+		case 'logout': {
+			if (flagBool(flags, 'all')) {
+				await clearConfig();
+				console.log('Logged out of all accounts.');
+				return 0;
+			}
+			const { accounts, defaultName } = await loadAccounts();
+			const name = flagString(flags, 'account') ?? defaultName;
+			if (!name || accounts.length === 0) {
+				console.log('Not logged in.');
+				return 0;
+			}
+			const target = accounts.find((account) => account.name === name.toLowerCase());
+			if (target?.fromEnv) {
+				throw new Error(
+					`Account "${target.name}" comes from QUICKINBOX_URL / QUICKINBOX_TOKEN; unset those variables to stop using it.`
+				);
+			}
+			const remaining = await removeAccount(name);
+			console.log(
+				remaining.length === 0
+					? 'Logged out.'
+					: `Logged out of "${name.toLowerCase()}". Remaining: ${remaining.join(', ')}.`
+			);
 			return 0;
+		}
 		case 'whoami': {
-			const user = await (await clientFromConfig()).whoami();
-			if (json) printJson(user);
-			else console.log(`${user.name} <${user.email}>${user.is_admin ? '  admin' : ''}`);
+			const account = await resolveAccount(flagString(flags, 'account'));
+			const user = await new QuickInboxClient(account.url, account.token).whoami();
+			if (json) printJson({ account: account.name, url: account.url, ...user });
+			else {
+				console.log(
+					`${user.name} <${user.email}>${user.is_admin ? '  admin' : ''}  [${account.name}] ${account.url}`
+				);
+			}
 			return 0;
 		}
+		case 'accounts':
+			return accountsCommand(sub, rest, json);
 		case 'inbox':
 		case 'list': {
-			const client = await clientFromConfig();
-			const page = await client.listThreads({
-				view: 'inbox',
+			const query = {
+				view: 'inbox' as const,
 				page: Number(flagString(flags, 'page')) || 1,
 				unread: flagBool(flags, 'unread'),
 				domain: flagString(flags, 'domain')
-			});
+			};
+			if (flagBool(flags, 'all-accounts')) {
+				const result = await listThreadsAcross(await clientsFromConfig(flags), query);
+				if (json) printJson(result);
+				else printMultiAccountThreads(result);
+				return 0;
+			}
+			const page = await (await clientFromConfig(flags)).listThreads(query);
 			if (json) printJson(page);
 			else printThreads(page);
 			return 0;
@@ -235,12 +338,18 @@ async function run(argv: string[]): Promise<number> {
 		case 'search': {
 			const q = rest[0] ?? sub ?? flagString(flags, 'query');
 			if (!q) throw new Error('search requires a query');
-			const client = await clientFromConfig();
-			const page = await client.listThreads({
+			const query = {
 				q,
 				view: mailboxView(flagString(flags, 'view')),
 				page: Number(flagString(flags, 'page')) || 1
-			});
+			};
+			if (flagBool(flags, 'all-accounts')) {
+				const result = await listThreadsAcross(await clientsFromConfig(flags), query);
+				if (json) printJson(result);
+				else printMultiAccountThreads(result);
+				return 0;
+			}
+			const page = await (await clientFromConfig(flags)).listThreads(query);
 			if (json) printJson(page);
 			else printThreads(page);
 			return 0;
@@ -249,7 +358,7 @@ async function run(argv: string[]): Promise<number> {
 		case 'thread': {
 			const id = sub;
 			if (!id) throw new Error('read requires a thread or message id');
-			const client = await clientFromConfig();
+			const client = await clientFromConfig(flags);
 			const thread = await client.getThread(id);
 			if (json) {
 				printJson(thread);
@@ -281,7 +390,7 @@ async function run(argv: string[]): Promise<number> {
 				throw new Error('send requires --to, --subject, and --body (or stdin)');
 			}
 			const result = await (
-				await clientFromConfig()
+				await clientFromConfig(flags)
 			).sendMessage({
 				to,
 				subject,
@@ -298,7 +407,7 @@ async function run(argv: string[]): Promise<number> {
 			const id = sub;
 			const text = await readBody(flags);
 			if (!id || !text) throw new Error('reply requires an id and --body (or stdin)');
-			const result = await (await clientFromConfig()).reply(id, { text });
+			const result = await (await clientFromConfig(flags)).reply(id, { text });
 			if (json) printJson(result);
 			else console.log(`Sent ${result.id}`);
 			return 0;
@@ -306,7 +415,7 @@ async function run(argv: string[]): Promise<number> {
 		case 'attachments': {
 			const id = sub;
 			if (!id) throw new Error('attachments requires a thread or message id');
-			const thread = await (await clientFromConfig()).getThread(id);
+			const thread = await (await clientFromConfig(flags)).getThread(id);
 			const rows = thread.messages.flatMap((message) =>
 				message.attachments.map((attachment) => ({
 					email_id: message.id,
@@ -326,7 +435,7 @@ async function run(argv: string[]): Promise<number> {
 			const emailId = sub;
 			const attachmentId = rest[0];
 			if (!emailId || !attachmentId) throw new Error('download requires <email-id> <attachment-id>');
-			const file = await (await clientFromConfig()).downloadAttachment(emailId, attachmentId);
+			const file = await (await clientFromConfig(flags)).downloadAttachment(emailId, attachmentId);
 			const out = flagString(flags, 'out') ?? safeDownloadName(file.filename);
 			await writeFile(out, file.bytes);
 			console.log(out);
@@ -339,7 +448,7 @@ async function run(argv: string[]): Promise<number> {
 		case 'addresses':
 			return addressesCommand(sub, rest, flags, json);
 		case 'unrouted': {
-			const items = await (await clientFromConfig()).listUnrouted(Number(flagString(flags, 'limit')) || 50);
+			const items = await (await clientFromConfig(flags)).listUnrouted(Number(flagString(flags, 'limit')) || 50);
 			if (json) printJson(items);
 			else if (items.length === 0) console.log('No unrouted mail.');
 			else {
@@ -375,8 +484,68 @@ async function run(argv: string[]): Promise<number> {
 	}
 }
 
+async function accountsCommand(sub: string | undefined, rest: string[], json: boolean): Promise<number> {
+	switch (sub) {
+		case undefined:
+		case 'list':
+		case 'ls': {
+			const { accounts, defaultName } = await loadAccounts();
+			if (json) {
+				printJson({
+					default: defaultName ?? null,
+					accounts: accounts.map((account) => ({
+						name: account.name,
+						url: account.url,
+						default: account.name === defaultName,
+						source: account.fromEnv ? 'env' : 'config'
+					}))
+				});
+				return 0;
+			}
+			if (accounts.length === 0) {
+				console.log('No accounts. Run `quickinbox login --url <instance> --token <key>`.');
+				return 0;
+			}
+			for (const account of accounts) {
+				const marker = account.name === defaultName ? '*' : ' ';
+				console.log(`${marker} ${account.name}  ${account.url}${account.fromEnv ? '  (env)' : ''}`);
+			}
+			return 0;
+		}
+		case 'use':
+		case 'default': {
+			const name = rest[0];
+			if (!name) throw new Error('accounts use requires an account name');
+			const chosen = await setDefaultAccount(name);
+			if (envFlag('QUICKINBOX_URL', 'QUICKMAIL_URL') && envFlag('QUICKINBOX_TOKEN', 'QUICKMAIL_TOKEN')) {
+				console.log(
+					`Default account is now "${chosen}", but QUICKINBOX_URL / QUICKINBOX_TOKEN are set and take precedence.`
+				);
+			} else {
+				console.log(`Default account is now "${chosen}".`);
+			}
+			return 0;
+		}
+		case 'remove':
+		case 'rm':
+		case 'delete': {
+			const name = rest[0];
+			if (!name) throw new Error('accounts remove requires an account name');
+			const remaining = await removeAccount(name);
+			console.log(
+				remaining.length === 0
+					? `Removed "${name.toLowerCase()}". No accounts left.`
+					: `Removed "${name.toLowerCase()}". Remaining: ${remaining.join(', ')}.`
+			);
+			return 0;
+		}
+		default:
+			throw new Error('accounts commands: list, use, remove');
+	}
+}
+
 async function usersCommand(sub: string | undefined, rest: string[], flags: Flags, json: boolean): Promise<number> {
-	const client = await clientFromConfig();
+	const client = await clientFromConfig(flags);
 
 	switch (sub) {
 		case 'list': {
@@ -430,8 +599,7 @@ async function usersCommand(sub: string | undefined, rest: string[], flags: Flag
 }
 
 async function domainsCommand(sub: string | undefined, rest: string[], flags: Flags, json: boolean): Promise<number> {
-	const client = await clientFromConfig();
-	void flags;
+	const client = await clientFromConfig(flags);
 
 	switch (sub) {
 		case 'list': {
@@ -473,7 +641,7 @@ async function domainsCommand(sub: string | undefined, rest: string[], flags: Fl
 }
 
 async function addressesCommand(sub: string | undefined, rest: string[], flags: Flags, json: boolean): Promise<number> {
-	const client = await clientFromConfig();
+	const client = await clientFromConfig(flags);
 	void rest;
 
 	switch (sub) {

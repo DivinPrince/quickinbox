@@ -5,7 +5,7 @@
 	import Topbar from '$lib/components/Topbar.svelte';
 	import MobileChrome from '$lib/components/MobileChrome.svelte';
 	import SwipeBack from '$lib/components/SwipeBack.svelte';
-	import { disablePushForCurrentAccount } from '$lib/push-client';
+	import { logoutAccount } from '$lib/account-switch';
 	import {
 		isMailboxPath,
 		isStackedPath,
@@ -43,16 +43,9 @@
 		toggleCollapsed(collapsed);
 	});
 
-	async function logout() {
-		try {
-			await disablePushForCurrentAccount();
-		} catch (error) {
-			console.warn('Could not fully remove the push subscription during logout', error);
-		} finally {
-			await fetch('/api/auth/login', { method: 'DELETE' });
-			window.location.href = '/login';
-		}
-	}
+	// With other accounts signed in, logging out lands in the next one's inbox.
+	const logout = () => logoutAccount();
+	const logoutAll = () => logoutAccount(true);
 </script>
 
 <div
@@ -75,7 +68,9 @@
 			userName={data.user.name}
 			userEmail={data.user.email}
 			addresses={data.addresses}
+			accounts={data.accounts}
 			onLogout={logout}
+			onLogoutAll={logoutAll}
 		/>
 
 		<main class="app-main" class:app-main-narrow={narrow}>
@@ -95,7 +90,9 @@
 			domains={data.domains}
 			activeDomainId={data.activeDomainId}
 			isAdmin={data.user.is_admin}
+			accounts={data.accounts}
 			onLogout={logout}
+			onLogoutAll={logoutAll}
 		/>
 	{/if}
 </div>

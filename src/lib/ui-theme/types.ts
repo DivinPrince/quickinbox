@@ -1,5 +1,5 @@
 import type { Component, Snippet } from 'svelte';
-import type { MailboxCounts, MailboxView, User, Domain, MailAddress } from '$lib/types';
+import type { MailboxCounts, MailboxView, User, Domain, LinkedAccount, MailAddress } from '$lib/types';
 
 export type ThemeCapabilities = {
 	twoPane: boolean;
@@ -14,6 +14,8 @@ export type ThemeShellData = {
 	domains: Domain[];
 	addresses: MailAddress[];
 	activeDomainId: string | null;
+	/** Accounts signed in on this browser, active first. Empty when there is only one. */
+	accounts: LinkedAccount[];
 	counts: MailboxCounts;
 	uiTheme: string;
 };

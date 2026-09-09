@@ -6,25 +6,43 @@
 	import { setThemePreference } from '$lib/theme';
 	import { t } from '$lib/i18n';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-	import type { MailAddress } from '$lib/types';
+	import { ADD_ACCOUNT_HREF, switchAccount } from '$lib/account-switch';
+	import type { LinkedAccount, MailAddress } from '$lib/types';
 	import type { ThemeShellData } from '$lib/ui-theme/types';
 	import Icon from './icons/Icon.svelte';
 
 	let {
 		data,
 		collapsed,
-		onLogout
+		onLogout,
+		onLogoutAll
 	}: {
 		data: ThemeShellData;
 		collapsed: boolean;
 		onLogout: () => Promise<void>;
+		onLogoutAll?: () => Promise<void>;
 	} = $props();
 
 	let menuOpen = $state(false);
 	let extraOpen = $state(false);
 	let localeOpen = $state(false);
 	let switching = $state(false);
+	let switchError = $state('');
 	let darkMode = $state(false);
+
+	const otherAccounts = $derived(data.accounts.filter((account) => !account.current));
+
+	async function switchTo(account: LinkedAccount) {
+		if (switching) return;
+		switching = true;
+		switchError = '';
+		try {
+			await switchAccount(account.id);
+		} catch (error) {
+			switchError = error instanceof Error ? error.message : t('account.switchFailed');
+			switching = false;
+		}
+	}
 
 	$effect(() => {
 		darkMode = document.documentElement.dataset.theme === 'dark';
@@ -252,6 +270,30 @@
 			{#if collapsed}
 				<LocaleSwitcher embedded />
 			{/if}
+			{#if otherAccounts.length > 0}
+				<p class="z-menu-label">{t('account.accounts')}</p>
+				{#each otherAccounts as account (account.id)}
+					<button
+						type="button"
+						disabled={switching}
+						aria-label={t('account.switchTo', { name: account.name })}
+						onclick={() => switchTo(account)}
+					>
+						<span class="z-tile">{initials(account.name || account.email)}</span>
+						<span>
+							<strong>{account.name}</strong>
+							<small>{account.address ?? account.email}</small>
+						</span>
+					</button>
+				{/each}
+				{#if switchError}
+					<p class="z-menu-error" role="alert">{switchError}</p>
+				{/if}
+			{/if}
+			<a href={ADD_ACCOUNT_HREF} onclick={closeMenus}>
+				<Icon name="Plus" size={16} />
+				{t('account.addAccount')}
+			</a>
 			<a href="/settings/general" onclick={closeMenus}>
 				<Icon name="SettingsGear" size={16} />
 				{t('nav.settings')}
@@ -269,6 +311,12 @@
 				<Icon name="ArrowLeft" size={16} />
 				{t('nav.logOut')}
 			</button>
+			{#if otherAccounts.length > 0 && onLogoutAll}
+				<button type="button" class="logout" onclick={() => onLogoutAll()}>
+					<Icon name="ArrowLeft" size={16} />
+					{t('account.logOutAll')}
+				</button>
+			{/if}
 		</div>
 	{/if}
 </div>
