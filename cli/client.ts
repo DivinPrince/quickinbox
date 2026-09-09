@@ -153,7 +153,7 @@ export class QuickInboxClient {
 		return this.request<MailboxPage>(`/api/mail${suffix}`);
 	}
 
-	async getThread(id: string): Promise<{ threadId: string; subject: string; messages: ThreadMessage[] }> {
+	async getThread(id: string): Promise<Thread> {
 		return this.request(`/api/mail/${encodeURIComponent(id)}`);
 	}
 
@@ -266,6 +266,104 @@ export class QuickInboxClient {
 		);
 		return body.unrouted;
 	}
+}
+
+/** A client paired with the saved account name it authenticates as. */
+export type AccountClient = { name: string; client: QuickInboxClient };
+
+export type TaggedThread = ThreadSummary & { account: string };
+
+export type MultiAccountPage = {
+	/** Threads from every account, newest first, each tagged with the account it belongs to. */
+	threads: TaggedThread[];
+	accounts: {
+		account: string;
+		url: string;
+		total: number;
+		page: number;
+		pageCount: number;
+		/** Set when that account's request failed; its threads are simply missing. */
+		error?: string;
+	}[];
+};
+
+export type Thread = { threadId: string; subject: string; messages: ThreadMessage[] };
+
+function errorText(error: unknown): string {
+	if (error instanceof QuickInboxError) return `${error.status} ${error.message}`;
+	return error instanceof Error ? error.message : 'Request failed';
+}
+
+/**
+ * Run the same mailbox query on several accounts in parallel and merge the pages.
+ * `page` applies per account. One failing account does not fail the whole listing.
+ */
+export async function listThreadsAcross(
+	clients: AccountClient[],
+	query: ListThreadsQuery = {}
+): Promise<MultiAccountPage> {
+	const results = await Promise.all(
+		clients.map(async ({ name, client }) => {
+			try {
+				const page = await client.listThreads(query);
+				return { name, url: client.url, page, error: undefined };
+			} catch (error) {
+				return { name, url: client.url, page: undefined, error: errorText(error) };
+			}
+		})
+	);
+
+	const threads: TaggedThread[] = [];
+	const accounts: MultiAccountPage['accounts'] = [];
+	for (const result of results) {
+		if (!result.page) {
+			accounts.push({
+				account: result.name,
+				url: result.url,
+				total: 0,
+				page: query.page ?? 1,
+				pageCount: 0,
+				error: result.error
+			});
+			continue;
+		}
+		accounts.push({
+			account: result.name,
+			url: result.url,
+			total: result.page.total,
+			page: result.page.page,
+			pageCount: result.page.pageCount
+		});
+		for (const thread of result.page.threads) threads.push({ ...thread, account: result.name });
+	}
+
+	threads.sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
+	return { threads, accounts };
+}
+
+/**
+ * Find which account owns a thread or message id. Ids are unique per instance, so
+ * try each account in order and treat 404 as "not here". Other errors propagate.
+ */
+export async function findThreadAcross(
+	clients: AccountClient[],
+	id: string
+): Promise<{ account: AccountClient; thread: Thread }> {
+	for (const account of clients) {
+		try {
+			const thread = await account.client.getThread(id);
+			return { account, thread };
+		} catch (error) {
+			if (error instanceof QuickInboxError && error.status === 404) continue;
+			throw error;
+		}
+	}
+	throw new QuickInboxError(
+		404,
+		clients.length > 1
+			? `No thread or message ${id} in any account (${clients.map((entry) => entry.name).join(', ')})`
+			: `No thread or message ${id}`
+	);
 }
 
 /** Pre-rename aliases so scripts that imported the old names keep working. */

@@ -23,7 +23,12 @@
 	const showShell = $derived(
 		Boolean(data.user) &&
 			$page.url.pathname !== '/onboarding' &&
-			$page.url.pathname !== '/account/setup'
+			$page.url.pathname !== '/account/setup' &&
+			// Signed-in users reach /login only to add another account; it is a
+			// standalone form, not a page inside the mailbox.
+			$page.url.pathname !== '/login' &&
+			// The OAuth consent screen is a focused, one-decision page.
+			$page.url.pathname !== '/oauth/authorize'
 	);
 	const ThemeShell = $derived(getTheme(data.uiTheme).Shell);
 	const shellData = $derived.by((): ThemeShellData | null => {
@@ -33,6 +38,7 @@
 			domains: data.domains,
 			addresses: data.addresses,
 			activeDomainId: data.activeDomainId,
+			accounts: data.accounts,
 			counts: data.counts,
 			uiTheme: data.uiTheme
 		};

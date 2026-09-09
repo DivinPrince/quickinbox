@@ -73,7 +73,12 @@
 		"moreAddresses": "More addresses",
 		"lightMode": "Light mode",
 		"darkMode": "Dark mode",
-		"account": "Account"
+		"account": "Account",
+		"accounts": "Accounts",
+		"switchTo": "Switch to {name}",
+		"addAccount": "Add account",
+		"logOutAll": "Log out of all accounts",
+		"switchFailed": "Could not switch account"
 	},
 	"auth": {
 		"signInTitle": "Sign in — {app}",
@@ -81,7 +86,11 @@
 		"email": "Email",
 		"password": "Password",
 		"signingIn": "Signing in…",
-		"loginFailed": "Login failed"
+		"loginFailed": "Login failed",
+		"addAccountTitle": "Add account — {app}",
+		"addAccount": "Add another account",
+		"addAccountHint": "Sign in to another mailbox on this server. You can switch between accounts from the account menu.",
+		"backToInbox": "Back to inbox"
 	},
 	"accountSetup": {
 		"title": "Complete account setup — {app}",
@@ -359,6 +368,15 @@
 		"couldNotCreateKey": "Could not create the API key",
 		"couldNotRevokeKey": "Could not revoke that key",
 		"copyInstall": "Copy install command",
+		"mcp": "AI assistants (MCP)",
+		"mcpHint": "Add this URL as a remote MCP server in Claude, Cursor, ChatGPT or any other MCP client. You approve access in your browser — no API key to paste.",
+		"copyMcpUrl": "Copy MCP URL",
+		"connectedApps": "Connected apps",
+		"noConnectedApps": "No apps are connected yet.",
+		"lastUsed": "Last used {date}",
+		"connectedOn": "Connected {date}",
+		"disconnectAppConfirm": "Disconnect {name}? It will have to ask for access again.",
+		"couldNotDisconnect": "Could not disconnect that app",
 		"copyApiKey": "Copy API key",
 		"newApiKey": "New API key",
 		"copyThisKey": "Copy this key",
@@ -547,6 +565,25 @@
 		"goToBin": "Go to bin",
 		"goToSettings": "Go to settings",
 		"filters": "All / Unread / Starred"
+	},
+	"oauth": {
+		"title": "Connect {client} to {app}",
+		"subtitle": "{client} is asking to use your mailbox. You can disconnect it at any time.",
+		"willBeAbleTo": "{client} will be able to",
+		"scopeReadTitle": "Read your mail",
+		"scopeReadDetail": "Inbox, archive, sent mail, search and attachments",
+		"scopeSendTitle": "Send and organize mail",
+		"scopeSendDetail": "Send messages and replies as you; mark read, star, archive or trash",
+		"cannot": "It cannot change your password, manage API keys, or see other accounts on this device.",
+		"signedInAs": "Connecting as",
+		"chooseAccount": "Choose the account to connect",
+		"useAnotherAccount": "Use another account",
+		"allow": "Allow access",
+		"deny": "Cancel",
+		"redirectNote": "You’ll be sent back to {host}.",
+		"manageHint": "Manage connected apps in Settings",
+		"invalidTitle": "This connection request can’t be completed",
+		"invalidHint": "Go back to the app and try connecting again. If it keeps happening, the app may need to be updated."
 	},
 	"language": {
 		"en": "English",

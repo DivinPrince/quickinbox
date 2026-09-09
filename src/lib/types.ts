@@ -7,6 +7,16 @@ export type User = {
 	created_at: string;
 };
 
+/** An account signed in on this browser; shown in the account switcher. */
+export type LinkedAccount = {
+	id: string;
+	email: string;
+	name: string;
+	/** Default sending address, when the account has one. */
+	address: string | null;
+	current: boolean;
+};
+
 export type ApiScope = 'mail:send' | 'mail:read' | 'admin';
 
 export type ApiTokenSummary = {
@@ -15,6 +25,19 @@ export type ApiTokenSummary = {
 	preview: string;
 	scopes: ApiScope[];
 	created_at: string;
+	last_used_at: string | null;
+};
+
+/** An MCP client the user authorized via OAuth, as shown in Settings. */
+export type ConnectedApp = {
+	client_id: string;
+	client_name: string;
+	client_uri: string | null;
+	logo_uri: string | null;
+	scopes: Extract<ApiScope, 'mail:read' | 'mail:send'>[];
+	/** Live token pairs for this client (usually one per device). */
+	sessions: number;
+	connected_at: string;
 	last_used_at: string | null;
 };
 

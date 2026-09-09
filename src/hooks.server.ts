@@ -4,10 +4,20 @@ import { getUserByApiToken, readBearerToken } from '$lib/server/api-tokens';
 import {
 	countUsers,
 	getAuthenticatedSession,
-	readSessionToken
+	readSessionToken,
+	sessionCookieOptions,
+	SESSION_COOKIE,
+	type AuthenticatedSession
 } from '$lib/server/auth';
-import { DOMAIN_COOKIE, UI_THEME_COOKIE, UI_THEME_COOKIE_MAX_AGE } from '$lib/server/constants';
+import { readLinkedTokens, resolveLinkedSessions, toLinkedAccounts, writeLinkedTokens } from '$lib/server/accounts';
+import {
+	DOMAIN_COOKIE,
+	SESSION_DAYS,
+	UI_THEME_COOKIE,
+	UI_THEME_COOKIE_MAX_AGE
+} from '$lib/server/constants';
 import { listAddressesForUser, listDomains } from '$lib/server/domains';
+import { loginHref, safeNextPath } from '$lib/next-url';
 import { getUserLocale } from '$lib/server/locale';
 import { getUserUiTheme } from '$lib/server/ui-theme';
 import { BUILTIN_THEME_IDS, DEFAULT_UI_THEME, parseThemeId } from '$lib/ui-theme/ids';
@@ -31,6 +41,38 @@ const PUBLIC_PREFIXES = [
 
 function isPublicPath(pathname: string): boolean {
 	return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+/**
+ * The hosted MCP endpoint and its OAuth server. Called by AI clients, not
+ * browsers: they authenticate with bearer tokens inside the route, need CORS
+ * for browser-based clients, and must never be bounced to the login page.
+ * `/oauth/authorize` is deliberately absent — that is the consent page and
+ * uses the normal session flow.
+ */
+const MCP_PREFIXES = ['/mcp', '/oauth/register', '/oauth/token', '/oauth/revoke', '/.well-known/oauth-'];
+
+function isMcpPath(pathname: string): boolean {
+	return MCP_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
+}
+
+function corsHeaders(request: Request): Record<string, string> {
+	return {
+		'Access-Control-Allow-Origin': request.headers.get('origin') ?? '*',
+		'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+		'Access-Control-Allow-Headers':
+			'Authorization, Content-Type, Accept, Mcp-Session-Id, MCP-Protocol-Version, Last-Event-ID',
+		// Browser clients discover the authorization server from the 401 challenge.
+		'Access-Control-Expose-Headers': 'WWW-Authenticate, Mcp-Session-Id, MCP-Protocol-Version',
+		'Access-Control-Max-Age': '86400',
+		Vary: 'Origin'
+	};
+}
+
+function withCors(response: Response, request: Request): Response {
+	const headers = new Headers(response.headers);
+	for (const [key, value] of Object.entries(corsHeaders(request))) headers.set(key, value);
+	return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
 function jsonError(error: string, status: number): Response {
@@ -79,15 +121,62 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.addresses = [];
 	event.locals.activeDomainId = null;
 	event.locals.currentSessionId = null;
+	event.locals.accounts = [];
 	event.locals.uiTheme = parseThemeId(event.cookies.get(UI_THEME_COOKIE), BUILTIN_THEME_IDS);
 	event.locals.locale =
 		matchLocale(event.cookies.get(LOCALE_COOKIE)) ??
 		localeFromAcceptLanguage(event.request.headers.get('accept-language'));
 
+	if (isMcpPath(pathname)) {
+		if (event.request.method === 'OPTIONS') {
+			return new Response(null, { status: 204, headers: corsHeaders(event.request) });
+		}
+		return withCors(await resolve(event), event.request);
+	}
+
 	if (db) {
 		// Browser sessions take precedence so an incidental or stale Authorization
 		// header cannot downgrade a legitimate cookie-authenticated API request.
-		const cookieSession = await getAuthenticatedSession(db, readSessionToken(event.cookies));
+		const activeToken = readSessionToken(event.cookies);
+		let cookieSession: AuthenticatedSession | null = await getAuthenticatedSession(db, activeToken);
+
+		// Other accounts signed in on this browser. Only page loads need them (the
+		// switcher); API calls stay single-user and skip the extra query.
+		const linkedTokens = pathname.startsWith('/api/') ? [] : readLinkedTokens(event.cookies);
+		if (linkedTokens.length > 0) {
+			const parked = await resolveLinkedSessions(
+				db,
+				linkedTokens.filter((token) => token !== activeToken)
+			);
+
+			// The active session expired or was revoked: fall through to the next
+			// account instead of bouncing to the login page.
+			if (!cookieSession || cookieSession.isMobile) {
+				const next = parked.shift();
+				if (next) {
+					event.cookies.set(
+						SESSION_COOKIE,
+						next.token,
+						sessionCookieOptions(SESSION_DAYS * 24 * 60 * 60, event.url)
+					);
+					cookieSession = { user: next.user, sessionId: next.sessionId, isMobile: false };
+				}
+			}
+
+			const others = parked.filter((session) => session.user.id !== cookieSession?.user.id);
+			const keep = others.map((session) => session.token);
+			if (keep.length !== linkedTokens.length || keep.some((token, i) => token !== linkedTokens[i])) {
+				writeLinkedTokens(event.cookies, keep, event.url);
+			}
+
+			if (cookieSession && !cookieSession.isMobile) {
+				event.locals.accounts = toLinkedAccounts(
+					{ user: cookieSession.user, address: null },
+					others
+				);
+			}
+		}
+
 		if (cookieSession && !cookieSession.isMobile) {
 			event.locals.user = cookieSession.user;
 			event.locals.currentSessionId = cookieSession.sessionId;
@@ -130,6 +219,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 			event.locals.domains = domains;
 			event.locals.addresses = addresses;
+
+			// The switcher labels each account by its default sending address, so
+			// give the active account the same treatment as the parked ones.
+			const current = event.locals.accounts.find((account) => account.current);
+			if (current) {
+				current.address =
+					addresses.find((address) => address.is_default)?.address ?? addresses[0]?.address ?? null;
+			}
 
 			// Scripts pass `?domain=`; the dashboard uses a cookie.
 			const requested = pathname.startsWith('/api/')
@@ -223,8 +320,22 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (pathname === '/login') {
-		if (event.locals.user) {
-			throw redirect(303, event.locals.user.must_change_password ? '/account/setup' : '/inbox');
+		// `?add=1` is the "add another account" flow: a signed-in user may reach
+		// the form so long as their own account is fully set up. `?setup=complete`
+		// is the same situation after first-login setup: that account's session was
+		// revoked, another signed-in account may have been promoted, and the person
+		// still needs to sign back in as the one they just set up.
+		const addingAccount =
+			(event.url.searchParams.get('add') === '1' ||
+				event.url.searchParams.get('setup') === 'complete') &&
+			!event.locals.user?.must_change_password;
+		if (event.locals.user && !addingAccount) {
+			throw redirect(
+				303,
+				event.locals.user.must_change_password
+					? '/account/setup'
+					: safeNextPath(event.url.searchParams.get('next')) ?? '/inbox'
+			);
 		}
 		return render(event, resolve);
 	}
@@ -234,7 +345,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (!event.locals.user) {
-		throw redirect(303, '/login');
+		// An OAuth consent request survives the sign-in detour; nothing else does.
+		const resume = safeNextPath(`${pathname}${event.url.search}`);
+		throw redirect(303, resume ? loginHref(resume) : '/login');
 	}
 
 	if (event.locals.user.must_change_password) {

@@ -424,7 +424,9 @@ export async function setUserPassword(
 	// Password rotation must cut off every login path, including long-lived keys.
 	await db.batch([
 		db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
-		db.prepare('DELETE FROM api_tokens WHERE user_id = ?').bind(userId)
+		db.prepare('DELETE FROM api_tokens WHERE user_id = ?').bind(userId),
+		db.prepare('DELETE FROM oauth_grants WHERE user_id = ?').bind(userId),
+		db.prepare('DELETE FROM oauth_codes WHERE user_id = ?').bind(userId)
 	]);
 }
 
@@ -601,6 +603,8 @@ export async function deleteUser(
 		db.prepare(`DELETE FROM addresses WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM sessions WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM api_tokens WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM oauth_grants WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM oauth_codes WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM pairing_codes WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db
 			.prepare(`DELETE FROM push_subscriptions WHERE user_id = ? AND ${gone}`)

@@ -73,7 +73,17 @@
 		"moreAddresses": "更多地址",
 		"lightMode": "浅色模式",
 		"darkMode": "深色模式",
-		"account": "账户"
+		"account": "账户",
+		"accounts": "账户",
+		"switchTo": "切换到 {name}",
+		"addAccount": "添加账户",
+		"logOutAll": "退出所有账户",
+		"switchFailed": "无法切换账户",
+		"accounts": "账户",
+		"switchTo": "切换到 {name}",
+		"addAccount": "添加账户",
+		"logOutAll": "退出所有账户",
+		"switchFailed": "无法切换账户"
 	},
 	"auth": {
 		"signInTitle": "登录 — {app}",
@@ -81,7 +91,11 @@
 		"email": "邮箱",
 		"password": "密码",
 		"signingIn": "正在登录…",
-		"loginFailed": "登录失败"
+		"loginFailed": "登录失败",
+		"addAccountTitle": "添加账户 — {app}",
+		"addAccount": "添加另一个账户",
+		"addAccountHint": "登录此服务器上的另一个邮箱。之后可在账户菜单中切换账户。",
+		"backToInbox": "返回收件箱"
 	},
 	"accountSetup": {
 		"title": "完成账户设置 — {app}",
@@ -359,6 +373,15 @@
 		"couldNotCreateKey": "无法创建 API 密钥",
 		"couldNotRevokeKey": "无法撤销该密钥",
 		"copyInstall": "复制安装命令",
+		"mcp": "AI 助手（MCP）",
+		"mcpHint": "在 Claude、Cursor、ChatGPT 或任何 MCP 客户端中将此 URL 添加为远程 MCP 服务器。在浏览器中授权即可，无需粘贴 API 密钥。",
+		"copyMcpUrl": "复制 MCP URL",
+		"connectedApps": "已连接的应用",
+		"noConnectedApps": "尚未连接任何应用。",
+		"lastUsed": "上次使用：{date}",
+		"connectedOn": "连接于 {date}",
+		"disconnectAppConfirm": "断开 {name}？它需要重新请求访问权限。",
+		"couldNotDisconnect": "无法断开该应用",
 		"copyApiKey": "复制 API 密钥",
 		"newApiKey": "新建 API 密钥",
 		"copyThisKey": "复制此密钥",
@@ -547,6 +570,25 @@
 		"goToBin": "前往回收站",
 		"goToSettings": "前往设置",
 		"filters": "全部 / 未读 / 已加星标"
+	},
+	"oauth": {
+		"title": "将 {client} 连接到 {app}",
+		"subtitle": "{client} 请求使用你的邮箱。你可以随时断开连接。",
+		"willBeAbleTo": "{client} 将能够",
+		"scopeReadTitle": "读取你的邮件",
+		"scopeReadDetail": "收件箱、归档、已发送、搜索和附件",
+		"scopeSendTitle": "发送和整理邮件",
+		"scopeSendDetail": "以你的身份发送邮件和回复；标记已读、加星、归档或移至废纸篓",
+		"cannot": "它无法更改你的密码、管理 API 密钥，也无法查看此设备上的其他账户。",
+		"signedInAs": "连接账户",
+		"chooseAccount": "选择要连接的账户",
+		"useAnotherAccount": "使用其他账户",
+		"allow": "允许访问",
+		"deny": "取消",
+		"redirectNote": "完成后将返回 {host}。",
+		"manageHint": "在设置中管理已连接的应用",
+		"invalidTitle": "无法完成此连接请求",
+		"invalidHint": "请返回应用重试。如果问题持续出现，该应用可能需要更新。"
 	},
 	"language": {
 		"en": "English",

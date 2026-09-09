@@ -4,22 +4,43 @@
 	import DomainSwitcher from './DomainSwitcher.svelte';
 	import LocaleSwitcher from './LocaleSwitcher.svelte';
 	import { haptic, isMailboxPath, isMorePath } from '$lib/app-chrome';
+	import { ADD_ACCOUNT_HREF, switchAccount } from '$lib/account-switch';
 	import { t } from '$lib/i18n';
-	import type { Domain, MailboxCounts } from '$lib/types';
+	import type { Domain, LinkedAccount, MailboxCounts } from '$lib/types';
 
 	let {
 		counts,
 		domains,
 		activeDomainId,
 		isAdmin,
-		onLogout
+		accounts = [],
+		onLogout,
+		onLogoutAll
 	}: {
 		counts: MailboxCounts;
 		domains: Domain[];
 		activeDomainId: string | null;
 		isAdmin: boolean;
+		/** Every account signed in on this browser, active first. */
+		accounts?: LinkedAccount[];
 		onLogout: () => void;
+		onLogoutAll?: () => void;
 	} = $props();
+
+	const otherAccounts = $derived(accounts.filter((account) => !account.current));
+	let switching = $state(false);
+
+	async function switchTo(account: LinkedAccount) {
+		if (switching) return;
+		switching = true;
+		haptic(8);
+		try {
+			await switchAccount(account.id);
+		} catch (error) {
+			console.warn('Could not switch account', error);
+			switching = false;
+		}
+	}
 
 	let moreOpen = $state(false);
 	let sheetWasOpen = false;
@@ -187,10 +208,39 @@
 		</div>
 
 		<div class="sheet-section">
+			<p class="sheet-title">{t('account.accounts')}</p>
+			{#each otherAccounts as account (account.id)}
+				<button
+					type="button"
+					class="sheet-link sheet-logout"
+					disabled={switching}
+					aria-label={t('account.switchTo', { name: account.name })}
+					onclick={() => switchTo(account)}
+				>
+					<Icon name="user-line" size={20} />
+					<span class="sheet-account">
+						<span>{account.name}</span>
+						<small>{account.address ?? account.email}</small>
+					</span>
+				</button>
+			{/each}
+			<a href={ADD_ACCOUNT_HREF} class="sheet-link">
+				<Icon name="user-add-line" size={20} />
+				<span>{t('account.addAccount')}</span>
+			</a>
+		</div>
+
+		<div class="sheet-section">
 			<button type="button" class="sheet-link sheet-logout" onclick={onLogout}>
 				<Icon name="logout-box-r-line" size={20} />
 				<span>{t('nav.logOut')}</span>
 			</button>
+			{#if otherAccounts.length > 0 && onLogoutAll}
+				<button type="button" class="sheet-link sheet-logout" onclick={onLogoutAll}>
+					<Icon name="logout-circle-r-line" size={20} />
+					<span>{t('account.logOutAll')}</span>
+				</button>
+			{/if}
 		</div>
 	</div>
 {/if}
@@ -383,6 +433,25 @@
 			font: inherit;
 			text-align: left;
 			cursor: pointer;
+		}
+
+		.sheet-account {
+			display: flex;
+			min-width: 0;
+			flex-direction: column;
+			line-height: 1.25;
+		}
+
+		.sheet-account small {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-size: 0.75rem;
+			color: var(--color-muted);
+		}
+
+		.sheet-link:disabled {
+			opacity: 0.6;
 		}
 
 		.sheet-title {

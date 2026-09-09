@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { disablePushForCurrentAccount } from '$lib/push-client';
+	import { logoutAccount } from '$lib/account-switch';
 	import { t } from '$lib/i18n';
 	import type { ThemeShellProps } from '$lib/ui-theme/types';
 	import Tooltip from '$lib/components/Tooltip.svelte';
@@ -136,16 +136,8 @@
 		});
 	}
 
-	async function logout() {
-		try {
-			await disablePushForCurrentAccount();
-		} catch (error) {
-			console.warn('Could not fully remove the push subscription during logout', error);
-		} finally {
-			await fetch('/api/auth/login', { method: 'DELETE' });
-			window.location.href = '/login';
-		}
-	}
+	// With other accounts signed in, logging out lands in the next one's inbox.
+	const logout = (everywhere = false) => logoutAccount(everywhere);
 
 	function onToggleSidebar() {
 		toggleSidebar();
@@ -248,7 +240,12 @@
 	{/if}
 
 	<aside class="z-sidebar">
-		<AccountHeader {data} collapsed={settings || mobileOpen ? false : collapsed} onLogout={logout} />
+		<AccountHeader
+			{data}
+			collapsed={settings || mobileOpen ? false : collapsed}
+			onLogout={() => logout()}
+			onLogoutAll={() => logout(true)}
+		/>
 
 		{#if !settings}
 			<Tooltip text={t('nav.compose')} shortcut="C" side="right" enabled={collapsed && !mobileOpen} stretch>
