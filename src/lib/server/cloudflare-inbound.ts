@@ -7,6 +7,10 @@ import { collectInboundRecipients, parseEmailAddress } from './email-address';
 import { emailExistsByProviderId, insertEmail } from './mail-store';
 import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
 import { normalizeMessageId } from './send-mail';
+import {
+	scheduleTelegramNotification,
+	type TelegramNotificationEnv
+} from './telegram-notify';
 
 export type CloudflareInboundMessage = {
 	readonly from: string;
@@ -16,9 +20,10 @@ export type CloudflareInboundMessage = {
 	setReject(reason: string): void;
 };
 
-export type CloudflareInboundEnv = PushNotificationEnv & {
-	ATTACHMENTS: R2Bucket;
-};
+export type CloudflareInboundEnv = PushNotificationEnv &
+	TelegramNotificationEnv & {
+		ATTACHMENTS: R2Bucket;
+	};
 
 /**
  * Email Routing delivers the full MIME on `message.raw`. Parse once, then reuse
@@ -68,6 +73,12 @@ export async function handleCloudflareInbound(
 			subject,
 			reason: 'No matching address and no catch-all for this domain'
 		});
+		scheduleTelegramNotification(env, {
+			from,
+			to: recipients.join(', ') || envelopeTo || '(unknown)',
+			subject,
+			unrouted: true
+		});
 		return;
 	}
 
@@ -95,6 +106,12 @@ export async function handleCloudflareInbound(
 		userId: route.userId,
 		from: sender?.name || from,
 		subject
+	});
+	scheduleTelegramNotification(env, {
+		from: sender?.name ? `${sender.name} <${from}>` : from,
+		to: route.address,
+		subject,
+		attachments: parsed.attachments?.length ?? 0
 	});
 }
 

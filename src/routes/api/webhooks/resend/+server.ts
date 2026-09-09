@@ -60,6 +60,9 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 				VAPID_PUBLIC_KEY: platform?.env.VAPID_PUBLIC_KEY,
 				VAPID_PRIVATE_KEY: platform?.env.VAPID_PRIVATE_KEY,
 				VAPID_SUBJECT: platform?.env.VAPID_SUBJECT,
+				TELEGRAM_BOT_TOKEN: platform?.env.TELEGRAM_BOT_TOKEN,
+				TELEGRAM_CHAT_ID: platform?.env.TELEGRAM_CHAT_ID,
+				APP_URL: platform?.env.APP_URL,
 				waitUntil: platform?.ctx ? (promise) => platform.ctx.waitUntil(promise) : undefined
 			},
 			client

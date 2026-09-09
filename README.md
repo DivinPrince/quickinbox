@@ -195,6 +195,25 @@ bun run deploy
 Users opt in under **Settings → Desktop notifications**. Don't rotate the key
 pair after users subscribe, or they'll have to re-enable.
 
+### Telegram notifications (optional)
+
+Every inbound message can also ping a Telegram chat — useful for a mailbox you
+watch from your phone without installing anything:
+
+```bash
+bunx wrangler secret put TELEGRAM_BOT_TOKEN   # from @BotFather
+bunx wrangler secret put TELEGRAM_CHAT_ID     # from @userinfobot; negative for groups
+bun run deploy
+```
+
+Add `APP_URL` to `vars` in `wrangler.jsonc` to link your install from each
+notification. Both secrets are required — leave either unset and notifications
+stay off. This works on both provider tracks, and mail that matched no mailbox
+is announced too, so a missing route is visible instead of silent.
+
+Delivery is fire-and-forget: a Telegram outage is logged and ignored rather
+than failing the inbound handler, which the provider would then retry.
+
 ## Development
 
 ```bash

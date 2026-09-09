@@ -14,6 +14,9 @@ declare global {
 		VAPID_PUBLIC_KEY?: string;
 		VAPID_PRIVATE_KEY?: string;
 		VAPID_SUBJECT?: string;
+		TELEGRAM_BOT_TOKEN?: string;
+		TELEGRAM_CHAT_ID?: string;
+		APP_URL?: string;
 	}
 }
 

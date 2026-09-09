@@ -7,6 +7,7 @@ import { recordUnroutedEmail, resolveInboundRoute } from './domains';
 import { emailExistsByProviderId, insertEmail, updateEmailStatusByProviderId } from './mail-store';
 import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
 import type { ResendClient } from './resend';
+import { scheduleTelegramNotification, type TelegramNotificationEnv } from './telegram-notify';
 
 export type ResendWebhookEvent = {
 	type: string;
@@ -19,7 +20,7 @@ export type WebhookOutcome = {
 	note: string;
 };
 
-type InboundEnv = PushNotificationEnv & { ATTACHMENTS: R2Bucket };
+type InboundEnv = PushNotificationEnv & TelegramNotificationEnv & { ATTACHMENTS: R2Bucket };
 
 /** Resend delivery events → the status we display on a sent message. */
 const STATUS_BY_EVENT: Record<string, DeliveryStatus> = {
@@ -111,7 +112,14 @@ async function handleInboundEmail(
 			subject,
 			reason: 'No matching address and no catch-all for this domain'
 		});
-
+		if (recorded) {
+			scheduleTelegramNotification(env, {
+				from,
+				to: recipients.join(', ') || '(unknown)',
+				subject,
+				unrouted: true
+			});
+		}
 		return {
 			handled: true,
 			// Resend retries on non-2xx; say plainly when a retry changed nothing.
@@ -145,6 +153,11 @@ async function handleInboundEmail(
 		emailId,
 		userId: route.userId,
 		from: sender.name || from,
+		subject
+	});
+	scheduleTelegramNotification(env, {
+		from: sender.name ? `${sender.name} <${from}>` : from,
+		to: route.address,
 		subject
 	});
 
