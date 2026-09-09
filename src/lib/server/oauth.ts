@@ -314,10 +314,82 @@ export function registrationResponse(client: OAuthClient) {
 export function isClientMetadataUrl(clientId: string): boolean {
 	try {
 		const url = new URL(clientId);
-		return url.protocol === 'https:' && url.pathname.length > 1 && !url.username && !url.password;
+		return (
+			url.protocol === 'https:' &&
+			url.pathname.length > 1 &&
+			!url.username &&
+			!url.password &&
+			!isBlockedMetadataHost(url.hostname)
+		);
 	} catch {
 		return false;
 	}
+}
+
+/** Loopback, RFC1918, link-local, and metadata hosts must not be fetched as client documents. */
+export function isBlockedMetadataHost(hostname: string): boolean {
+	const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+	if (
+		host === 'localhost' ||
+		host.endsWith('.localhost') ||
+		host.endsWith('.local') ||
+		host.endsWith('.internal') ||
+		host === 'metadata.google.internal'
+	) {
+		return true;
+	}
+	if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) {
+		const parts = host.split('.').map(Number);
+		if (parts.some((octet) => octet > 255)) return true;
+		const [a, b] = parts;
+		return (
+			a === 0 ||
+			a === 10 ||
+			a === 127 ||
+			(a === 169 && b === 254) ||
+			(a === 192 && b === 168) ||
+			(a === 172 && b >= 16 && b <= 31)
+		);
+	}
+	if (host.includes(':')) {
+		return (
+			host === '::1' ||
+			host === '::' ||
+			host.startsWith('fe80:') ||
+			host.startsWith('fc') ||
+			host.startsWith('fd') ||
+			host.startsWith('::ffff:')
+		);
+	}
+	return false;
+}
+
+async function readCappedText(response: Response, maxBytes: number): Promise<string> {
+	const declared = Number(response.headers.get('content-length'));
+	if (Number.isFinite(declared) && declared > maxBytes) {
+		throw new OAuthError('invalid_client', 'Client metadata document is too large', 401);
+	}
+	const reader = response.body?.getReader();
+	if (!reader) return '';
+	const chunks: Uint8Array[] = [];
+	let total = 0;
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		total += value.byteLength;
+		if (total > maxBytes) {
+			await reader.cancel();
+			throw new OAuthError('invalid_client', 'Client metadata document is too large', 401);
+		}
+		chunks.push(value);
+	}
+	const bytes = new Uint8Array(total);
+	let offset = 0;
+	for (const chunk of chunks) {
+		bytes.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return new TextDecoder().decode(bytes);
 }
 
 async function fetchClientMetadataDocument(
@@ -341,10 +413,7 @@ async function fetchClientMetadataDocument(
 	if (!response.ok) {
 		throw new OAuthError('invalid_client', 'Client metadata document is unavailable', 401);
 	}
-	const text = await response.text();
-	if (text.length > CLIENT_METADATA_MAX_BYTES) {
-		throw new OAuthError('invalid_client', 'Client metadata document is too large', 401);
-	}
+	const text = await readCappedText(response, CLIENT_METADATA_MAX_BYTES);
 	let doc: unknown;
 	try {
 		doc = JSON.parse(text);
@@ -785,14 +854,6 @@ export async function revokeClientForUser(db: D1Database, userId: string, client
 		.bind(new Date().toISOString(), userId, clientId)
 		.run();
 	return result.meta.changes ?? 0;
-}
-
-/** Password changes and account deletion cut off MCP access along with everything else. */
-export async function revokeAllForUser(db: D1Database, userId: string): Promise<void> {
-	await db.batch([
-		db.prepare('UPDATE oauth_grants SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL').bind(new Date().toISOString(), userId),
-		db.prepare('DELETE FROM oauth_codes WHERE user_id = ?').bind(userId)
-	]);
 }
 
 // ---- Bearer challenge -------------------------------------------------------------

@@ -53,6 +53,8 @@ describe('account names', () => {
 	test('derive from the host, adding the port for local dev', () => {
 		assert.equal(accountNameForUrl('https://mail.alter.rw/'), 'mail.alter.rw');
 		assert.equal(accountNameForUrl('http://localhost:5173'), 'localhost-5173');
+		assert.equal(accountNameForUrl('http://[::1]:5173'), '1-5173');
+		assert.equal(accountNameForUrl(`https://${'a'.repeat(80)}.example/`), 'a'.repeat(64));
 	});
 
 	test('reject shell-unfriendly names', () => {

@@ -78,11 +78,6 @@
 		"switchTo": "切换到 {name}",
 		"addAccount": "添加账户",
 		"logOutAll": "退出所有账户",
-		"switchFailed": "无法切换账户",
-		"accounts": "账户",
-		"switchTo": "切换到 {name}",
-		"addAccount": "添加账户",
-		"logOutAll": "退出所有账户",
 		"switchFailed": "无法切换账户"
 	},
 	"auth": {
@@ -381,7 +376,7 @@
 		"lastUsed": "上次使用：{date}",
 		"connectedOn": "连接于 {date}",
 		"disconnectAppConfirm": "断开 {name}？它需要重新请求访问权限。",
-		"couldNotDisconnect": "无法断开该应用",
+		"couldNotDisconnectApp": "无法断开该应用",
 		"copyApiKey": "复制 API 密钥",
 		"newApiKey": "新建 API 密钥",
 		"copyThisKey": "复制此密钥",

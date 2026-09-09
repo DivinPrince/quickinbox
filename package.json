@@ -14,8 +14,6 @@
 		"preview": "bun run build && wrangler dev",
 		"setup": "node scripts/setup.mjs",
 		"deploy": "bun run build && wrangler deploy",
-		"deploy:alter": "bash scripts/deploy-instance.sh deployments/alter-mail/wrangler.jsonc",
-		"deploy:cursorrwanda": "bash scripts/deploy-instance.sh deployments/cursorrwanda-mail/wrangler.jsonc",
 		"db:migrate:local": "wrangler d1 migrations apply quickmail --local",
 		"db:migrate:remote": "wrangler d1 migrations apply quickmail --remote",
 		"prepare": "svelte-kit sync || echo ''",

@@ -13,7 +13,9 @@
 
 	const request = $derived(data.request);
 	const invalid = $derived(form?.invalid ?? data.invalid);
-	const brand = $derived(request ? clientBrand(request.client) : null);
+	const brand = $derived(
+		request ? clientBrand({ ...request.client, redirect_uri: request.redirectUri }) : null
+	);
 	const clientName = $derived(request?.client.client_name ?? '');
 	const host = $derived(request ? redirectHost(request.redirectUri) : '');
 	const currentPath = $derived(`${$page.url.pathname}${$page.url.search}`);

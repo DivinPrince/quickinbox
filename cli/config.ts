@@ -102,7 +102,13 @@ export function normalizeAccountName(name: string): string {
 /** Default account name for a URL: its hostname (plus port for local dev). */
 export function accountNameForUrl(url: string): string {
 	const parsed = new URL(normalizeUrl(url));
-	return parsed.port ? `${parsed.hostname}-${parsed.port}` : parsed.hostname;
+	const host = parsed.hostname
+		.replace(/[^a-z0-9._-]/gi, '-')
+		.replace(/^[^a-z0-9]+/i, '')
+		.replace(/[^a-z0-9]+$/i, '');
+	const base = host || 'account';
+	const name = parsed.port ? `${base}-${parsed.port}` : base;
+	return name.slice(0, 64).toLowerCase();
 }
 
 function sameUrl(a: string, b: string): boolean {

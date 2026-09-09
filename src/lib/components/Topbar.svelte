@@ -166,7 +166,7 @@
 							</button>
 						{/each}
 						{#if switchError}
-							<p class="menu-error">{switchError}</p>
+							<p class="menu-error" role="alert">{switchError}</p>
 						{/if}
 					{/if}
 					<a href={ADD_ACCOUNT_HREF} class="menu-item" role="menuitem" onclick={() => (menuOpen = false)}>

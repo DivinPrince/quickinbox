@@ -140,11 +140,15 @@ describe('client metadata', () => {
 		assert.deepEqual(response.grant_types, ['authorization_code', 'refresh_token']);
 	});
 
-	test('metadata-document client ids are https URLs with a path', () => {
+	test('metadata-document client ids are https URLs with a public path', () => {
 		assert.equal(isClientMetadataUrl('https://claude.ai/.well-known/oauth-client'), true);
 		assert.equal(isClientMetadataUrl('https://claude.ai'), false);
 		assert.equal(isClientMetadataUrl('http://claude.ai/x'), false);
 		assert.equal(isClientMetadataUrl('qi_client_abc'), false);
+		assert.equal(isClientMetadataUrl('https://127.0.0.1/meta'), false);
+		assert.equal(isClientMetadataUrl('https://10.0.0.8/meta'), false);
+		assert.equal(isClientMetadataUrl('https://169.254.169.254/latest/meta-data'), false);
+		assert.equal(isClientMetadataUrl('https://localhost/oauth-client.json'), false);
 	});
 });
 
@@ -171,12 +175,22 @@ describe('discovery', () => {
 });
 
 describe('consent page helpers', () => {
-	test('recognises well-known clients by name, uri or id', () => {
-		assert.equal(clientBrand({ client_name: 'Claude' })?.icon, 'claude-fill');
-		assert.equal(clientBrand({ client_name: 'claude-code', client_uri: null })?.label, 'Claude');
+	test('recognises well-known clients from attributable hosts, not names', () => {
+		assert.equal(clientBrand({ client_name: 'Claude' }), null);
+		assert.equal(clientBrand({ client_name: 'Not Claude', client_uri: 'https://claude.ai' })?.icon, 'claude-fill');
+		assert.equal(clientBrand({ client_name: 'Claude', client_uri: 'https://evil.example' }), null);
 		assert.equal(clientBrand({ client_name: 'My tool', client_uri: 'https://cursor.com' })?.icon, 'cursor-ai-fill');
-		assert.equal(clientBrand({ client_name: 'ChatGPT' })?.icon, 'openai-fill');
-		assert.equal(clientBrand({ client_name: 'MCP Inspector' })?.icon, 'terminal-box-line');
+		assert.equal(
+			clientBrand({
+				client_name: 'ChatGPT',
+				client_id: 'https://chatgpt.com/.well-known/oauth-client'
+			})?.icon,
+			'openai-fill'
+		);
+		assert.equal(
+			clientBrand({ client_name: 'MCP Inspector', redirect_uri: 'http://localhost:6274/oauth/callback' })?.icon,
+			'terminal-box-line'
+		);
 		assert.equal(clientBrand({ client_name: 'Totally Unknown' }), null);
 	});
 

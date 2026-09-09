@@ -376,7 +376,7 @@
 		"lastUsed": "Last used {date}",
 		"connectedOn": "Connected {date}",
 		"disconnectAppConfirm": "Disconnect {name}? It will have to ask for access again.",
-		"couldNotDisconnect": "Could not disconnect that app",
+		"couldNotDisconnectApp": "Could not disconnect that app",
 		"copyApiKey": "Copy API key",
 		"newApiKey": "New API key",
 		"copyThisKey": "Copy this key",

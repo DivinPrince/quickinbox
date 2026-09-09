@@ -1,6 +1,7 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { authorizeApiRequest, canAccessDuringFirstLogin } from '$lib/server/api-access';
 import { getUserByApiToken, readBearerToken } from '$lib/server/api-tokens';
+import { getUserByOAuthToken } from '$lib/server/oauth';
 import {
 	countUsers,
 	getAuthenticatedSession,
@@ -191,11 +192,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 					event.locals.apiScopes = apiToken.scopes;
 					event.locals.apiTokenId = apiToken.tokenId;
 				} else {
-					const bearerSession = await getAuthenticatedSession(db, bearer);
-					if (bearerSession?.isMobile) {
-						event.locals.user = bearerSession.user;
-						event.locals.currentSessionId = bearerSession.sessionId;
-						event.locals.authMethod = 'mobile_session';
+					const oauth = await getUserByOAuthToken(db, bearer);
+					if (oauth) {
+						event.locals.user = oauth.user;
+						event.locals.authMethod = 'api_token';
+						event.locals.apiScopes = oauth.scopes;
+					} else {
+						const bearerSession = await getAuthenticatedSession(db, bearer);
+						if (bearerSession?.isMobile) {
+							event.locals.user = bearerSession.user;
+							event.locals.currentSessionId = bearerSession.sessionId;
+							event.locals.authMethod = 'mobile_session';
+						}
 					}
 				}
 			}

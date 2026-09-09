@@ -15,35 +15,53 @@ export type ClientBrand = {
 };
 
 const BRANDS: Array<ClientBrand & { match: RegExp }> = [
-	{ match: /claude|anthropic/, icon: 'claude-fill', label: 'Claude', color: '#d97757' },
-	{ match: /cursor/, icon: 'cursor-ai-fill', label: 'Cursor', color: '#111111' },
-	{ match: /chatgpt|openai|codex/, icon: 'openai-fill', label: 'ChatGPT', color: '#111111' },
-	{ match: /copilot/, icon: 'copilot-fill', label: 'GitHub Copilot', color: '#24292f' },
-	{ match: /github/, icon: 'github-fill', label: 'GitHub', color: '#24292f' },
-	{ match: /gemini|google/, icon: 'gemini-fill', label: 'Gemini', color: '#1a73e8' },
-	{ match: /perplexity/, icon: 'perplexity-fill', label: 'Perplexity', color: '#20808d' },
-	{ match: /vs ?code|visual studio|microsoft/, icon: 'microsoft-fill', label: 'Visual Studio Code', color: '#0078d4' },
-	{ match: /slack/, icon: 'slack-fill', label: 'Slack', color: '#4a154b' },
-	{ match: /notion/, icon: 'notion-fill', label: 'Notion', color: '#111111' },
-	{ match: /discord/, icon: 'discord-fill', label: 'Discord', color: '#5865f2' },
-	{ match: /inspector|mcp-remote|\bcli\b|terminal|localhost|127\.0\.0\.1/, icon: 'terminal-box-line', label: 'Local client', color: '#4b5563' }
+	{ match: /(^|\.)claude\.ai$|(^|\.)anthropic\.com$/, icon: 'claude-fill', label: 'Claude', color: '#d97757' },
+	{ match: /(^|\.)cursor\.com$|(^|\.)cursor\.sh$|cursor-retrieval$|^cursor$/, icon: 'cursor-ai-fill', label: 'Cursor', color: '#111111' },
+	{ match: /(^|\.)chatgpt\.com$|(^|\.)openai\.com$/, icon: 'openai-fill', label: 'ChatGPT', color: '#111111' },
+	{ match: /(^|\.)githubcopilot\.com$|(^|\.)copilot\.github\.com$/, icon: 'copilot-fill', label: 'GitHub Copilot', color: '#24292f' },
+	{ match: /(^|\.)github\.com$/, icon: 'github-fill', label: 'GitHub', color: '#24292f' },
+	{ match: /(^|\.)google\.com$|(^|\.)gemini\.google$/, icon: 'gemini-fill', label: 'Gemini', color: '#1a73e8' },
+	{ match: /(^|\.)perplexity\.ai$/, icon: 'perplexity-fill', label: 'Perplexity', color: '#20808d' },
+	{ match: /(^|\.)microsoft\.com$|(^|\.)visualstudio\.com$|(^|\.)vscode\.dev$/, icon: 'microsoft-fill', label: 'Visual Studio Code', color: '#0078d4' },
+	{ match: /(^|\.)slack\.com$/, icon: 'slack-fill', label: 'Slack', color: '#4a154b' },
+	{ match: /(^|\.)notion\.so$|(^|\.)notion\.com$/, icon: 'notion-fill', label: 'Notion', color: '#111111' },
+	{ match: /(^|\.)discord\.com$|(^|\.)discord\.gg$/, icon: 'discord-fill', label: 'Discord', color: '#5865f2' },
+	{ match: /^(localhost|127\.0\.0\.1|::1)$/, icon: 'terminal-box-line', label: 'Local client', color: '#4b5563' }
 ];
 
 export type BrandableClient = {
 	client_name: string;
 	client_uri?: string | null;
 	client_id?: string | null;
+	redirect_uri?: string | null;
 };
 
-/** Which well-known product this client is, if any. */
+function hostFrom(value: string | null | undefined): string | null {
+	if (!value) return null;
+	try {
+		const url = new URL(value);
+		if (url.protocol === 'http:' || url.protocol === 'https:') return url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+		return url.protocol.replace(/:$/, '').toLowerCase();
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Brand marks come only from independently attributable hosts (metadata URL,
+ * registered client_uri, or redirect URI). A self-declared `client_name` of
+ * "Claude" is not enough — anyone can register that.
+ */
 export function clientBrand(client: BrandableClient): ClientBrand | null {
-	const haystack = [client.client_name, client.client_uri ?? '', client.client_id ?? '']
-		.join(' ')
-		.toLowerCase();
-	for (const brand of BRANDS) {
-		if (brand.match.test(haystack)) {
-			const { match: _match, ...rest } = brand;
-			return rest;
+	const hosts = [hostFrom(client.client_id), hostFrom(client.client_uri), hostFrom(client.redirect_uri)].filter(
+		(host): host is string => Boolean(host)
+	);
+	for (const host of hosts) {
+		for (const brand of BRANDS) {
+			if (brand.match.test(host)) {
+				const { match: _match, ...rest } = brand;
+				return rest;
+			}
 		}
 	}
 	return null;

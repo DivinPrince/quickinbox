@@ -27,6 +27,7 @@
 	let extraOpen = $state(false);
 	let localeOpen = $state(false);
 	let switching = $state(false);
+	let switchError = $state('');
 	let darkMode = $state(false);
 
 	const otherAccounts = $derived(data.accounts.filter((account) => !account.current));
@@ -34,11 +35,11 @@
 	async function switchTo(account: LinkedAccount) {
 		if (switching) return;
 		switching = true;
-		closeMenus();
+		switchError = '';
 		try {
 			await switchAccount(account.id);
 		} catch (error) {
-			console.warn('Could not switch account', error);
+			switchError = error instanceof Error ? error.message : t('account.switchFailed');
 			switching = false;
 		}
 	}
@@ -285,6 +286,9 @@
 						</span>
 					</button>
 				{/each}
+				{#if switchError}
+					<p class="z-menu-error" role="alert">{switchError}</p>
+				{/if}
 			{/if}
 			<a href={ADD_ACCOUNT_HREF} onclick={closeMenus}>
 				<Icon name="Plus" size={16} />

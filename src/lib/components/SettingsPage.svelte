@@ -223,7 +223,7 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				appError = body.error ?? t('settings.couldNotDisconnect');
+				appError = body.error ?? t('settings.couldNotDisconnectApp');
 				return;
 			}
 			editedApps = body.apps;

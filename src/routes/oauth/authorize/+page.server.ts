@@ -142,11 +142,12 @@ function handleAuthorizeError(origin: string, error: unknown): { code: string; m
 	return { code: error.code, message: error.message };
 }
 
-export const load: PageServerLoad = async ({ url, locals, platform, fetch }) => {
+export const load: PageServerLoad = async ({ url, locals, platform, fetch, setHeaders }) => {
 	const db = platform?.env.DB;
 	if (!locals.user || !db) {
 		throw redirect(303, loginHref(`${url.pathname}${url.search}`));
 	}
+	setHeaders({ 'cache-control': 'no-store' });
 
 	let request: AuthorizeRequest;
 	try {

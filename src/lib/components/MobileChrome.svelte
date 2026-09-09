@@ -29,15 +29,17 @@
 
 	const otherAccounts = $derived(accounts.filter((account) => !account.current));
 	let switching = $state(false);
+	let switchError = $state('');
 
 	async function switchTo(account: LinkedAccount) {
 		if (switching) return;
 		switching = true;
+		switchError = '';
 		haptic(8);
 		try {
 			await switchAccount(account.id);
 		} catch (error) {
-			console.warn('Could not switch account', error);
+			switchError = error instanceof Error ? error.message : t('account.switchFailed');
 			switching = false;
 		}
 	}
@@ -228,6 +230,9 @@
 				<Icon name="user-add-line" size={20} />
 				<span>{t('account.addAccount')}</span>
 			</a>
+			{#if switchError}
+				<p class="sheet-error" role="alert">{switchError}</p>
+			{/if}
 		</div>
 
 		<div class="sheet-section">
@@ -452,6 +457,12 @@
 
 		.sheet-link:disabled {
 			opacity: 0.6;
+		}
+
+		.sheet-error {
+			margin: 0.375rem 0.75rem 0;
+			font-size: 0.8125rem;
+			color: var(--color-danger, var(--color-text-secondary));
 		}
 
 		.sheet-title {
