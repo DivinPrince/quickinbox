@@ -96,6 +96,18 @@ export async function resolveFromAddress(
  * Returns null when the user has no sending identity, so the thread page can
  * still load.
  */
+/**
+ * Catch-all replies send from an address that has no `addresses` row, so the id
+ * below is synthetic. `emails.address_id` has a foreign key onto `addresses`,
+ * so it must be stored as NULL — the address itself is still kept in `from_addr`.
+ */
+const SYNTHETIC_ADDRESS_ID_PREFIX = 'reply:';
+
+export function persistableAddressId(id: string | null | undefined): string | null {
+	if (!id || id.startsWith(SYNTHETIC_ADDRESS_ID_PREFIX)) return null;
+	return id;
+}
+
 export async function resolveReplyFromAddress(
 	db: D1Database,
 	user: User,
@@ -189,7 +201,7 @@ export async function sendAndStore(
 		references: input.references ?? null,
 		replyToEmailId: input.replyToEmailId ?? null,
 		domainId: from.domain_id,
-		addressId: from.id,
+		addressId: persistableAddressId(from.id),
 		providerId,
 		status: initialOutboundStatus(provider.kind),
 		isRead: true,
