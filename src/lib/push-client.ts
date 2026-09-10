@@ -30,14 +30,16 @@ export function applicationServerKeyMatches(
 	return actual.byteLength === expected.byteLength && actual.every((byte, index) => byte === expected[index]);
 }
 
+/** Decide whether a subscription was created with the configured VAPID key.
+ * Safari's plain subscription objects carry no options; the server-side
+ * registration check then decides whether the subscription still belongs
+ * to this account. A present-but-null applicationServerKey can never be
+ * verified and must not be treated as a match. */
 export function subscriptionUsesPublicKey(
 	subscription: PushSubscription,
 	publicKey: string
 ): boolean {
-	// Safari's plain subscription objects carry no options; the server-side
-	// registration check then decides whether the subscription still belongs
-	// to this account.
-	if (!subscription.options?.applicationServerKey) return true;
+	if (!subscription.options) return true;
 	return applicationServerKeyMatches(subscription.options.applicationServerKey, publicKey);
 }
 
@@ -94,6 +96,7 @@ function waitUntilActive(registration: ServiceWorkerRegistration): Promise<Servi
 	});
 }
 
+/** Register the push service worker, waiting for it to activate. */
 async function ensurePushRegistration(): Promise<ServiceWorkerRegistration> {
 	const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL);
 	if (registration.active) return registration;
@@ -101,19 +104,22 @@ async function ensurePushRegistration(): Promise<ServiceWorkerRegistration> {
 }
 
 let activePushRegistration: ServiceWorkerRegistration | null = null;
+let registrationPromise: Promise<void> | null = null;
 
 /**
  * Register and activate the push worker at page load. Safari only shows its
  * permission prompt while the click's gesture is still alive, so everything
- * must be ready before the user reaches for the Enable button.
+ * must be ready before the user reaches for the Enable button. Callers use
+ * this to keep the Enable action unavailable until the worker is warm.
  */
 export function prewarmPushRegistration(): Promise<void> {
 	if (!supportsWebPush()) return Promise.resolve();
-	return ensurePushRegistration()
+	registrationPromise ??= ensurePushRegistration()
 		.then((registration) => {
 			activePushRegistration = registration;
 		})
 		.catch(() => undefined);
+	return registrationPromise;
 }
 
 /**
@@ -132,6 +138,8 @@ export function subscribeToPushImmediately(publicKey: string): Promise<PushSubsc
 	});
 }
 
+/** Subscribe this browser, replacing stale subscriptions from another key so
+ * VAPID key rotation recovers through the normal Enable action. */
 export async function subscribeToPush(publicKey: string): Promise<PushSubscription> {
 	const registration = await ensurePushRegistration();
 	const existing = await registration.pushManager.getSubscription();
@@ -164,6 +172,7 @@ async function readError(response: Response): Promise<string> {
 	return typeof body?.error === 'string' ? body.error : `Request failed (${response.status})`;
 }
 
+/** Encode raw key bytes as URL-safe Base64 without padding. */
 function base64UrlEncode(buffer: ArrayBuffer): string {
 	const bytes = new Uint8Array(buffer);
 	let binary = '';
@@ -173,6 +182,8 @@ function base64UrlEncode(buffer: ArrayBuffer): string {
 	return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '');
 }
 
+/** Accept strings, ArrayBuffers, and Uint8Arrays so Safari's plain
+ * subscription objects serialize no matter which shape they carry. */
 function keyAsBase64Url(value: unknown): string | null {
 	if (typeof value === 'string') return value;
 	if (value instanceof ArrayBuffer) return base64UrlEncode(value);
@@ -235,6 +246,7 @@ export function pushSubscriptionPayload(subscription: PushSubscription): string 
 	return JSON.stringify({ endpoint, expirationTime, keys: { p256dh, auth } });
 }
 
+/** Register a subscription with the server for the signed-in account. */
 export async function savePushSubscription(subscription: PushSubscription): Promise<void> {
 	const response = await fetch('/api/push/subscriptions', {
 		method: 'POST',

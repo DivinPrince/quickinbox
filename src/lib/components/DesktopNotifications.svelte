@@ -34,6 +34,8 @@
 	let pushState = $state<PushState>('loading');
 	let pushBusy = $state(false);
 	let pushError = $state('');
+	/** Safari needs the worker warm before the click or it never prompts. */
+	let pushWorkerReady = $state(false);
 	const pushStatusLabel = $derived(
 		({
 			loading: t('notifications.checking'),
@@ -46,10 +48,12 @@
 		} satisfies Record<PushState, string>)[pushState]
 	);
 
+	/** Show a human-readable failure for the notification controls. */
 	function pushErrorMessage(error: unknown): string {
 		return error instanceof Error ? error.message : t('notifications.updateFailed');
 	}
 
+	/** Re-read the browser and server push state for the current account. */
 	async function refreshPushState() {
 		pushError = '';
 		if (!configured || !publicKey) {
@@ -84,10 +88,16 @@
 	}
 
 	$effect(() => {
-		if (configured && publicKey) void prewarmPushRegistration();
+		if (configured && publicKey) {
+			void prewarmPushRegistration().then(() => {
+				pushWorkerReady = true;
+			});
+		}
 		void refreshPushState();
 	});
 
+	/** Subscribe from the click gesture itself so Safari prompts, falling back
+	 * to the async path when the worker could not be prewarmed. */
 	async function enableDesktopNotifications() {
 		if (!publicKey || !supportsWebPush()) return;
 		pushBusy = true;
@@ -114,6 +124,7 @@
 		}
 	}
 
+	/** Remove this browser's push subscription locally and server-side. */
 	async function disableDesktopNotifications() {
 		pushBusy = true;
 		pushError = '';
@@ -178,7 +189,7 @@
 				<button
 					type="button"
 					class="btn-primary"
-					disabled={pushBusy || pushState === 'loading'}
+					disabled={pushBusy || pushState === 'loading' || !pushWorkerReady}
 					onclick={enableDesktopNotifications}
 				>
 					{pushBusy ? t('notifications.enabling') : pushState === 'loading' ? t('notifications.checkingAction') : t('notifications.enable')}

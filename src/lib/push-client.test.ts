@@ -30,6 +30,14 @@ test('treats subscriptions without options as matching', () => {
 	assert.equal(subscriptionUsesPublicKey(subscription, 'AQID-v8'), true);
 });
 
+test('rejects subscriptions carrying a null application server key', () => {
+	const subscription = {
+		endpoint: 'https://web.push.apple.com/device',
+		options: { applicationServerKey: null }
+	} as unknown as PushSubscription;
+	assert.equal(subscriptionUsesPublicKey(subscription, 'AQID-v8'), false);
+});
+
 test('serializes subscriptions via toJSON when available', () => {
 	const subscription = {
 		endpoint: 'https://fcm.googleapis.com/device',
