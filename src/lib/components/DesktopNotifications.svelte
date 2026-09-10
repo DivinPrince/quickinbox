@@ -4,10 +4,13 @@
 		deletePushSubscription,
 		getPushSubscription,
 		isPushSubscriptionRegistered,
+		prewarmPushRegistration,
 		savePushSubscription,
 		subscribeToPush,
+		subscribeToPushImmediately,
 		subscriptionUsesPublicKey,
-		supportsWebPush
+		supportsWebPush,
+		unsubscribeSubscription
 	} from '$lib/push-client';
 	import { t } from '$lib/i18n';
 
@@ -81,6 +84,7 @@
 	}
 
 	$effect(() => {
+		if (configured && publicKey) void prewarmPushRegistration();
 		void refreshPushState();
 	});
 
@@ -89,22 +93,22 @@
 		pushBusy = true;
 		pushError = '';
 		try {
-			const permission = await Notification.requestPermission();
-			if (permission !== 'granted') {
-				pushState = permission === 'denied' ? 'denied' : 'disabled';
-				pushError =
-					permission === 'denied'
-						? t('notifications.blockedHint')
-						: t('notifications.notGranted');
-				return;
-			}
-
-			const subscription = await subscribeToPush(publicKey);
+			// Safari only prompts when subscribe() is called straight from the
+			// click gesture; fall back to the async path elsewhere.
+			const subscription =
+				(await subscribeToPushImmediately(publicKey)) ?? (await subscribeToPush(publicKey));
 			await savePushSubscription(subscription);
 			pushState = 'enabled';
 		} catch (error) {
-			pushState = 'error';
-			pushError = pushErrorMessage(error);
+			if (error instanceof DOMException && error.name === 'NotAllowedError') {
+				pushState = 'denied';
+				pushError = t('notifications.blockedHint');
+				console.warn('Push subscribe rejected:', error.name, error.message);
+			} else {
+				pushState = 'error';
+				pushError = pushErrorMessage(error);
+				console.warn('Push enable failed:', error);
+			}
 		} finally {
 			pushBusy = false;
 		}
@@ -117,7 +121,7 @@
 			const subscription = await getPushSubscription();
 			if (subscription) {
 				await deletePushSubscription(subscription);
-				const removed = await subscription.unsubscribe();
+				const removed = await unsubscribeSubscription(subscription);
 				if (!removed) throw new Error('The browser could not remove its push subscription');
 			}
 			pushState = 'disabled';
