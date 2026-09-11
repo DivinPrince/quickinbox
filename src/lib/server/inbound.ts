@@ -177,7 +177,8 @@ async function storeInboundAttachments(
 			await insertAttachmentBytes(env.DB, env.ATTACHMENTS, emailId, {
 				filename: attachment.filename || 'attachment',
 				type: attachment.content_type || 'application/octet-stream',
-				bytes
+				bytes,
+				contentId: attachment.content_id ?? null
 			});
 		} catch (error) {
 			// One bad attachment shouldn't cost us the message.

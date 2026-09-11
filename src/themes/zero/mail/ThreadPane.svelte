@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import { invalidateAll } from '$app/navigation';
 	import EmailBody from '$lib/components/EmailBody.svelte';
+	import { resolveInlineImages } from '$lib/utils/inline-images';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
@@ -596,7 +597,7 @@
 						<div class="z-msg-body">
 							<div class="z-msg-html">
 								{#if message.body_html}
-									<EmailBody html={message.body_html} />
+									<EmailBody html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
 								{:else}
 									<pre class="z-msg-text">{message.body_text}</pre>
 								{/if}

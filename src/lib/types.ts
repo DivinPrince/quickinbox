@@ -238,6 +238,8 @@ export type EmailAttachmentMeta = {
 	content_type: string;
 	size_bytes: number;
 	created_at: string;
+	/** MIME Content-ID, set when the part was referenced inline by the body. */
+	content_id: string | null;
 };
 
 export type OutboundAttachmentInput = {
