@@ -3,6 +3,7 @@
 	import AttachmentList from './AttachmentList.svelte';
 	import DeliveryStatus from './DeliveryStatus.svelte';
 	import EmailBody from './EmailBody.svelte';
+	import { resolveInlineImages } from '$lib/utils/inline-images';
 	import { formatFullDate, formatRelativeDate } from '$lib/utils/date';
 	import { splitQuotedText } from '$lib/utils/quotes';
 	import { page } from '$app/stores';
@@ -133,7 +134,7 @@
 
 		<div class="body mail-body">
 			{#if message.body_html}
-				<EmailBody html={message.body_html} />
+				<EmailBody html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
 			{:else if text.body}
 				<p class="whitespace-pre-wrap">{text.body}</p>
 				{#if text.quoted}
