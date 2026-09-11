@@ -100,7 +100,7 @@ export async function handleCloudflareInbound(
 		providerId
 	});
 
-	await storeInboundAttachments(env, emailId, parsed.attachments);
+	const storedAttachments = await storeInboundAttachments(env, emailId, parsed.attachments);
 	await scheduleNewMailNotification(env, {
 		emailId,
 		userId: route.userId,
@@ -111,15 +111,18 @@ export async function handleCloudflareInbound(
 		from: sender?.name ? `${sender.name} <${from}>` : from,
 		to: route.address,
 		subject,
-		attachments: parsed.attachments?.length ?? 0
+		attachments: storedAttachments
 	});
 }
 
-async function storeInboundAttachments(
+/** Returns how many attachments actually made it into storage. */
+export async function storeInboundAttachments(
 	env: CloudflareInboundEnv,
 	emailId: string,
 	attachments: Attachment[]
-): Promise<void> {
+): Promise<number> {
+	let stored = 0;
+
 	for (const attachment of attachments.slice(0, MAX_ATTACHMENTS_PER_EMAIL)) {
 		const bytes = attachmentBytes(attachment.content);
 		if (!bytes || bytes.byteLength === 0 || bytes.byteLength > MAX_ATTACHMENT_BYTES) {
@@ -133,10 +136,13 @@ async function storeInboundAttachments(
 				bytes,
 				contentId: attachment.contentId ?? null
 			});
+			stored += 1;
 		} catch (error) {
 			console.error('Failed to store inbound Cloudflare attachment', attachment.filename, error);
 		}
 	}
+
+	return stored;
 }
 
 /**

@@ -148,7 +148,7 @@ async function handleInboundEmail(
 		providerId
 	});
 
-	await storeInboundAttachments(env, client, providerId, emailId);
+	const storedAttachments = await storeInboundAttachments(env, client, providerId, emailId);
 	await scheduleNewMailNotification(env, {
 		emailId,
 		userId: route.userId,
@@ -158,7 +158,8 @@ async function handleInboundEmail(
 	scheduleTelegramNotification(env, {
 		from: sender.name ? `${sender.name} <${from}>` : from,
 		to: route.address,
-		subject
+		subject,
+		attachments: storedAttachments
 	});
 
 	return {
@@ -167,19 +168,22 @@ async function handleInboundEmail(
 	};
 }
 
-async function storeInboundAttachments(
+/** Returns how many attachments actually made it into storage. */
+export async function storeInboundAttachments(
 	env: InboundEnv,
 	client: ResendClient,
 	providerId: string,
 	emailId: string
-): Promise<void> {
+): Promise<number> {
 	let attachments;
 	try {
 		attachments = await client.listReceivedAttachments(providerId);
 	} catch (error) {
 		console.error('Failed to list inbound attachments', providerId, error);
-		return;
+		return 0;
 	}
+
+	let stored = 0;
 
 	for (const attachment of attachments.slice(0, MAX_ATTACHMENTS_PER_EMAIL)) {
 		if (!attachment.download_url) continue;
@@ -198,11 +202,14 @@ async function storeInboundAttachments(
 				bytes,
 				contentId: attachment.content_id ?? null
 			});
+			stored += 1;
 		} catch (error) {
 			// One bad attachment shouldn't cost us the message.
 			console.error('Failed to store inbound attachment', attachment.id, error);
 		}
 	}
+
+	return stored;
 }
 
 /** Resend retries on non-2xx, so record ids we've already processed. */
