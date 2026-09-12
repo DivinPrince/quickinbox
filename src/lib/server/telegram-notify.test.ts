@@ -103,6 +103,22 @@ describe('buildTelegramMessage', () => {
 		assert.ok(subject.includes('…'));
 		assert.ok(subject.length < 200);
 	});
+
+	test('keeps the complete fallback message within Telegram’s 4096 limit', () => {
+		const text = buildTelegramMessage({
+			...notification,
+			subject: 'S'.repeat(200),
+			from: 'F'.repeat(200),
+			to: 'T'.repeat(200),
+			body: 'B'.repeat(8000),
+			attachments: Array.from({ length: 20 }, (_, i) => ({
+				filename: `file-${i}.pdf`,
+				sizeBytes: 1_000_000,
+				contentType: 'application/pdf'
+			}))
+		});
+		assert.ok(text.length <= 4096);
+	});
 });
 
 describe('formatBytes', () => {
@@ -165,6 +181,27 @@ describe('scheduleTelegramNotification', () => {
 		);
 	});
 
+	test('rich upload uses the valid file when an earlier attachment cannot be sent', async () => {
+		const calls = captureFetch(true);
+		await run(configured, {
+			...notification,
+			attachments: [
+				{ filename: 'empty.txt', sizeBytes: 0, contentType: 'text/plain', bytes: new Uint8Array(0) },
+				{ filename: 'shot.jpg', sizeBytes: 4, contentType: 'image/jpeg', bytes: new Uint8Array(4) }
+			]
+		});
+
+		const rich = calls.find((call) => call.method === 'sendRichMessage');
+		assert.ok(rich?.form);
+		const payload = JSON.parse(String(rich.form.get('rich_message'))) as {
+			media: { id: string }[];
+		};
+		assert.equal(payload.media.length, 1);
+		assert.equal(payload.media[0].id, 'att0');
+		assert.equal(rich.form.has('file0'), true);
+		assert.equal(rich.form.has('file1'), false);
+	});
+
 	test('falls back to a card plus uploads when rich messages are unavailable', async () => {
 		// Older Bot API versions reject sendRichMessage; everything must still arrive.
 		const calls = captureFetch(false);
@@ -221,7 +258,7 @@ describe('scheduleTelegramNotification', () => {
 		// A forum chat drops an untargeted message into General; a non-forum chat
 		// rejects an invalid topic outright. Neither is worth sending.
 		const calls = captureFetch(false);
-		for (const threadId of [undefined, '', '  ', 'general', '0', '-4']) {
+		for (const threadId of [undefined, '', '  ', 'general', '0', '-4', '3.5']) {
 			await run({ ...configured, TELEGRAM_THREAD_ID: threadId });
 		}
 

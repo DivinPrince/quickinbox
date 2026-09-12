@@ -36,6 +36,7 @@ export type TelegramNotification = {
 };
 
 /** Telegram rejects anything past 4096 characters; leave room for the markup. */
+const TELEGRAM_TEXT_LIMIT = 4096;
 const MAX_MESSAGE_LENGTH = 3500;
 const MAX_HEADER_LENGTH = 150;
 /** Past this the body is worth collapsing so the chat stays scannable. */
@@ -109,7 +110,8 @@ export function buildTelegramMessage(payload: TelegramNotification, appUrl?: str
 	const link = threadLink(appUrl, payload.threadKey);
 	if (link) lines.push('', `<a href="${link}">Open the message</a>`);
 
-	return lines.join('\n');
+	const text = lines.join('\n');
+	return text.length <= TELEGRAM_TEXT_LIMIT ? text : `${text.slice(0, TELEGRAM_TEXT_LIMIT - 1)}…`;
 }
 
 /** Deep link to the conversation; falls back to the app when there is no thread. */
@@ -149,11 +151,7 @@ export function buildRichMessage(
 	}
 
 	const media: { id: string; type: 'photo' | 'document' }[] = [];
-	for (const [index, file] of (payload.attachments ?? []).entries()) {
-		if (!file.bytes || file.bytes.byteLength === 0 || file.bytes.byteLength > MAX_UPLOAD_BYTES) {
-			continue;
-		}
-
+	for (const [index, file] of uploadableAttachments(payload.attachments).entries()) {
 		const id = `att${index}`;
 		const asPhoto = isPhoto(file);
 		const element = asPhoto
@@ -175,6 +173,12 @@ export function buildRichMessage(
 /** Telegram accepts up to 10MB on sendPhoto and 50MB on sendDocument. */
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+function uploadableAttachments(attachments: StoredAttachment[] | undefined): StoredAttachment[] {
+	return (attachments ?? []).filter(
+		(file) => file.bytes && file.bytes.byteLength > 0 && file.bytes.byteLength <= MAX_UPLOAD_BYTES
+	);
+}
 
 function isPhoto(file: StoredAttachment): boolean {
 	const type = file.contentType.toLowerCase();
@@ -250,7 +254,7 @@ async function sendRich(
 	appUrl?: string
 ): Promise<boolean> {
 	const { html, media } = buildRichMessage(payload, appUrl);
-	const attachments = payload.attachments ?? [];
+	const attachments = uploadableAttachments(payload.attachments);
 
 	const form = new FormData();
 	form.set('chat_id', chatId);
@@ -282,7 +286,7 @@ export function scheduleTelegramNotification(
 	// A forum supergroup drops anything without a topic into General, which is
 	// rarely where the mail is meant to land.
 	const parsedThread = Number(env.TELEGRAM_THREAD_ID?.trim());
-	const threadId = Number.isFinite(parsedThread) && parsedThread > 0 ? parsedThread : null;
+	const threadId = Number.isInteger(parsedThread) && parsedThread > 0 ? parsedThread : null;
 
 	const delivery = (async () => {
 		// One message carrying the text and the files beats a card followed by a
