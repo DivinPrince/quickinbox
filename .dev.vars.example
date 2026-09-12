@@ -26,6 +26,9 @@ RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Production values should be added with `wrangler secret put`, not committed.
 # TELEGRAM_BOT_TOKEN=123456789:AA...
 # TELEGRAM_CHAT_ID=987654321
+# Forum supergroups only: the topic to post into. Without it Telegram puts the
+# message in General. Open the topic and read the last number in its link.
+# TELEGRAM_THREAD_ID=3
 # Public URL of this install, linked from each notification.
 # APP_URL=https://mail.example.com
 

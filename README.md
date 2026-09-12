@@ -206,8 +206,9 @@ bunx wrangler secret put TELEGRAM_CHAT_ID     # from @userinfobot; negative for 
 bun run deploy
 ```
 
-Add `APP_URL` to `vars` in `wrangler.jsonc` to link your install from each
-notification. Both secrets are required — leave either unset and notifications
+If the chat is a forum supergroup, add `TELEGRAM_THREAD_ID` for the topic to
+post into — without it Telegram puts the message in General. Add `APP_URL` to
+`vars` in `wrangler.jsonc` to link your install from each notification. Both secrets are required — leave either unset and notifications
 stay off. This works on both provider tracks, and mail that matched no mailbox
 is announced too, so a missing route is visible instead of silent.
 
