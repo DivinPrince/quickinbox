@@ -51,6 +51,15 @@ describe('resolveInlineImages', () => {
 		);
 	});
 
+	test('does not fall back once any part carries a Content-ID', () => {
+		// A forward keeps the original's `cid:` in the quoted HTML while the only
+		// stored image is the forwarder's signature logo. Pairing them would put
+		// the logo where the screenshot should be.
+		const html = '<img src="cid:ii_original@mail">';
+		const logo = [attachment({ id: 'att-logo', content_id: 'logo@signature' })];
+		assert.equal(resolveInlineImages(html, 'mail-1', logo), html);
+	});
+
 	test('does not guess when the pairing is ambiguous', () => {
 		const html = '<img src="cid:a"><img src="cid:b">';
 		const two = [

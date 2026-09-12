@@ -1,4 +1,5 @@
 import type { EmailAttachmentMeta } from '$lib/types';
+import { attachmentHref } from './attachments';
 
 /**
  * Inline images arrive as `<img src="cid:ii_123@mail">` — a reference to a MIME
@@ -24,10 +25,6 @@ function bare(value: string): string {
 
 function isImage(attachment: EmailAttachmentMeta): boolean {
 	return attachment.content_type.toLowerCase().startsWith('image/');
-}
-
-export function attachmentUrl(emailId: string, attachmentId: string): string {
-	return `/api/mail/${emailId}/attachments/${attachmentId}`;
 }
 
 /**
@@ -60,10 +57,15 @@ export function resolveInlineImages(
 		if (attachment.content_id) byContentId.set(bare(attachment.content_id), attachment);
 	}
 
-	const fallback = soleImageFallback(html, attachments);
+	// Only mail stored before the Content-ID column existed may be paired by
+	// guesswork. Once any part carries one, an unmatched reference is a genuine
+	// miss — a quoted `cid:` from a forwarded original, say — and substituting
+	// the one image that happens to be attached would show the wrong picture
+	// with nothing to give it away.
+	const fallback = byContentId.size === 0 ? soleImageFallback(html, attachments) : null;
 
 	return html.replace(CID_REFERENCE, (whole, reference: string) => {
 		const match = byContentId.get(bare(reference)) ?? fallback;
-		return match ? attachmentUrl(emailId, match.id) : whole;
+		return match ? attachmentHref(emailId, match.id) : whole;
 	});
 }
