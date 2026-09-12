@@ -372,6 +372,7 @@ export async function resolveInboundRoute(
 	return null;
 }
 
+/** Returns whether a new row was stored — false when this is a retry. */
 export async function recordUnroutedEmail(
 	db: D1Database,
 	input: {
@@ -381,10 +382,13 @@ export async function recordUnroutedEmail(
 		subject: string | null;
 		reason: string;
 	}
-): Promise<void> {
-	await db
+): Promise<boolean> {
+	// A retried delivery must not pile up rows or announce the same message
+	// twice. `provider_id` is unique where present, so the retry is ignored and
+	// the caller learns nothing was recorded.
+	const result = await db
 		.prepare(
-			`INSERT INTO unrouted_emails (id, provider_id, from_addr, to_addr, subject, reason)
+			`INSERT OR IGNORE INTO unrouted_emails (id, provider_id, from_addr, to_addr, subject, reason)
 			 VALUES (?, ?, ?, ?, ?, ?)`
 		)
 		.bind(
@@ -396,6 +400,8 @@ export async function recordUnroutedEmail(
 			input.reason
 		)
 		.run();
+
+	return (result.meta?.changes ?? 0) > 0;
 }
 
 export async function listUnroutedEmails(db: D1Database, limit = 50) {
