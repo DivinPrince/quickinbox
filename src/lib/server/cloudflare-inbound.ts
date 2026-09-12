@@ -68,20 +68,22 @@ export async function handleCloudflareInbound(
 	const route = await resolveInboundRoute(env.DB, recipients);
 
 	if (!route) {
-		await recordUnroutedEmail(env.DB, {
+		const recorded = await recordUnroutedEmail(env.DB, {
 			providerId,
 			from,
 			to: recipients.join(', ') || envelopeTo || '(unknown)',
 			subject,
 			reason: 'No matching address and no catch-all for this domain'
 		});
-		scheduleTelegramNotification(env, {
-			from,
-			to: recipients.join(', ') || envelopeTo || '(unknown)',
-			subject,
-			body: parsed.text ?? (parsed.html ? stripHtml(parsed.html) : null),
-			unrouted: true
-		});
+		if (recorded) {
+			scheduleTelegramNotification(env, {
+				from,
+				to: recipients.join(', ') || envelopeTo || '(unknown)',
+				subject,
+				body: parsed.text ?? (parsed.html ? stripHtml(parsed.html) : null),
+				unrouted: true
+			});
+		}
 		return;
 	}
 
