@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { invalidateAll } from '$app/navigation';
 	import EmailBody from '$lib/components/EmailBody.svelte';
-	import { resolveInlineImages } from '$lib/utils/inline-images';
+	import { resolveInlineImages, visibleAttachments } from '$lib/utils/inline-images';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
@@ -594,6 +594,7 @@
 					</div>
 
 					{#if isOpen}
+						{@const files = visibleAttachments(message.body_html, message.attachments)}
 						<div class="z-msg-body">
 							<div class="z-msg-html">
 								{#if message.body_html}
@@ -602,9 +603,9 @@
 									<pre class="z-msg-text">{message.body_text}</pre>
 								{/if}
 							</div>
-							{#if message.attachments.length > 0}
+							{#if files.length > 0}
 								<div class="z-attach-row">
-									{#each message.attachments as file (file.id)}
+									{#each files as file (file.id)}
 										<a
 											class="z-attach-file"
 											href={attachmentHref(message.id, file.id)}

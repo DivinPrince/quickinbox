@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { EmailAttachmentMeta } from '$lib/types';
-import { resolveInlineImages } from './inline-images';
+import { resolveInlineImages, visibleAttachments } from './inline-images';
 
 function attachment(overrides: Partial<EmailAttachmentMeta> = {}): EmailAttachmentMeta {
 	return {
@@ -86,5 +86,39 @@ describe('resolveInlineImages', () => {
 	test('handles a body with no references and an empty body', () => {
 		assert.equal(resolveInlineImages('<p>hi</p>', 'mail-1', [attachment()]), '<p>hi</p>');
 		assert.equal(resolveInlineImages(null, 'mail-1', []), '');
+	});
+});
+
+describe('visibleAttachments', () => {
+	test('hides a part the body already displays', () => {
+		const html = '<img src="cid:ii_123">';
+		assert.deepEqual(visibleAttachments(html, [attachment()]), []);
+	});
+
+	test('keeps a part the body never references', () => {
+		const html = '<img src="cid:ii_123">';
+		const files = [attachment(), attachment({ id: 'att-2', content_id: 'unused', filename: 'a.pdf' })];
+		assert.deepEqual(
+			visibleAttachments(html, files).map((file) => file.id),
+			['att-2']
+		);
+	});
+
+	test('keeps everything when the body has no references', () => {
+		const files = [attachment()];
+		assert.deepEqual(visibleAttachments('<p>hi</p>', files), files);
+		assert.deepEqual(visibleAttachments(null, files), files);
+	});
+
+	test('hides the single image the fallback resolved', () => {
+		// Pre-migration mail: the body shows it, so the chip would be a duplicate.
+		const html = '<img src="cid:ii_gone">';
+		assert.deepEqual(visibleAttachments(html, [attachment({ content_id: null })]), []);
+	});
+
+	test('keeps a part left unresolved', () => {
+		const html = '<img src="cid:missing">';
+		const files = [attachment({ content_id: 'other' })];
+		assert.deepEqual(visibleAttachments(html, files), files);
 	});
 });
