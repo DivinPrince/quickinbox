@@ -94,6 +94,18 @@ test('document head asks for a standalone home-screen app', () => {
 	assert.match(html, /apple-touch-startup-image/);
 });
 
+test('Zero phone chrome clears the iOS status bar and keeps tap targets large', () => {
+	const css = readFileSync(join(root, 'src/themes/zero/shell.css'), 'utf8');
+	const phone = css.split('@media (max-width: 767px)')[1] ?? '';
+	assert.match(phone, /\.z-list-head[\s\S]*safe-area-inset-top/);
+	assert.match(phone, /\.z-settings-bar[\s\S]*safe-area-inset-top/);
+	assert.match(phone, /\.z-thread-bar[\s\S]*safe-area-inset-top/);
+	assert.match(phone, /data-mobile-open='true'\] \.z-sidebar[\s\S]*safe-area-inset-top/);
+	assert.match(phone, /\.z-mobile-nav a[\s\S]*min-width:\s*var\(--touch-target\)/);
+	assert.match(phone, /\.z-mobile-nav a[\s\S]*min-height:\s*var\(--touch-target\)/);
+	assert.match(phone, /\.z-list-tools \.z-icon-btn[\s\S]*--touch-target/);
+});
+
 test('phone gestures follow the 900px shell, not desktop pointer type', () => {
 	for (const file of [
 		'src/lib/components/SwipeBack.svelte',

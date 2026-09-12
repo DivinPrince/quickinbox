@@ -103,7 +103,26 @@ if (!existsSync(wranglerPath)) {
 	}
 }
 
-// 4. The licence has to ship with the code.
+// 4. Deploy-to-Cloudflare must create tables. Workers Builds picks up the
+// `deploy` script; it has to migrate via the D1 *binding* so a renamed
+// database still works, and `build` must exist for the button's build step.
+const pkgPath = new URL('package.json', `file://${root}`);
+if (!existsSync(pkgPath)) {
+	fail('package.json is missing');
+} else {
+	const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+	if (!pkg.scripts?.build) {
+		fail('package.json is missing a "build" script — Deploy to Cloudflare runs it');
+	}
+	const deploy = String(pkg.scripts?.deploy ?? '');
+	if (!/d1 migrations apply DB --remote/.test(deploy)) {
+		fail(
+			'package.json deploy script must run `wrangler d1 migrations apply DB --remote` before wrangler deploy'
+		);
+	}
+}
+
+// 5. The licence has to ship with the code.
 for (const required of ['LICENSE.md', 'README.md', '.dev.vars.example']) {
 	if (!tracked.includes(required)) {
 		fail(`${required} is missing from the repository`);

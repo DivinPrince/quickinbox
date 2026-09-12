@@ -29,6 +29,14 @@ bun run setup
 bash scripts/setup.sh
 ```
 
+The button's deploy command applies D1 migrations (the `users` table and the
+rest of the schema). If an older deploy left you with `no such table: users`,
+run this once against that Worker, then reload:
+
+```bash
+npx wrangler d1 migrations apply DB --remote
+```
+
 The wizard creates the D1 database and R2 bucket, writes config, and onboards
 your domain. Budget about 30 minutes — most of that is waiting on DNS.
 
