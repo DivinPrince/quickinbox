@@ -113,7 +113,8 @@ async function storeInboundAttachments(
 			await insertAttachmentBytes(env.DB, env.ATTACHMENTS, emailId, {
 				filename: attachment.filename || 'attachment',
 				type: attachment.mimeType || 'application/octet-stream',
-				bytes
+				bytes,
+				contentId: attachment.contentId ?? null
 			});
 		} catch (error) {
 			console.error('Failed to store inbound Cloudflare attachment', attachment.filename, error);
