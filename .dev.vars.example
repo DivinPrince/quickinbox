@@ -19,6 +19,19 @@ RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Comma-separated domains already onboarded in Email Service / Email Routing.
 # CLOUDFLARE_MAIL_DOMAINS=example.com,mail.example.com
 
+# --- Telegram notifications (optional) ---
+# Ping a Telegram chat on every inbound message. Both values are required —
+# leave either blank and notifications stay off. Works with both providers.
+# Token from @BotFather; chat id from @userinfobot (negative for groups).
+# Production values should be added with `wrangler secret put`, not committed.
+# TELEGRAM_BOT_TOKEN=123456789:AA...
+# TELEGRAM_CHAT_ID=987654321
+# Forum supergroups only: the topic to post into. Without it Telegram puts the
+# message in General. Open the topic and read the last number in its link.
+# TELEGRAM_THREAD_ID=3
+# Public URL of this install, linked from each notification.
+# APP_URL=https://mail.example.com
+
 # --- Desktop notifications (optional) ---
 # Generate once with: bunx web-push generate-vapid-keys
 # Production values should be added with `wrangler secret put`, not committed.

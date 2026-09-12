@@ -4,9 +4,20 @@ import { insertAttachmentBytes } from './attachments';
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL, MAX_BODY_BYTES } from './constants';
 import { collectInboundRecipients, parseEmailIdentity } from './email-address';
 import { recordUnroutedEmail, resolveInboundRoute } from './domains';
-import { emailExistsByProviderId, insertEmail, updateEmailStatusByProviderId } from './mail-store';
+import { stripHtml } from './html';
+import {
+	emailExistsByProviderId,
+	getThreadKey,
+	insertEmail,
+	updateEmailStatusByProviderId
+} from './mail-store';
 import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
 import type { ResendClient } from './resend';
+import {
+	scheduleTelegramNotification,
+	type StoredAttachment,
+	type TelegramNotificationEnv
+} from './telegram-notify';
 
 export type ResendWebhookEvent = {
 	type: string;
@@ -19,7 +30,7 @@ export type WebhookOutcome = {
 	note: string;
 };
 
-type InboundEnv = PushNotificationEnv & { ATTACHMENTS: R2Bucket };
+type InboundEnv = PushNotificationEnv & TelegramNotificationEnv & { ATTACHMENTS: R2Bucket };
 
 /** Resend delivery events → the status we display on a sent message. */
 const STATUS_BY_EVENT: Record<string, DeliveryStatus> = {
@@ -111,7 +122,15 @@ async function handleInboundEmail(
 			subject,
 			reason: 'No matching address and no catch-all for this domain'
 		});
-
+		if (recorded) {
+			scheduleTelegramNotification(env, {
+				from,
+				to: recipients.join(', ') || '(unknown)',
+				subject,
+				body: received.text ?? (received.html ? stripHtml(received.html) : null),
+				unrouted: true
+			});
+		}
 		return {
 			handled: true,
 			// Resend retries on non-2xx; say plainly when a retry changed nothing.
@@ -140,12 +159,20 @@ async function handleInboundEmail(
 		providerId
 	});
 
-	await storeInboundAttachments(env, client, providerId, emailId);
+	const storedAttachments = await storeInboundAttachments(env, client, providerId, emailId);
 	await scheduleNewMailNotification(env, {
 		emailId,
 		userId: route.userId,
 		from: sender.name || from,
 		subject
+	});
+	scheduleTelegramNotification(env, {
+		from: sender.name ? `${sender.name} <${from}>` : from,
+		to: route.address,
+		subject,
+		body: received.text ?? (received.html ? stripHtml(received.html) : null),
+		attachments: storedAttachments,
+		threadKey: await getThreadKey(env.DB, emailId)
 	});
 
 	return {
@@ -154,19 +181,22 @@ async function handleInboundEmail(
 	};
 }
 
-async function storeInboundAttachments(
+/** Returns the attachments that actually made it into storage. */
+export async function storeInboundAttachments(
 	env: InboundEnv,
 	client: ResendClient,
 	providerId: string,
 	emailId: string
-): Promise<void> {
+): Promise<StoredAttachment[]> {
 	let attachments;
 	try {
 		attachments = await client.listReceivedAttachments(providerId);
 	} catch (error) {
 		console.error('Failed to list inbound attachments', providerId, error);
-		return;
+		return [];
 	}
+
+	const stored: StoredAttachment[] = [];
 
 	for (const attachment of attachments.slice(0, MAX_ATTACHMENTS_PER_EMAIL)) {
 		if (!attachment.download_url) continue;
@@ -185,11 +215,19 @@ async function storeInboundAttachments(
 				bytes,
 				contentId: attachment.content_id ?? null
 			});
+			stored.push({
+				filename: attachment.filename || 'attachment',
+				sizeBytes: bytes.byteLength,
+				contentType: attachment.content_type || 'application/octet-stream',
+				bytes
+			});
 		} catch (error) {
 			// One bad attachment shouldn't cost us the message.
 			console.error('Failed to store inbound attachment', attachment.id, error);
 		}
 	}
+
+	return stored;
 }
 
 /** Resend retries on non-2xx, so record ids we've already processed. */

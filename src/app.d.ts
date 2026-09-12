@@ -26,6 +26,14 @@ declare global {
 				VAPID_PRIVATE_KEY?: string;
 				/** A mailto: or https: contact URI for Web Push. */
 				VAPID_SUBJECT?: string;
+				/** Bot token from @BotFather — enables Telegram notifications. */
+				TELEGRAM_BOT_TOKEN?: string;
+				/** Chat, group, or channel the notifications go to. */
+				TELEGRAM_CHAT_ID?: string;
+				/** Topic id when the chat is a forum supergroup. */
+				TELEGRAM_THREAD_ID?: string;
+				/** Public URL of this install, linked from notifications. */
+				APP_URL?: string;
 			};
 		}
 		interface Locals {

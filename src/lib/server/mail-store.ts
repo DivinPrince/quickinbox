@@ -136,6 +136,19 @@ export async function insertEmail(
 	return id;
 }
 
+/**
+ * The id a thread is addressed by in the UI (`/inbox?thread=…`). A message that
+ * starts a conversation has no `thread_id` of its own and stands in for it.
+ */
+export async function getThreadKey(db: D1Database, emailId: string): Promise<string> {
+	const row = await db
+		.prepare('SELECT COALESCE(thread_id, id) AS thread_key FROM emails WHERE id = ?')
+		.bind(emailId)
+		.first<{ thread_key: string }>();
+
+	return row?.thread_key ?? emailId;
+}
+
 /** Already stored? Resend retries webhooks, so inbound writes must be idempotent. */
 export async function emailExistsByProviderId(
 	db: D1Database,
