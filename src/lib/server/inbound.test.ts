@@ -58,66 +58,66 @@ function listed(count: number, size = 10): ListedAttachment[] {
 }
 
 describe('storeInboundAttachments (Resend)', () => {
-	test('returns how many attachments were stored', async () => {
+	test('returns what was stored', async () => {
 		const { env, stored } = mockEnv();
-		const count = await storeInboundAttachments(env, mockClient(listed(3), () => 10), 'msg-1', 'email-1');
-		assert.equal(count, 3);
-		assert.equal(stored.length, 3);
+		const result = await storeInboundAttachments(env, mockClient(listed(3), () => 10), 'msg-1', 'email-1');
+		assert.equal(result.length, 3);
+		assert.equal(result.length, 3);
 	});
 
-	test('does not count an attachment the provider listed but never delivered', async () => {
+	test('does not include an attachment the provider listed but never delivered', async () => {
 		// No download_url — nothing to fetch, so nothing is stored, and announcing
 		// it would promise the reader a file the mailbox does not have.
 		const { env } = mockEnv();
 		const attachments = [...listed(1), { id: 'att-x', filename: 'ghost.txt', content_type: 'text/plain' }];
-		const count = await storeInboundAttachments(env, mockClient(attachments, () => 10), 'msg-1', 'email-1');
-		assert.equal(count, 1);
+		const result = await storeInboundAttachments(env, mockClient(attachments, () => 10), 'msg-1', 'email-1');
+		assert.equal(result.length, 1);
 	});
 
-	test('does not count attachments skipped for size', async () => {
+	test('does not include attachments skipped for size', async () => {
 		const { env } = mockEnv();
 		const big = listed(1, MAX_ATTACHMENT_BYTES + 1);
-		const count = await storeInboundAttachments(env, mockClient(big, () => 10), 'msg-1', 'email-1');
-		assert.equal(count, 0);
+		const result = await storeInboundAttachments(env, mockClient(big, () => 10), 'msg-1', 'email-1');
+		assert.equal(result.length, 0);
 	});
 
-	test('does not count an attachment whose body turns out to be oversized', async () => {
+	test('does not include an attachment whose body turns out to be oversized', async () => {
 		// `size` from the listing is advisory; the downloaded body is the truth.
 		const { env } = mockEnv();
 		const attachments = listed(1, 10);
-		const count = await storeInboundAttachments(
+		const result = await storeInboundAttachments(
 			env,
 			mockClient(attachments, () => MAX_ATTACHMENT_BYTES + 1),
 			'msg-1',
 			'email-1'
 		);
-		assert.equal(count, 0);
+		assert.equal(result.length, 0);
 	});
 
-	test('does not count an attachment whose storage fails', async () => {
+	test('does not include an attachment whose storage fails', async () => {
 		const { env } = mockEnv({ failPut: true });
-		const count = await storeInboundAttachments(env, mockClient(listed(2), () => 10), 'msg-1', 'email-1');
-		assert.equal(count, 0);
+		const result = await storeInboundAttachments(env, mockClient(listed(2), () => 10), 'msg-1', 'email-1');
+		assert.equal(result.length, 0);
 	});
 
-	test('counts no more than the per-message cap', async () => {
+	test('stores no more than the per-message cap', async () => {
 		const { env } = mockEnv();
-		const count = await storeInboundAttachments(
+		const result = await storeInboundAttachments(
 			env,
 			mockClient(listed(MAX_ATTACHMENTS_PER_EMAIL + 3), () => 10),
 			'msg-1',
 			'email-1'
 		);
-		assert.equal(count, MAX_ATTACHMENTS_PER_EMAIL);
+		assert.equal(result.length, MAX_ATTACHMENTS_PER_EMAIL);
 	});
 
-	test('returns zero when the attachment listing fails', async () => {
+	test('returns nothing when the attachment listing fails', async () => {
 		const { env } = mockEnv();
 		const client = {
 			async listReceivedAttachments() {
 				throw new Error('Resend down');
 			}
 		} as unknown as ResendClient;
-		assert.equal(await storeInboundAttachments(env, client, 'msg-1', 'email-1'), 0);
+		assert.equal((await storeInboundAttachments(env, client, 'msg-1', 'email-1')).length, 0);
 	});
 });

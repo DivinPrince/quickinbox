@@ -76,32 +76,26 @@ function parsed(count: number, byteLength = 10): Attachment[] {
 }
 
 describe('storeInboundAttachments (Cloudflare)', () => {
-	test('returns how many attachments were stored', async () => {
-		assert.equal(await storeInboundAttachments(mockEnv(), 'email-1', parsed(3)), 3);
+	test('returns what was stored', async () => {
+		assert.equal((await storeInboundAttachments(mockEnv(), 'email-1', parsed(3))).length, 3);
 	});
 
-	test('does not count empty or oversized parts', async () => {
+	test('does not include empty or oversized parts', async () => {
 		// The count is what the reader can actually open, so parts we drop must
 		// not appear in the notification.
-		assert.equal(await storeInboundAttachments(mockEnv(), 'email-1', parsed(1, 0)), 0);
-		assert.equal(
-			await storeInboundAttachments(mockEnv(), 'email-1', parsed(1, MAX_ATTACHMENT_BYTES + 1)),
-			0
-		);
+		assert.equal((await storeInboundAttachments(mockEnv(), 'email-1', parsed(1, 0))).length, 0);
+		assert.equal((await storeInboundAttachments(mockEnv(), 'email-1', parsed(1, MAX_ATTACHMENT_BYTES + 1))).length, 0);
 	});
 
-	test('does not count an attachment whose storage fails', async () => {
-		assert.equal(await storeInboundAttachments(mockEnv({ failPut: true }), 'email-1', parsed(2)), 0);
+	test('does not include an attachment whose storage fails', async () => {
+		assert.equal((await storeInboundAttachments(mockEnv({ failPut: true }), 'email-1', parsed(2))).length, 0);
 	});
 
-	test('counts no more than the per-message cap', async () => {
-		assert.equal(
-			await storeInboundAttachments(mockEnv(), 'email-1', parsed(MAX_ATTACHMENTS_PER_EMAIL + 3)),
-			MAX_ATTACHMENTS_PER_EMAIL
-		);
+	test('stores no more than the per-message cap', async () => {
+		assert.equal((await storeInboundAttachments(mockEnv(), 'email-1', parsed(MAX_ATTACHMENTS_PER_EMAIL + 3))).length, MAX_ATTACHMENTS_PER_EMAIL);
 	});
 
 	test('handles a message with no attachments', async () => {
-		assert.equal(await storeInboundAttachments(mockEnv(), 'email-1', []), 0);
+		assert.equal((await storeInboundAttachments(mockEnv(), 'email-1', [])).length, 0);
 	});
 });

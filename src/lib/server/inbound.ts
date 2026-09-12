@@ -4,10 +4,20 @@ import { insertAttachmentBytes } from './attachments';
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL, MAX_BODY_BYTES } from './constants';
 import { collectInboundRecipients, parseEmailIdentity } from './email-address';
 import { recordUnroutedEmail, resolveInboundRoute } from './domains';
-import { emailExistsByProviderId, insertEmail, updateEmailStatusByProviderId } from './mail-store';
+import { stripHtml } from './html';
+import {
+	emailExistsByProviderId,
+	getThreadKey,
+	insertEmail,
+	updateEmailStatusByProviderId
+} from './mail-store';
 import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
 import type { ResendClient } from './resend';
-import { scheduleTelegramNotification, type TelegramNotificationEnv } from './telegram-notify';
+import {
+	scheduleTelegramNotification,
+	type StoredAttachment,
+	type TelegramNotificationEnv
+} from './telegram-notify';
 
 export type ResendWebhookEvent = {
 	type: string;
@@ -117,6 +127,7 @@ async function handleInboundEmail(
 				from,
 				to: recipients.join(', ') || '(unknown)',
 				subject,
+				body: received.text ?? (received.html ? stripHtml(received.html) : null),
 				unrouted: true
 			});
 		}
@@ -159,7 +170,9 @@ async function handleInboundEmail(
 		from: sender.name ? `${sender.name} <${from}>` : from,
 		to: route.address,
 		subject,
-		attachments: storedAttachments
+		body: received.text ?? (received.html ? stripHtml(received.html) : null),
+		attachments: storedAttachments,
+		threadKey: await getThreadKey(env.DB, emailId)
 	});
 
 	return {
@@ -168,22 +181,22 @@ async function handleInboundEmail(
 	};
 }
 
-/** Returns how many attachments actually made it into storage. */
+/** Returns the attachments that actually made it into storage. */
 export async function storeInboundAttachments(
 	env: InboundEnv,
 	client: ResendClient,
 	providerId: string,
 	emailId: string
-): Promise<number> {
+): Promise<StoredAttachment[]> {
 	let attachments;
 	try {
 		attachments = await client.listReceivedAttachments(providerId);
 	} catch (error) {
 		console.error('Failed to list inbound attachments', providerId, error);
-		return 0;
+		return [];
 	}
 
-	let stored = 0;
+	const stored: StoredAttachment[] = [];
 
 	for (const attachment of attachments.slice(0, MAX_ATTACHMENTS_PER_EMAIL)) {
 		if (!attachment.download_url) continue;
@@ -202,7 +215,12 @@ export async function storeInboundAttachments(
 				bytes,
 				contentId: attachment.content_id ?? null
 			});
-			stored += 1;
+			stored.push({
+				filename: attachment.filename || 'attachment',
+				sizeBytes: bytes.byteLength,
+				contentType: attachment.content_type || 'application/octet-stream',
+				bytes
+			});
 		} catch (error) {
 			// One bad attachment shouldn't cost us the message.
 			console.error('Failed to store inbound attachment', attachment.id, error);

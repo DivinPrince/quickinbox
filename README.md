@@ -212,6 +212,11 @@ post into — without it Telegram puts the message in General. Add `APP_URL` to
 stay off. This works on both provider tracks, and mail that matched no mailbox
 is announced too, so a missing route is visible instead of silent.
 
+Each message arrives as a single rich message — subject, sender, the body in
+an expandable quote, every attachment inline with its size, and a link straight
+to the conversation. That needs Bot API 10.1; against an older API the call
+fails and the notification falls back to a text card followed by the files.
+
 Delivery is fire-and-forget: a Telegram outage is logged and ignored rather
 than failing the inbound handler, which the provider would then retry.
 
