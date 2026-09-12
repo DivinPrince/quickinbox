@@ -44,6 +44,43 @@ function soleImageFallback(
 	return images.length === 1 ? images[0] : null;
 }
 
+/**
+ * Attachments the body already displays. Showing them again as chips below the
+ * message duplicates a signature logo on every reply, and buries a real
+ * attachment among parts the reader has already seen.
+ */
+export function visibleAttachments(
+	html: string | null | undefined,
+	attachments: EmailAttachmentMeta[]
+): EmailAttachmentMeta[] {
+	const inlined = inlineAttachmentIds(html, attachments);
+	return inlined.size === 0
+		? attachments
+		: attachments.filter((attachment) => !inlined.has(attachment.id));
+}
+
+export function inlineAttachmentIds(
+	html: string | null | undefined,
+	attachments: EmailAttachmentMeta[]
+): Set<string> {
+	const ids = new Set<string>();
+	if (!html || !html.toLowerCase().includes('cid:')) return ids;
+
+	const byContentId = new Map<string, EmailAttachmentMeta>();
+	for (const attachment of attachments) {
+		if (attachment.content_id) byContentId.set(bare(attachment.content_id), attachment);
+	}
+
+	const fallback = byContentId.size === 0 ? soleImageFallback(html, attachments) : null;
+
+	for (const match of html.matchAll(CID_REFERENCE)) {
+		const resolved = byContentId.get(bare(match[1])) ?? fallback;
+		if (resolved) ids.add(resolved.id);
+	}
+
+	return ids;
+}
+
 export function resolveInlineImages(
 	html: string | null | undefined,
 	emailId: string,
