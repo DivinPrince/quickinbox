@@ -8,6 +8,8 @@
 export type TelegramNotificationEnv = {
 	TELEGRAM_BOT_TOKEN?: string;
 	TELEGRAM_CHAT_ID?: string;
+	/** Topic to post into, when the chat is a forum supergroup. */
+	TELEGRAM_THREAD_ID?: string;
 	APP_URL?: string;
 	waitUntil?: (promise: Promise<void>) => void;
 };
@@ -55,11 +57,17 @@ export function scheduleTelegramNotification(
 	const chatId = env.TELEGRAM_CHAT_ID?.trim();
 	if (!token || !chatId) return;
 
+	// A forum supergroup drops anything without a topic into General, which is
+	// rarely where the mail is meant to land.
+	const threadId = Number(env.TELEGRAM_THREAD_ID?.trim());
+	const topic = Number.isFinite(threadId) && threadId > 0 ? { message_thread_id: threadId } : {};
+
 	const delivery = fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify({
 			chat_id: chatId,
+			...topic,
 			text: buildTelegramText(payload, env.APP_URL),
 			disable_web_page_preview: true
 		})

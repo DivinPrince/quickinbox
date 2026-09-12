@@ -62,6 +62,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 				VAPID_SUBJECT: platform?.env.VAPID_SUBJECT,
 				TELEGRAM_BOT_TOKEN: platform?.env.TELEGRAM_BOT_TOKEN,
 				TELEGRAM_CHAT_ID: platform?.env.TELEGRAM_CHAT_ID,
+				TELEGRAM_THREAD_ID: platform?.env.TELEGRAM_THREAD_ID,
 				APP_URL: platform?.env.APP_URL,
 				waitUntil: platform?.ctx ? (promise) => platform.ctx.waitUntil(promise) : undefined
 			},

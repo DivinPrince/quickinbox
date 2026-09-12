@@ -87,6 +87,47 @@ describe('scheduleTelegramNotification', () => {
 		assert.equal((calls[0].body as { chat_id: string }).chat_id, '42');
 	});
 
+	test('posts into a forum topic when one is configured', async () => {
+		const calls = captureFetch();
+		const pending: Promise<void>[] = [];
+		scheduleTelegramNotification(
+			{
+				TELEGRAM_BOT_TOKEN: 'token',
+				TELEGRAM_CHAT_ID: '-1001234567890',
+				TELEGRAM_THREAD_ID: '3',
+				waitUntil: (promise) => pending.push(promise)
+			},
+			notification
+		);
+
+		await Promise.all(pending);
+		assert.equal((calls[0].body as { message_thread_id?: number }).message_thread_id, 3);
+	});
+
+	test('omits the topic when it is unset or not a positive number', async () => {
+		// A forum chat drops an untargeted message into General; a non-forum chat
+		// rejects an invalid topic outright. Neither is worth sending.
+		const calls = captureFetch();
+		const pending: Promise<void>[] = [];
+		for (const threadId of [undefined, '', '  ', 'general', '0', '-4']) {
+			scheduleTelegramNotification(
+				{
+					TELEGRAM_BOT_TOKEN: 'token',
+					TELEGRAM_CHAT_ID: '42',
+					TELEGRAM_THREAD_ID: threadId,
+					waitUntil: (promise) => pending.push(promise)
+				},
+				notification
+			);
+		}
+
+		await Promise.all(pending);
+		assert.equal(calls.length, 6);
+		for (const call of calls) {
+			assert.ok(!('message_thread_id' in (call.body as object)));
+		}
+	});
+
 	test('swallows a transport error so inbound handling still succeeds', async () => {
 		const pending: Promise<void>[] = [];
 		globalThis.fetch = (() => Promise.reject(new Error('network down'))) as unknown as typeof fetch;

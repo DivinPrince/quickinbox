@@ -40,6 +40,7 @@ export default {
 			VAPID_SUBJECT: env.VAPID_SUBJECT,
 			TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN,
 			TELEGRAM_CHAT_ID: env.TELEGRAM_CHAT_ID,
+			TELEGRAM_THREAD_ID: env.TELEGRAM_THREAD_ID,
 			APP_URL: env.APP_URL,
 			waitUntil: (promise) => ctx.waitUntil(promise)
 		};

@@ -30,6 +30,8 @@ declare global {
 				TELEGRAM_BOT_TOKEN?: string;
 				/** Chat, group, or channel the notifications go to. */
 				TELEGRAM_CHAT_ID?: string;
+				/** Topic id when the chat is a forum supergroup. */
+				TELEGRAM_THREAD_ID?: string;
 				/** Public URL of this install, linked from notifications. */
 				APP_URL?: string;
 			};
