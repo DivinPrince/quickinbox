@@ -231,12 +231,15 @@ export type ThreadMessage = {
 	attachments: EmailAttachmentMeta[];
 };
 
+export type AttachmentDisposition = 'attachment' | 'inline';
+
 export type EmailAttachmentMeta = {
 	id: string;
 	email_id: string;
 	filename: string;
 	content_type: string;
 	size_bytes: number;
+	content_disposition: AttachmentDisposition | null;
 	created_at: string;
 	/** MIME Content-ID, set when the part was referenced inline by the body. */
 	content_id: string | null;
@@ -246,4 +249,6 @@ export type OutboundAttachmentInput = {
 	filename: string;
 	type: string;
 	content: string;
+	disposition?: AttachmentDisposition;
+	contentId?: string;
 };

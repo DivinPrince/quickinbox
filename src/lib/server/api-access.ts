@@ -62,6 +62,16 @@ const BEARER_ROUTES: RouteRule[] = [
 		scopes: ['mail:send']
 	},
 	{
+		method: 'POST',
+		match: (pathname) => /^\/api\/mail\/[^/]+\/forward$/.test(pathname),
+		scopes: ['mail:send']
+	},
+	{
+		method: 'POST',
+		match: (pathname) => /^\/api\/mail\/thread\/[^/]+\/forward$/.test(pathname),
+		scopes: ['mail:send']
+	},
+	{
 		method: 'PATCH',
 		match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname),
 		scopes: ['mail:send']
@@ -147,6 +157,11 @@ const MOBILE_SESSION_ROUTES: Array<Pick<RouteRule, 'method' | 'match'>> = [
 	{ method: 'GET', match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname) },
 	{ method: 'GET', match: (pathname) => /^\/api\/drafts\/[^/]+$/.test(pathname) },
 	{ method: 'POST', match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname) },
+	{ method: 'POST', match: (pathname) => /^\/api\/mail\/[^/]+\/forward$/.test(pathname) },
+	{
+		method: 'POST',
+		match: (pathname) => /^\/api\/mail\/thread\/[^/]+\/forward$/.test(pathname)
+	},
 	{ method: 'PATCH', match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname) },
 	{ method: 'DELETE', match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname) },
 	{ method: 'GET', match: (pathname) => pathname === '/api/addresses' },

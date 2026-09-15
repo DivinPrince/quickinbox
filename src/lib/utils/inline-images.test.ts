@@ -10,6 +10,7 @@ function attachment(overrides: Partial<EmailAttachmentMeta> = {}): EmailAttachme
 		filename: 'shot.jpg',
 		content_type: 'image/jpeg',
 		size_bytes: 100,
+		content_disposition: null,
 		created_at: '2026-01-01T00:00:00.000Z',
 		content_id: 'ii_123',
 		...overrides

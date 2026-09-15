@@ -5,6 +5,7 @@ import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL } from './constants';
 import { recordUnroutedEmail, resolveInboundRoute } from './domains';
 import { collectInboundRecipients, parseEmailAddress } from './email-address';
 import { stripHtml } from './html';
+import { inboundAttachmentMetadata } from './inbound';
 import { emailExistsByProviderId, getThreadKey, insertEmail } from './mail-store';
 import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
 import { normalizeMessageId } from './send-mail';
@@ -137,11 +138,16 @@ export async function storeInboundAttachments(
 		}
 
 		try {
+			const metadata = inboundAttachmentMetadata({
+				disposition: attachment.disposition,
+				contentId: attachment.contentId,
+				related: attachment.related
+			});
 			await insertAttachmentBytes(env.DB, env.ATTACHMENTS, emailId, {
 				filename: attachment.filename || 'attachment',
 				type: attachment.mimeType || 'application/octet-stream',
 				bytes,
-				contentId: attachment.contentId ?? null
+				...metadata
 			});
 			stored.push({
 				filename: attachment.filename || 'attachment',
