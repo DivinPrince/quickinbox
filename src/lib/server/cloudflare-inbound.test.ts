@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { inboundSender } from './cloudflare-inbound';
+import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
+import type { Attachment } from 'postal-mime';
+import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL } from './constants';
+import { inboundSender, storeInboundAttachments } from './cloudflare-inbound';
 
 describe('inboundSender', () => {
 	test('prefers the From: header over the bounce envelope sender', () => {
@@ -40,5 +43,59 @@ describe('inboundSender', () => {
 
 	test('returns an empty string when neither is present', () => {
 		assert.equal(inboundSender(undefined, undefined), '');
+	});
+});
+
+function mockEnv(options: { failPut?: boolean } = {}) {
+	const bucket = {
+		async put() {
+			if (options.failPut) throw new Error('R2 unavailable');
+		}
+	} as unknown as R2Bucket;
+
+	const db = {
+		prepare() {
+			return {
+				bind() {
+					return { async run() {} };
+				}
+			};
+		}
+	} as unknown as D1Database;
+
+	return { DB: db, ATTACHMENTS: bucket };
+}
+
+function parsed(count: number, byteLength = 10): Attachment[] {
+	return Array.from({ length: count }, (_, i) => ({
+		filename: `file-${i}.txt`,
+		mimeType: 'text/plain',
+		disposition: 'attachment',
+		content: new ArrayBuffer(byteLength)
+	})) as unknown as Attachment[];
+}
+
+describe('storeInboundAttachments (Cloudflare)', () => {
+	test('returns what was stored', async () => {
+		assert.equal((await storeInboundAttachments(mockEnv(), 'email-1', parsed(3))).length, 3);
+	});
+
+	test('does not include empty or oversized parts', async () => {
+		// The count is what the reader can actually open, so parts we drop must
+		// not appear in the notification.
+		assert.equal((await storeInboundAttachments(mockEnv(), 'email-1', parsed(1, 0))).length, 0);
+		assert.equal((await storeInboundAttachments(mockEnv(), 'email-1', parsed(1, MAX_ATTACHMENT_BYTES + 1))).length, 0);
+	});
+
+	test('does not include an attachment whose storage fails', async () => {
+		assert.equal((await storeInboundAttachments(mockEnv({ failPut: true }), 'email-1', parsed(2))).length, 0);
+	});
+
+	test('stores no more than the per-message cap', async () => {
+		assert.equal((await storeInboundAttachments(mockEnv(), 'email-1', parsed(MAX_ATTACHMENTS_PER_EMAIL + 3))).length, MAX_ATTACHMENTS_PER_EMAIL);
+	});
+
+	test('handles a message with no attachments', async () => {
+		assert.equal((await storeInboundAttachments(mockEnv(), 'email-1', [])).length, 0);
 	});
 });

@@ -4,10 +4,13 @@
 		deletePushSubscription,
 		getPushSubscription,
 		isPushSubscriptionRegistered,
+		prewarmPushRegistration,
 		savePushSubscription,
 		subscribeToPush,
+		subscribeToPushImmediately,
 		subscriptionUsesPublicKey,
-		supportsWebPush
+		supportsWebPush,
+		unsubscribeSubscription
 	} from '$lib/push-client';
 	import { t } from '$lib/i18n';
 
@@ -31,6 +34,8 @@
 	let pushState = $state<PushState>('loading');
 	let pushBusy = $state(false);
 	let pushError = $state('');
+	/** Safari needs the worker warm before the click or it never prompts. */
+	let pushWorkerReady = $state(false);
 	const pushStatusLabel = $derived(
 		({
 			loading: t('notifications.checking'),
@@ -43,10 +48,12 @@
 		} satisfies Record<PushState, string>)[pushState]
 	);
 
+	/** Show a human-readable failure for the notification controls. */
 	function pushErrorMessage(error: unknown): string {
 		return error instanceof Error ? error.message : t('notifications.updateFailed');
 	}
 
+	/** Re-read the browser and server push state for the current account. */
 	async function refreshPushState() {
 		pushError = '';
 		if (!configured || !publicKey) {
@@ -81,35 +88,43 @@
 	}
 
 	$effect(() => {
+		if (configured && publicKey) {
+			void prewarmPushRegistration().then(() => {
+				pushWorkerReady = true;
+			});
+		}
 		void refreshPushState();
 	});
 
+	/** Subscribe from the click gesture itself so Safari prompts, falling back
+	 * to the async path when the worker could not be prewarmed. */
 	async function enableDesktopNotifications() {
 		if (!publicKey || !supportsWebPush()) return;
 		pushBusy = true;
 		pushError = '';
 		try {
-			const permission = await Notification.requestPermission();
-			if (permission !== 'granted') {
-				pushState = permission === 'denied' ? 'denied' : 'disabled';
-				pushError =
-					permission === 'denied'
-						? t('notifications.blockedHint')
-						: t('notifications.notGranted');
-				return;
-			}
-
-			const subscription = await subscribeToPush(publicKey);
+			// Safari only prompts when subscribe() is called straight from the
+			// click gesture; fall back to the async path elsewhere.
+			const subscription =
+				(await subscribeToPushImmediately(publicKey)) ?? (await subscribeToPush(publicKey));
 			await savePushSubscription(subscription);
 			pushState = 'enabled';
 		} catch (error) {
-			pushState = 'error';
-			pushError = pushErrorMessage(error);
+			if (error instanceof DOMException && error.name === 'NotAllowedError') {
+				pushState = 'denied';
+				pushError = t('notifications.blockedHint');
+				console.warn('Push subscribe rejected:', error.name, error.message);
+			} else {
+				pushState = 'error';
+				pushError = pushErrorMessage(error);
+				console.warn('Push enable failed:', error);
+			}
 		} finally {
 			pushBusy = false;
 		}
 	}
 
+	/** Remove this browser's push subscription locally and server-side. */
 	async function disableDesktopNotifications() {
 		pushBusy = true;
 		pushError = '';
@@ -117,7 +132,7 @@
 			const subscription = await getPushSubscription();
 			if (subscription) {
 				await deletePushSubscription(subscription);
-				const removed = await subscription.unsubscribe();
+				const removed = await unsubscribeSubscription(subscription);
 				if (!removed) throw new Error('The browser could not remove its push subscription');
 			}
 			pushState = 'disabled';
@@ -174,7 +189,7 @@
 				<button
 					type="button"
 					class="btn-primary"
-					disabled={pushBusy || pushState === 'loading'}
+					disabled={pushBusy || pushState === 'loading' || !pushWorkerReady}
 					onclick={enableDesktopNotifications}
 				>
 					{pushBusy ? t('notifications.enabling') : pushState === 'loading' ? t('notifications.checkingAction') : t('notifications.enable')}

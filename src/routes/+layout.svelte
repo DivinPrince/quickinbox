@@ -2,7 +2,7 @@
 	import './layout.css';
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/stores';
-	import favicon from '$lib/assets/favicon.svg';
+	import favicon from '$lib/assets/logo.png';
 	import { watchSystemTheme } from '$lib/theme';
 	import {
 		captureInstallPrompt,
@@ -12,14 +12,24 @@
 	} from '$lib/app-chrome';
 	import { setupMobileViewTransitions } from '$lib/view-transitions';
 	import { persistUiTheme } from '$lib/ui-theme/apply';
-import { persistLocale } from '$lib/i18n';
+	import { persistLocale } from '$lib/i18n';
 	import { getTheme } from '$lib/ui-theme/registry';
+	import MailboxLiveSync from '$lib/components/MailboxLiveSync.svelte';
 	import type { ThemeShellData } from '$lib/ui-theme/types';
 	import type { LayoutData } from './$types';
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
 
-	const showShell = $derived(Boolean(data.user) && $page.url.pathname !== '/onboarding');
+	const showShell = $derived(
+		Boolean(data.user) &&
+			$page.url.pathname !== '/onboarding' &&
+			$page.url.pathname !== '/account/setup' &&
+			// Signed-in users reach /login only to add another account; it is a
+			// standalone form, not a page inside the mailbox.
+			$page.url.pathname !== '/login' &&
+			// The OAuth consent screen is a focused, one-decision page.
+			$page.url.pathname !== '/oauth/authorize'
+	);
 	const ThemeShell = $derived(getTheme(data.uiTheme).Shell);
 	const shellData = $derived.by((): ThemeShellData | null => {
 		if (!data.user) return null;
@@ -28,6 +38,7 @@ import { persistLocale } from '$lib/i18n';
 			domains: data.domains,
 			addresses: data.addresses,
 			activeDomainId: data.activeDomainId,
+			accounts: data.accounts,
 			counts: data.counts,
 			uiTheme: data.uiTheme
 		};
@@ -71,7 +82,7 @@ import { persistLocale } from '$lib/i18n';
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="icon" type="image/png" href={favicon} />
 	{#if data.uiTheme === 'classic'}
 		<link
 			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
@@ -82,6 +93,7 @@ import { persistLocale } from '$lib/i18n';
 </svelte:head>
 
 {#if showShell && shellData}
+	<MailboxLiveSync />
 	<ThemeShell data={shellData}>
 		{@render children()}
 	</ThemeShell>

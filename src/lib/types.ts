@@ -3,7 +3,18 @@ export type User = {
 	email: string;
 	name: string;
 	is_admin: boolean;
+	must_change_password: boolean;
 	created_at: string;
+};
+
+/** An account signed in on this browser; shown in the account switcher. */
+export type LinkedAccount = {
+	id: string;
+	email: string;
+	name: string;
+	/** Default sending address, when the account has one. */
+	address: string | null;
+	current: boolean;
 };
 
 export type ApiScope = 'mail:send' | 'mail:read' | 'admin';
@@ -14,6 +25,19 @@ export type ApiTokenSummary = {
 	preview: string;
 	scopes: ApiScope[];
 	created_at: string;
+	last_used_at: string | null;
+};
+
+/** An MCP client the user authorized via OAuth, as shown in Settings. */
+export type ConnectedApp = {
+	client_id: string;
+	client_name: string;
+	client_uri: string | null;
+	logo_uri: string | null;
+	scopes: Extract<ApiScope, 'mail:read' | 'mail:send'>[];
+	/** Live token pairs for this client (usually one per device). */
+	sessions: number;
+	connected_at: string;
 	last_used_at: string | null;
 };
 
@@ -207,6 +231,8 @@ export type ThreadMessage = {
 	attachments: EmailAttachmentMeta[];
 };
 
+export type AttachmentDisposition = 'attachment' | 'inline';
+
 export type EmailAttachmentMeta = {
 	id: string;
 	email_id: string;
@@ -214,11 +240,10 @@ export type EmailAttachmentMeta = {
 	content_type: string;
 	size_bytes: number;
 	content_disposition: AttachmentDisposition | null;
-	content_id: string | null;
 	created_at: string;
+	/** MIME Content-ID, set when the part was referenced inline by the body. */
+	content_id: string | null;
 };
-
-export type AttachmentDisposition = 'attachment' | 'inline';
 
 export type OutboundAttachmentInput = {
 	filename: string;

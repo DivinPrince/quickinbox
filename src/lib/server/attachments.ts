@@ -60,6 +60,19 @@ export async function insertAttachments(
 	}
 }
 
+/**
+ * Content-ID arrives wrapped in angle brackets (`<ii_123@mail>`), while the
+ * body references it bare (`cid:ii_123@mail`). Store the bare, lowercased form
+ * so the two can be compared directly. Reject line breaks so a malformed value
+ * can never become a header-injection vector downstream.
+ */
+export function normalizeContentId(value: string | null | undefined): string | null {
+	if (typeof value !== 'string') return null;
+	if (/[\r\n]/.test(value)) return null;
+	const trimmed = value.trim().replace(/^<|>$/g, '').trim().toLowerCase();
+	return trimmed ? trimmed : null;
+}
+
 export async function insertAttachmentBytes(
 	db: D1Database,
 	bucket: R2Bucket,
@@ -226,24 +239,6 @@ function buildStorageKey(emailId: string, attachmentId: string, filename: string
 
 function normalizeDisposition(value: unknown): AttachmentDisposition | null {
 	return value === 'attachment' || value === 'inline' ? value : null;
-}
-
-/**
- * Store Content-ID values without MIME angle brackets. Reject line breaks so a
- * malformed value can never become a header-injection vector downstream.
- */
-export function normalizeContentId(value: string | null | undefined): string | null {
-	if (typeof value !== 'string') return null;
-
-	const trimmed = value.trim();
-	if (!trimmed || /[\r\n]/.test(trimmed)) return null;
-
-	if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
-		const unwrapped = trimmed.slice(1, -1).trim();
-		return unwrapped || null;
-	}
-
-	return trimmed;
 }
 
 function base64ToBytes(base64: string): Uint8Array {

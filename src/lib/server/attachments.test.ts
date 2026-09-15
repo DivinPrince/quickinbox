@@ -247,6 +247,7 @@ test('list and get attachment metadata normalize Content-ID values', async () =>
 test('normalizing Content-ID is tolerant of legacy values and rejects line breaks', () => {
 	assert.equal(normalizeContentId(' <logo@example.test> '), 'logo@example.test');
 	assert.equal(normalizeContentId('logo@example.test'), 'logo@example.test');
+	assert.equal(normalizeContentId('<II_123@Mail>'), 'ii_123@mail');
 	assert.equal(normalizeContentId(null), null);
 	assert.equal(normalizeContentId('  '), null);
 	assert.equal(normalizeContentId('logo@example.test\r\nX-Injected: yes'), null);

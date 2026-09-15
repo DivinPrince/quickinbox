@@ -94,6 +94,18 @@ test('document head asks for a standalone home-screen app', () => {
 	assert.match(html, /apple-touch-startup-image/);
 });
 
+test('Zero phone chrome clears the iOS status bar and keeps tap targets large', () => {
+	const css = readFileSync(join(root, 'src/themes/zero/shell.css'), 'utf8');
+	const phone = css.split('@media (max-width: 767px)')[1] ?? '';
+	assert.match(phone, /\.z-list-head[\s\S]*safe-area-inset-top/);
+	assert.match(phone, /\.z-settings-bar[\s\S]*safe-area-inset-top/);
+	assert.match(phone, /\.z-thread-bar[\s\S]*safe-area-inset-top/);
+	assert.match(phone, /data-mobile-open='true'\] \.z-sidebar[\s\S]*safe-area-inset-top/);
+	assert.match(phone, /\.z-mobile-nav a[\s\S]*min-width:\s*var\(--touch-target\)/);
+	assert.match(phone, /\.z-mobile-nav a[\s\S]*min-height:\s*var\(--touch-target\)/);
+	assert.match(phone, /\.z-list-tools \.z-icon-btn[\s\S]*--touch-target/);
+});
+
 test('phone gestures follow the 900px shell, not desktop pointer type', () => {
 	for (const file of [
 		'src/lib/components/SwipeBack.svelte',
@@ -112,7 +124,7 @@ test('stacked swipe wrapper does not become a phone column on desktop', () => {
 });
 
 test('compose is not a centred reading column on desktop', () => {
-	const source = readFileSync(join(root, 'src/routes/+layout.svelte'), 'utf8');
+	const source = readFileSync(join(root, 'src/themes/classic/Shell.svelte'), 'utf8');
 	assert.match(source, /const NARROW = \['\/mail', '\/settings'\]/);
 	assert.doesNotMatch(source, /NARROW = \[[^\]]*\/compose/);
 });
@@ -129,7 +141,20 @@ test('service worker is a classic worker, not a Vite module', () => {
 	const source = readFileSync(join(root, 'src/service-worker.ts'), 'utf8');
 	assert.match(source, /addEventListener\('install'/);
 	assert.match(source, /addEventListener\('push'/);
+	assert.match(source, /postMessage/);
+	assert.match(source, /mail:changed/);
 	assert.doesNotMatch(source, /import\s+['"]\/@fs/);
+});
+
+test('signed-in shell refreshes the mailbox without a manual reload', () => {
+	const layout = readFileSync(join(root, 'src/routes/+layout.svelte'), 'utf8');
+	assert.match(layout, /MailboxLiveSync/);
+	const live = readFileSync(join(root, 'src/lib/mail/live.ts'), 'utf8');
+	assert.match(live, /mailboxSyncUrl/);
+	assert.match(live, /startMailboxLiveSync/);
+	assert.match(live, /MAIL_CHANGED_MESSAGE/);
+	const sync = readFileSync(join(root, 'src/lib/mail/sync.ts'), 'utf8');
+	assert.match(sync, /\/api\/mail\/sync/);
 });
 
 test('PWA manifest is standalone and points at real icons', () => {

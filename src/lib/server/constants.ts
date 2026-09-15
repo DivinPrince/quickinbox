@@ -5,6 +5,13 @@ export {
 } from '$lib/constants';
 export const SESSION_COOKIE = 'mail_session';
 export const SESSION_DAYS = 7;
+/**
+ * Other signed-in accounts in this browser: a JSON array of their session tokens.
+ * `SESSION_COOKIE` is always the active one, so everything downstream stays single-user.
+ */
+export const LINKED_SESSIONS_COOKIE = 'mail_accounts';
+/** Active account plus linked ones. Keeps the cookie small and the switcher usable. */
+export const MAX_LINKED_ACCOUNTS = 5;
 /** Bearer-token sessions (mobile) live longer; still revocable at any time. */
 export const MOBILE_SESSION_DAYS = 90;
 /** One-time pairing codes are valid for this long after creation. */

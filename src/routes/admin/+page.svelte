@@ -361,6 +361,9 @@
 									.map((address) => address.address)
 									.join(', ') || user.email}
 							</p>
+							{#if user.must_change_password}
+								<p class="user-status">{t('admin.pendingAccountSetup')}</p>
+							{/if}
 						</div>
 						{#if user.id === data.user?.id}
 							{#if user.is_admin}
@@ -493,6 +496,12 @@
 		margin-top: 0.375rem;
 		font-size: 0.8125rem;
 		line-height: 1.5;
+		color: var(--color-muted);
+	}
+
+	.user-status {
+		margin-top: 0.1875rem;
+		font-size: 0.6875rem;
 		color: var(--color-muted);
 	}
 

@@ -1,7 +1,7 @@
 import type { D1Database, ExecutionContext, R2Bucket } from '@cloudflare/workers-types';
 import type { ApiScope, AuthMethod } from '$lib/server/api-access';
 import type { CloudflareSendEmailBinding } from '$lib/server/providers/cloudflare-provider';
-import type { Domain, MailAddress, User } from '$lib/types';
+import type { Domain, LinkedAccount, MailAddress, User } from '$lib/types';
 
 declare global {
 	namespace App {
@@ -26,6 +26,14 @@ declare global {
 				VAPID_PRIVATE_KEY?: string;
 				/** A mailto: or https: contact URI for Web Push. */
 				VAPID_SUBJECT?: string;
+				/** Bot token from @BotFather — enables Telegram notifications. */
+				TELEGRAM_BOT_TOKEN?: string;
+				/** Chat, group, or channel the notifications go to. */
+				TELEGRAM_CHAT_ID?: string;
+				/** Topic id when the chat is a forum supergroup. */
+				TELEGRAM_THREAD_ID?: string;
+				/** Public URL of this install, linked from notifications. */
+				APP_URL?: string;
 			};
 		}
 		interface Locals {
@@ -43,6 +51,8 @@ declare global {
 			activeDomainId: string | null;
 			/** Server-only id of the session credential used for this request. */
 			currentSessionId: string | null;
+			/** Every account signed in on this browser (active first). Page requests only. */
+			accounts: LinkedAccount[];
 			/** Active UI theme id (Zero, Classic, or a drop-in folder). */
 			uiTheme: string;
 			/** Active UI locale (en, fr, zh-CN, es). */

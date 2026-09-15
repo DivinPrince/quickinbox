@@ -136,6 +136,19 @@ export async function insertEmail(
 	return id;
 }
 
+/**
+ * The id a thread is addressed by in the UI (`/inbox?thread=…`). A message that
+ * starts a conversation has no `thread_id` of its own and stands in for it.
+ */
+export async function getThreadKey(db: D1Database, emailId: string): Promise<string> {
+	const row = await db
+		.prepare('SELECT COALESCE(thread_id, id) AS thread_key FROM emails WHERE id = ?')
+		.bind(emailId)
+		.first<{ thread_key: string }>();
+
+	return row?.thread_key ?? emailId;
+}
+
 /** Already stored? Resend retries webhooks, so inbound writes must be idempotent. */
 export async function emailExistsByProviderId(
 	db: D1Database,
@@ -429,6 +442,38 @@ export async function listEmails(
 		status: row.status === 'draft' ? null : row.status,
 		created_at: row.created_at
 	}));
+}
+
+/**
+ * Cheap "has anything been inserted or deleted?" fingerprint. Flag changes
+ * (read, star, archive) do not move this, so a live poll can refresh on new
+ * mail without fighting the user's current selection.
+ */
+export function encodeMailboxCursor(messageCount: number, latestRowid: number): string {
+	return `${messageCount}:${latestRowid}`;
+}
+
+export async function getMailboxCursor(
+	db: D1Database,
+	userId: string,
+	domainId?: string | null
+): Promise<string> {
+	const bindings: unknown[] = [userId];
+	let scope = 'user_id = ?';
+	if (domainId) {
+		scope += ' AND domain_id = ?';
+		bindings.push(domainId);
+	}
+
+	const row = await db
+		.prepare(
+			`SELECT COUNT(*) AS message_count, COALESCE(MAX(rowid), 0) AS latest_rowid
+			 FROM emails WHERE ${scope}`
+		)
+		.bind(...bindings)
+		.first<{ message_count: number | string | null; latest_rowid: number | string | null }>();
+
+	return encodeMailboxCursor(Number(row?.message_count ?? 0), Number(row?.latest_rowid ?? 0));
 }
 
 /**
@@ -818,7 +863,8 @@ export async function listThreadMessages(
 	const placeholders = results.map(() => '?').join(', ');
 	const { results: files } = await db
 		.prepare(
-			`SELECT id, email_id, filename, content_type, size_bytes, created_at
+			`SELECT id, email_id, filename, content_type, size_bytes,
+			        content_disposition, content_id, created_at
 			 FROM email_attachments
 			 WHERE email_id IN (${placeholders})
 			 ORDER BY created_at ASC`

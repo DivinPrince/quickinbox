@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page as currentPage } from '$app/stores';
 	import Icon from './Icon.svelte';
@@ -63,10 +64,10 @@
 	let pressY = 0;
 
 	$effect(() => {
-		items = mailbox.threads;
-		selected = [];
-		selecting = false;
-		hadSelection = false;
+		const next = mailbox.threads;
+		items = next;
+		const ids = new Set(next.map((thread) => thread.thread_id));
+		selected = untrack(() => selected).filter((id) => ids.has(id));
 	});
 
 	$effect(() => {

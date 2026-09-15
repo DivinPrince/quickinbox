@@ -58,6 +58,7 @@
 
 	.mark {
 		display: flex;
+		overflow: hidden;
 		border-radius: 0.775rem;
 		box-shadow: var(--shadow-sm);
 		animation: mark-in 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;

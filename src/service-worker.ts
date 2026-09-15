@@ -25,6 +25,13 @@ function stringValue(value: unknown, fallback: string): string {
 	return typeof value === 'string' && value.trim() ? value.trim() : fallback;
 }
 
+async function notifyOpenClients(): Promise<void> {
+	const windows = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
+	for (const client of windows) {
+		client.postMessage({ type: 'mail:changed' });
+	}
+}
+
 function readPushPayload(event: PushEvent): PushPayload {
 	if (!event.data) return {};
 	try {
@@ -61,6 +68,7 @@ worker.addEventListener('push', (event: PushEvent) => {
 	event.waitUntil(
 		(async () => {
 			if (!(await currentAccountOwnsSubscription())) return;
+			await notifyOpenClients();
 			await worker.registration.showNotification(stringValue(payload.title, 'New message'), {
 				body: stringValue(payload.body, 'You received a new email.'),
 				icon: '/icons/icon-192.png',

@@ -17,7 +17,8 @@
 	import { APP_NAME } from '$lib/constants';
 	import { formatDeviceActivity } from '$lib/device-activity';
 	import { intlLocale, t } from '$lib/i18n';
-	import type { ApiTokenSummary, Domain, MailAddress } from '$lib/types';
+	import { clientBrand, clientInitials } from '$lib/oauth-brand';
+	import type { ApiTokenSummary, ConnectedApp, Domain, MailAddress } from '$lib/types';
 	import type { SettingsSection } from '$lib/settings-section';
 	import UiThemePicker from './UiThemePicker.svelte';
 	import LocalePicker from './LocalePicker.svelte';
@@ -40,6 +41,7 @@
 		push: { configured: boolean; publicKey: string | null };
 		isAdmin: boolean;
 		devices: DeviceSession[];
+		connectedApps: ConnectedApp[];
 	};
 
 	let {
@@ -192,6 +194,45 @@
 	const canCreateKey = $derived(
 		Boolean(keyName.trim()) && (sendScope || readScope || (data.isAdmin && adminScope))
 	);
+
+	// Hosted MCP: the URL AI clients connect to, and the apps that already did.
+	const mcpUrl = $derived(`${$page.url.origin}/mcp`);
+	let mcpCopied = $state(false);
+	let editedApps = $state<ConnectedApp[] | null>(null);
+	const connectedApps = $derived(editedApps ?? data.connectedApps);
+	let disconnectingApp = $state('');
+	let appError = $state('');
+
+	async function copyMcpUrl() {
+		try {
+			await navigator.clipboard.writeText(mcpUrl);
+			mcpCopied = true;
+			setTimeout(() => (mcpCopied = false), 1600);
+		} catch {
+			/* clipboard unavailable — the URL is still selectable */
+		}
+	}
+
+	async function disconnectApp(app: ConnectedApp) {
+		if (!confirm(t('settings.disconnectAppConfirm', { name: app.client_name }))) return;
+		disconnectingApp = app.client_id;
+		appError = '';
+		try {
+			const res = await fetch(`/api/oauth/grants?client_id=${encodeURIComponent(app.client_id)}`, {
+				method: 'DELETE'
+			});
+			const body = await res.json();
+			if (!res.ok) {
+				appError = body.error ?? t('settings.couldNotDisconnectApp');
+				return;
+			}
+			editedApps = body.apps;
+		} catch {
+			appError = t('common.networkError');
+		} finally {
+			disconnectingApp = '';
+		}
+	}
 
 	function openCreate() {
 		keyName = '';
@@ -823,6 +864,62 @@
 				<Icon name={installCopied ? 'check-line' : 'file-copy-line'} size={15} />
 			</button>
 		</div>
+	</section>
+
+	<section class="surface-lg card">
+		<h2><Icon name="robot-2-line" size={18} /> {t('settings.mcp')}</h2>
+		<p class="card-hint">{t('settings.mcpHint')}</p>
+
+		<div class="install-row">
+			<code>{mcpUrl}</code>
+			<button type="button" class="icon-btn" aria-label={t('settings.copyMcpUrl')} onclick={copyMcpUrl}>
+				<Icon name={mcpCopied ? 'check-line' : 'file-copy-line'} size={15} />
+			</button>
+		</div>
+
+		<h3 class="sub-head">{t('settings.connectedApps')}</h3>
+		{#if connectedApps.length}
+			<ul class="key-list">
+				{#each connectedApps as app (app.client_id)}
+					{@const brand = clientBrand(app)}
+					<li class="key-row app-row">
+						<span class="app-tile" style={brand ? `--tile: ${brand.color}` : undefined} aria-hidden="true">
+							{#if app.logo_uri}
+								<img src={app.logo_uri} alt="" referrerpolicy="no-referrer" />
+							{:else if brand}
+								<Icon name={brand.icon} size={18} />
+							{:else}
+								{clientInitials(app.client_name)}
+							{/if}
+						</span>
+						<div class="min-w-0 flex-1">
+							<p class="key-name">{app.client_name}</p>
+							<p class="key-meta">
+								<span class="caps">
+									{#each app.scopes as scope (scope)}<span class="chip">{scope}</span>{/each}
+								</span>
+								<span>
+									{app.last_used_at
+										? t('settings.lastUsed', { date: formatDate(app.last_used_at) })
+										: t('settings.connectedOn', { date: formatDate(app.connected_at) })}
+								</span>
+							</p>
+						</div>
+						<button
+							type="button"
+							class="btn-ghost text-xs"
+							disabled={disconnectingApp === app.client_id}
+							onclick={() => disconnectApp(app)}
+						>
+							{disconnectingApp === app.client_id ? t('common.disconnecting') : t('common.disconnect')}
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<p class="empty">{t('settings.noConnectedApps')}</p>
+		{/if}
+		{#if appError}<p class="error" role="alert">{appError}</p>{/if}
 	</section>
 
 	<section class="surface-lg card">
@@ -1557,6 +1654,44 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.375rem;
+	}
+
+	.sub-head {
+		margin-top: 1.25rem;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--color-muted);
+	}
+
+	.app-row {
+		gap: 0.75rem;
+	}
+
+	.app-tile {
+		display: grid;
+		flex-shrink: 0;
+		place-items: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		overflow: hidden;
+		border-radius: 26%;
+		font-size: 0.75rem;
+		font-weight: 600;
+		background: var(--tile, var(--color-surface-muted));
+		color: var(--color-text);
+		box-shadow: inset 0 0 0 1px var(--color-line);
+	}
+
+	.app-tile[style] {
+		color: #fff;
+	}
+
+	.app-tile img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 
 	.key-list {

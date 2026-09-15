@@ -16,6 +16,7 @@ no servers to maintain.
 - **Multiple domains and users** — per-user addresses, admin catch-all, unrouted-mail view; the combined inbox tags each conversation with the address it arrived on and can filter by it
 - **Delivery status** — delivered / bounced / complained tracking
 - **REST API, CLI, and MCP server** — send and read mail from scripts, the terminal, or AI agents
+- **Hosted MCP with OAuth** — paste `https://your-instance/mcp` into Claude, Cursor, or ChatGPT and approve access in the browser; disconnect apps from Settings
 - Light and dark themes
 
 ## Quick start
@@ -26,6 +27,14 @@ Click **Deploy to Cloudflare** above, or run the setup wizard locally:
 bun run setup
 # if bun isn't installed yet:
 bash scripts/setup.sh
+```
+
+The button's deploy command applies D1 migrations (the `users` table and the
+rest of the schema). If an older deploy left you with `no such table: users`,
+run this once against that Worker, then reload:
+
+```bash
+npx wrangler d1 migrations apply DB --remote
 ```
 
 The wizard creates the D1 database and R2 bucket, writes config, and onboards
@@ -169,6 +178,15 @@ Inbound mail only works on a **deployed** Worker (or `bun run preview`) —
 
 Send yourself a message from another account — it should land within seconds.
 
+### Several accounts in one browser
+
+If you have access to more than one mailbox on the same instance, use
+**Add account** in the account menu to sign in to another one without signing
+out. The menu then lists every signed-in account; pick one to switch (up to 5).
+**Log out** leaves only the active account and drops you into the next one;
+**Log out of all accounts** ends every session. Each account keeps its own
+session, so revoking one from Settings → Devices does not affect the others.
+
 ### Desktop notifications (optional)
 
 Quickinbox can push-notify users about new mail even with no tab open:
@@ -184,6 +202,31 @@ bun run deploy
 
 Users opt in under **Settings → Desktop notifications**. Don't rotate the key
 pair after users subscribe, or they'll have to re-enable.
+
+### Telegram notifications (optional)
+
+Every inbound message can also ping a Telegram chat — useful for a mailbox you
+watch from your phone without installing anything:
+
+```bash
+bunx wrangler secret put TELEGRAM_BOT_TOKEN   # from @BotFather
+bunx wrangler secret put TELEGRAM_CHAT_ID     # from @userinfobot; negative for groups
+bun run deploy
+```
+
+If the chat is a forum supergroup, add `TELEGRAM_THREAD_ID` for the topic to
+post into — without it Telegram puts the message in General. Add `APP_URL` to
+`vars` in `wrangler.jsonc` to link your install from each notification. Both secrets are required — leave either unset and notifications
+stay off. This works on both provider tracks, and mail that matched no mailbox
+is announced too, so a missing route is visible instead of silent.
+
+Each message arrives as a single rich message — subject, sender, the body in
+an expandable quote, every attachment inline with its size, and a link straight
+to the conversation. That needs Bot API 10.1; against an older API the call
+fails and the notification falls back to a text card followed by the files.
+
+Delivery is fire-and-forget: a Telegram outage is logged and ignored rather
+than failing the inbound handler, which the provider would then retry.
 
 ## Development
 
@@ -231,7 +274,42 @@ curl https://your-worker/api/mail \
 shown once. Revoking a key takes effect immediately. New keys start with
 `qi_live_`; existing `qm_live_` keys keep working after you pull this update.
 
-## CLI and MCP
+## MCP (hosted, with OAuth)
+
+Every instance is a remote MCP server. Add its URL to Claude, Cursor, ChatGPT,
+or any client that speaks Streamable HTTP, and the client walks you through a
+sign-in in the browser — no API key to paste:
+
+```
+https://mail.example.com/mcp
+```
+
+The consent screen shows which app is asking (with its real logo), exactly
+what it will be allowed to do, and which of your signed-in accounts it will act
+as. Approve, and the client receives an OAuth token scoped to that account.
+Disconnect any app later from **Settings › Connections › AI assistants (MCP)**;
+its tokens stop working immediately.
+
+Tools: `whoami`, `list_threads`, `search_mail`, `get_thread`, `list_attachments`
+(scope `mail:read`), `send_message`, `reply`, `update_thread` (scope `mail:send`).
+A client that asks for only `mail:read` never sees the send tools.
+
+Under the hood this is a standard OAuth 2.1 authorization server (RFC 8414 and
+RFC 9728 discovery, RFC 7591 dynamic registration, PKCE S256, refresh-token
+rotation with reuse detection, RFC 7009 revocation); public clients only. A
+`qi_live_` API key also works as a bearer token on `/mcp`, so existing CLI
+setups can point at it too.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `/.well-known/oauth-protected-resource/mcp` | Which server issues tokens for `/mcp` |
+| `/.well-known/oauth-authorization-server` | Endpoint list, scopes, PKCE methods |
+| `POST /oauth/register` | Dynamic client registration |
+| `GET /oauth/authorize` | Consent screen |
+| `POST /oauth/token` | Code exchange and refresh |
+| `POST /oauth/revoke` | Revoke a token |
+
+## CLI and MCP (local)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickinbox/main/scripts/install.sh | sh
@@ -240,7 +318,8 @@ quickinbox inbox
 quickinbox send --to someone@example.com --subject "Hi" --body "Hello"
 ```
 
-The same credentials drive an MCP server for Claude, Cursor, and other agents:
+The same credentials drive a local stdio MCP server, useful when a client cannot
+do OAuth or you want several instances behind one server (see below):
 
 ```json
 {
@@ -261,8 +340,38 @@ The same credentials drive an MCP server for Claude, Cursor, and other agents:
 `quickmail` is the same binary. Login once, or set `QUICKINBOX_URL` and
 `QUICKINBOX_TOKEN` as above (`QUICKMAIL_URL` / `QUICKMAIL_TOKEN` still work).
 
-Tools: `list_threads`, `get_thread`, `search_mail`, `send_message`, `reply`,
-`list_attachments`.
+Tools: `list_accounts`, `list_threads`, `get_thread`, `search_mail`,
+`send_message`, `reply`, `list_attachments`.
+
+### Multiple accounts
+
+If you have inboxes on several Quickinbox instances, log in to each one. Every
+login is saved as an account (named after the host unless you pass `--account`);
+the first one becomes the default.
+
+```bash
+quickinbox login --url https://mail.alter.rw --token qi_live_… --account alter
+quickinbox login --url https://mail.cursorrwanda.com --token qi_live_… --account rwanda
+quickinbox accounts                 # * alter  https://mail.alter.rw
+                                    #   rwanda https://mail.cursorrwanda.com
+quickinbox inbox --all-accounts     # every inbox in one list, tagged [alter] / [rwanda]
+quickinbox search invoice --all-accounts
+quickinbox read <id> --account rwanda
+quickinbox accounts use rwanda      # change the default
+quickinbox logout --account alter   # or `logout --all`
+```
+
+Every command takes `--account <name>` (`-a`). `QUICKINBOX_ACCOUNT` selects the
+default; `QUICKINBOX_URL` + `QUICKINBOX_TOKEN` add an account that always wins.
+
+The MCP server exposes all saved accounts at once. Each tool accepts an optional
+`account`; `list_threads` and `search_mail` query every account when it is
+omitted and tag each thread with its `account`, while `get_thread`, `reply`, and
+`list_attachments` find the account that owns the id automatically. Use
+`list_accounts` to see what is configured. `send_message` uses the default
+account unless told otherwise. Config lives in
+`~/.config/quickinbox/config.json`; an existing single-account file keeps
+working and is upgraded on the next login.
 
 ## Internationalization
 

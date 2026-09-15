@@ -2,13 +2,20 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { User } from '$lib/types';
-import { deleteUser, getAuthenticatedSession, setUserAdmin } from './auth';
+import {
+	completeFirstLogin,
+	deleteUser,
+	getAuthenticatedSession,
+	setUserAdmin
+} from './auth';
+import { hashPassword } from './crypto';
 
 const actor: User = {
 	id: 'admin-1',
 	email: 'ada@example.com',
 	name: 'Ada',
 	is_admin: true,
+	must_change_password: false,
 	created_at: '2026-01-01T00:00:00.000Z'
 };
 
@@ -17,6 +24,7 @@ const targetRow = {
 	email: 'grace@example.com',
 	name: 'Grace',
 	is_admin: 1,
+	must_change_password: 0,
 	created_at: '2026-01-02T00:00:00.000Z'
 };
 
@@ -159,6 +167,7 @@ describe('deleteUser', () => {
 			'addresses',
 			'sessions',
 			'api_tokens',
+			'pairing_codes',
 			'push_subscriptions'
 		]) {
 			assert.ok(
@@ -299,6 +308,98 @@ describe('setUserAdmin', () => {
 	});
 });
 
+describe('completeFirstLogin', () => {
+	test('updates the name and password while clearing the setup requirement', async () => {
+		const statements: string[] = [];
+		const temporaryPasswordHash = await hashPassword('temporary-password');
+		const db = {
+			prepare(sql: string) {
+				return {
+					bind(..._args: unknown[]) {
+						return {
+							sql,
+							async first() {
+								return { password_hash: temporaryPasswordHash };
+							},
+							async run() {
+								statements.push(sql);
+								return { meta: { changes: 1 } };
+							}
+						};
+					}
+				};
+			},
+			async batch(batch: { sql: string }[]) {
+				statements.push(...batch.map((statement) => statement.sql));
+				return batch.map(() => ({ meta: { changes: 1 }, results: [] }));
+			}
+		} as unknown as D1Database;
+
+		await completeFirstLogin(db, actor.id, {
+			name: 'Ada Lovelace',
+			password: 'correct-horse'
+		});
+
+		assert.match(statements[0], /must_change_password = 0/);
+		assert.match(statements[0], /must_change_password = 1/);
+		const sessionDelete = statements.find((sql) => sql.includes('DELETE FROM sessions'));
+		const tokenDelete = statements.find((sql) => sql.includes('DELETE FROM api_tokens'));
+		assert.match(sessionDelete ?? '', /password_hash = \?/);
+		assert.match(tokenDelete ?? '', /password_hash = \?/);
+	});
+
+	test('refuses a repeated completion attempt', async () => {
+		const db = {
+			prepare() {
+				return {
+					bind() {
+						return {
+							async first() {
+								return null;
+							}
+						};
+					}
+				};
+			}
+		} as unknown as D1Database;
+
+		await assert.rejects(
+			() =>
+				completeFirstLogin(db, actor.id, {
+					name: actor.name,
+					password: 'correct-horse'
+				}),
+			/setup is already complete/
+		);
+	});
+
+	test('requires a password different from the temporary password', async () => {
+		const temporaryPasswordHash = await hashPassword('temporary-password');
+		const db = {
+			prepare() {
+				return {
+					bind() {
+						return {
+							async first() {
+								return { password_hash: temporaryPasswordHash };
+							}
+						};
+					}
+				};
+			}
+		} as unknown as D1Database;
+
+		await assert.rejects(
+			() =>
+				completeFirstLogin(db, actor.id, {
+					name: actor.name,
+					password: 'temporary-password'
+				}),
+			/different from the temporary password/
+		);
+	});
+});
+
 describe('getAuthenticatedSession', () => {
 	test('does not rewrite a recent zoned mobile activity timestamp', async () => {
 		let updates = 0;
@@ -316,6 +417,7 @@ describe('getAuthenticatedSession', () => {
 									email: actor.email,
 									name: actor.name,
 									is_admin: 1,
+									must_change_password: 0,
 									created_at: actor.created_at
 								};
 							},

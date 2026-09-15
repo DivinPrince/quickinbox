@@ -1,13 +1,16 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { invalidateAll } from '$app/navigation';
 	import EmailBody from '$lib/components/EmailBody.svelte';
+	import { resolveInlineImages, visibleAttachments } from '$lib/utils/inline-images';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { formatMailDate, formatMailTime, shouldShowSeparateTime } from '$lib/utils/date';
 	import { attachmentHref } from '$lib/utils/attachments';
 	import { runMailAction } from '$lib/mail/client';
+	import { MAIL_CHANGED_MESSAGE } from '$lib/mail/sync';
 	import { initials, parseAddressList, type AddressPart } from '$lib/mail/folders';
 	import { t } from '$lib/i18n';
 	import type { MailAddress, MailboxView, OutboundAttachmentInput, ThreadMessage } from '$lib/types';
@@ -82,28 +85,47 @@
 		replyOpen = false;
 		detailsFor = null;
 		menuFor = null;
-		void fetch(`/api/mail/${current}`)
-			.then(async (response) => {
-				const body = (await response.json()) as ThreadPayload & { error?: string };
-				if (cancelled) return;
-				if (!response.ok) {
-					error = body.error ?? t('thread.couldNotLoad');
-					thread = null;
-					return;
-				}
-				thread = body;
-				const last = body.messages[body.messages.length - 1];
-				opened = new Set(last ? [last.id] : []);
-				onRead?.(body.threadId);
-			})
-			.catch(() => {
-				if (!cancelled) error = t('common.networkError');
-			})
-			.finally(() => {
-				if (!cancelled) loading = false;
-			});
+
+		const load = (resetUi: boolean) => {
+			if (resetUi) loading = true;
+			return fetch(`/api/mail/${current}`)
+				.then(async (response) => {
+					const body = (await response.json()) as ThreadPayload & { error?: string };
+					if (cancelled) return;
+					if (!response.ok) {
+						if (resetUi) {
+							error = body.error ?? t('thread.couldNotLoad');
+							thread = null;
+						}
+						return;
+					}
+					thread = body;
+					const last = body.messages[body.messages.length - 1];
+					if (resetUi) {
+						opened = new Set(last ? [last.id] : []);
+					} else if (last) {
+						opened = new Set([...untrack(() => opened), last.id]);
+					}
+					onRead?.(body.threadId);
+				})
+				.catch(() => {
+					if (!cancelled && resetUi) error = t('common.networkError');
+				})
+				.finally(() => {
+					if (!cancelled) loading = false;
+				});
+		};
+
+		void load(true);
+
+		const onMailChanged = () => {
+			void load(false);
+		};
+		window.addEventListener(MAIL_CHANGED_MESSAGE, onMailChanged);
+
 		return () => {
 			cancelled = true;
+			window.removeEventListener(MAIL_CHANGED_MESSAGE, onMailChanged);
 		};
 	});
 
@@ -572,17 +594,18 @@
 					</div>
 
 					{#if isOpen}
+						{@const files = visibleAttachments(message.body_html, message.attachments)}
 						<div class="z-msg-body">
 							<div class="z-msg-html">
 								{#if message.body_html}
-									<EmailBody html={message.body_html} />
+									<EmailBody html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
 								{:else}
 									<pre class="z-msg-text">{message.body_text}</pre>
 								{/if}
 							</div>
-							{#if message.attachments.length > 0}
+							{#if files.length > 0}
 								<div class="z-attach-row">
-									{#each message.attachments as file (file.id)}
+									{#each files as file (file.id)}
 										<a
 											class="z-attach-file"
 											href={attachmentHref(message.id, file.id)}

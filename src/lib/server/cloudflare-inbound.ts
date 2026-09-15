@@ -4,10 +4,16 @@ import { insertAttachmentBytes } from './attachments';
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL } from './constants';
 import { recordUnroutedEmail, resolveInboundRoute } from './domains';
 import { collectInboundRecipients, parseEmailAddress } from './email-address';
-import { emailExistsByProviderId, insertEmail } from './mail-store';
+import { stripHtml } from './html';
+import { inboundAttachmentMetadata } from './inbound';
+import { emailExistsByProviderId, getThreadKey, insertEmail } from './mail-store';
 import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
 import { normalizeMessageId } from './send-mail';
-import { inboundAttachmentMetadata } from './inbound';
+import {
+	scheduleTelegramNotification,
+	type StoredAttachment,
+	type TelegramNotificationEnv
+} from './telegram-notify';
 
 export type CloudflareInboundMessage = {
 	readonly from: string;
@@ -17,9 +23,10 @@ export type CloudflareInboundMessage = {
 	setReject(reason: string): void;
 };
 
-export type CloudflareInboundEnv = PushNotificationEnv & {
-	ATTACHMENTS: R2Bucket;
-};
+export type CloudflareInboundEnv = PushNotificationEnv &
+	TelegramNotificationEnv & {
+		ATTACHMENTS: R2Bucket;
+	};
 
 /**
  * Email Routing delivers the full MIME on `message.raw`. Parse once, then reuse
@@ -62,13 +69,22 @@ export async function handleCloudflareInbound(
 	const route = await resolveInboundRoute(env.DB, recipients);
 
 	if (!route) {
-		await recordUnroutedEmail(env.DB, {
+		const recorded = await recordUnroutedEmail(env.DB, {
 			providerId,
 			from,
 			to: recipients.join(', ') || envelopeTo || '(unknown)',
 			subject,
 			reason: 'No matching address and no catch-all for this domain'
 		});
+		if (recorded) {
+			scheduleTelegramNotification(env, {
+				from,
+				to: recipients.join(', ') || envelopeTo || '(unknown)',
+				subject,
+				body: parsed.text ?? (parsed.html ? stripHtml(parsed.html) : null),
+				unrouted: true
+			});
+		}
 		return;
 	}
 
@@ -90,20 +106,31 @@ export async function handleCloudflareInbound(
 		providerId
 	});
 
-	await storeInboundAttachments(env, emailId, parsed.attachments);
+	const storedAttachments = await storeInboundAttachments(env, emailId, parsed.attachments);
 	await scheduleNewMailNotification(env, {
 		emailId,
 		userId: route.userId,
 		from: sender?.name || from,
 		subject
 	});
+	scheduleTelegramNotification(env, {
+		from: sender?.name ? `${sender.name} <${from}>` : from,
+		to: route.address,
+		subject,
+		body: parsed.text ?? (parsed.html ? stripHtml(parsed.html) : null),
+		attachments: storedAttachments,
+		threadKey: await getThreadKey(env.DB, emailId)
+	});
 }
 
-async function storeInboundAttachments(
+/** Returns the attachments that actually made it into storage. */
+export async function storeInboundAttachments(
 	env: CloudflareInboundEnv,
 	emailId: string,
 	attachments: Attachment[]
-): Promise<void> {
+): Promise<StoredAttachment[]> {
+	const stored: StoredAttachment[] = [];
+
 	for (const attachment of attachments.slice(0, MAX_ATTACHMENTS_PER_EMAIL)) {
 		const bytes = attachmentBytes(attachment.content);
 		if (!bytes || bytes.byteLength === 0 || bytes.byteLength > MAX_ATTACHMENT_BYTES) {
@@ -122,10 +149,18 @@ async function storeInboundAttachments(
 				bytes,
 				...metadata
 			});
+			stored.push({
+				filename: attachment.filename || 'attachment',
+				sizeBytes: bytes.byteLength,
+				contentType: attachment.mimeType || 'application/octet-stream',
+				bytes
+			});
 		} catch (error) {
 			console.error('Failed to store inbound Cloudflare attachment', attachment.filename, error);
 		}
 	}
+
+	return stored;
 }
 
 /**
