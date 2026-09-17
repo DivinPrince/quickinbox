@@ -25,7 +25,17 @@
 	.logo {
 		display: block;
 		flex-shrink: 0;
+		max-width: none;
+		max-height: none;
 		border-radius: 26%;
-		object-fit: cover;
+		object-fit: contain;
+		object-position: center;
+		background: #0a0a0a;
+		filter: none;
+	}
+
+	:global(:root[data-theme='dark']) .logo {
+		background: transparent;
+		mix-blend-mode: screen;
 	}
 </style>

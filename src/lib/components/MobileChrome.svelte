@@ -6,10 +6,11 @@
 	import { haptic, isMailboxPath, isMorePath } from '$lib/app-chrome';
 	import { ADD_ACCOUNT_HREF, switchAccount } from '$lib/account-switch';
 	import { t } from '$lib/i18n';
-	import type { Domain, LinkedAccount, MailboxCounts } from '$lib/types';
+	import type { Domain, LinkedAccount, MailboxCounts, MailLabel } from '$lib/types';
 
 	let {
 		counts,
+		labels = [],
 		domains,
 		activeDomainId,
 		isAdmin,
@@ -18,6 +19,7 @@
 		onLogoutAll
 	}: {
 		counts: MailboxCounts;
+		labels?: MailLabel[];
 		domains: Domain[];
 		activeDomainId: string | null;
 		isAdmin: boolean;
@@ -171,6 +173,13 @@
 					<span class="sheet-count">{counts.archive}</span>
 				{/if}
 			</a>
+			<a href="/spam" class="sheet-link" class:active={$page.url.pathname === '/spam'}>
+				<Icon name="spam-2-line" size={20} />
+				<span>{t('nav.spam')}</span>
+				{#if counts.spam}
+					<span class="sheet-count">{counts.spam}</span>
+				{/if}
+			</a>
 			<a href="/trash" class="sheet-link" class:active={$page.url.pathname === '/trash'}>
 				<Icon name="delete-bin-line" size={20} />
 				<span>{t('nav.trash')}</span>
@@ -178,6 +187,18 @@
 					<span class="sheet-count">{counts.trash}</span>
 				{/if}
 			</a>
+			{#if labels.length > 0}
+				{#each labels as label (label.id)}
+					<a
+						href={`/inbox?label=${encodeURIComponent(label.id)}`}
+						class="sheet-link"
+						class:active={$page.url.searchParams.get('label') === label.id}
+					>
+						<Icon name="price-tag-3-line" size={20} />
+						<span>{label.name}</span>
+					</a>
+				{/each}
+			{/if}
 			<a href="/settings" class="sheet-link" class:active={$page.url.pathname === '/settings'}>
 				<Icon name="user-settings-line" size={20} />
 				<span>{t('nav.settings')}</span>

@@ -7,6 +7,7 @@ import {
 import { deleteDraft, listMailbox } from '$lib/server/mail-store';
 import { sendAndStore } from '$lib/server/outbox';
 import type { MailboxView, OutboundAttachmentInput } from '$lib/types';
+import { mailboxCategoryFilter } from '$lib/mail/categories';
 
 type SendMailBody = {
 	/** Set when the composer was editing a draft — it is removed once sent. */
@@ -30,6 +31,7 @@ function mailboxView(url: URL): MailboxView {
 		case 'drafts':
 		case 'sent':
 		case 'trash':
+		case 'spam':
 			return view;
 		default:
 			break;
@@ -53,15 +55,25 @@ export const GET: RequestHandler = async ({ locals, platform, url }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
+	const view = mailboxView(url);
+	const category = mailboxCategoryFilter({
+		view,
+		categoryParam: url.searchParams.get('category'),
+		labelId: url.searchParams.get('label'),
+		q: url.searchParams.get('q')
+	});
+
 	const mailbox = await listMailbox(db, locals.user.id, {
-		view: mailboxView(url),
+		view,
 		domainId: locals.activeDomainId,
 		addressId: url.searchParams.get('address'),
 		q: url.searchParams.get('q'),
 		unreadOnly: url.searchParams.get('unread') === '1',
 		starredOnly: url.searchParams.get('starred') === '1',
 		attachmentsOnly: url.searchParams.get('attachments') === '1',
-		page: Number(url.searchParams.get('page')) || 1
+		page: Number(url.searchParams.get('page')) || 1,
+		category,
+		labelId: url.searchParams.get('label')
 	});
 
 	return json(mailbox);

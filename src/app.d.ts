@@ -34,6 +34,8 @@ declare global {
 				TELEGRAM_THREAD_ID?: string;
 				/** Public URL of this install, linked from notifications. */
 				APP_URL?: string;
+				/** Optional TypeSafe key for inbound category/spam classification. */
+				TYPESAFE_API_KEY?: string;
 			};
 		}
 		interface Locals {

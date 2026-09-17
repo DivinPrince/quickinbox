@@ -17,6 +17,7 @@ no servers to maintain.
 - **Delivery status** — delivered / bounced / complained tracking
 - **REST API, CLI, and MCP server** — send and read mail from scripts, the terminal, or AI agents
 - **Hosted MCP with OAuth** — paste `https://your-instance/mcp` into Claude, Cursor, or ChatGPT and approve access in the browser; disconnect apps from Settings
+- **Inbox tabs** — optional TypeSafe classification into Primary, Social, Promotions, Updates, Forums, plus a spam mailbox
 - Light and dark themes
 
 ## Quick start
@@ -39,6 +40,9 @@ npx wrangler d1 migrations apply DB --remote
 
 The wizard creates the D1 database and R2 bucket, writes config, and onboards
 your domain. Budget about 30 minutes — most of that is waiting on DNS.
+
+The Deploy to Cloudflare form includes an optional `TYPESAFE_API_KEY` for inbox
+tabs. Keep the placeholder to skip. `bun run setup` asks for the same key.
 
 You need:
 
@@ -227,6 +231,29 @@ fails and the notification falls back to a text card followed by the files.
 
 Delivery is fire-and-forget: a Telegram outage is logged and ignored rather
 than failing the inbound handler, which the provider would then retry.
+
+### Inbox tabs (optional)
+
+Inbound mail can be sorted into Gmail-style tabs — Primary, Social, Promotions,
+Updates, Forums — with spam in its own mailbox. The Deploy to Cloudflare button
+asks for `TYPESAFE_API_KEY`; `bun run setup` prompts for the same key (or take
+`--typesafe-api-key`). To set it later:
+
+```bash
+bunx wrangler secret put TYPESAFE_API_KEY
+bun run deploy
+```
+
+Without the key, everything lands in Primary. Users can still move conversations
+between tabs, report spam, and create custom labels in Settings. Classification
+errors also fail open into Primary so mail is never hidden.
+
+Mail that arrived before the key was set stays in Primary until the owner runs
+**Classify** under Settings → Labels → Inbox tabs. The page updates after every
+message; notifications are not sent for that backfill.
+
+Promotions and Social do not send push/Telegram notifications. High-confidence
+spam is filed silently.
 
 ## Development
 

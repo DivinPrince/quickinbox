@@ -8,7 +8,8 @@ export const FOLDER_PATH: Record<MailboxView, string> = {
 	starred: '/starred',
 	drafts: '/drafts',
 	sent: '/sent',
-	trash: '/trash'
+	trash: '/trash',
+	spam: '/spam'
 };
 
 export function folderTitle(view: MailboxView, locale: string = DEFAULT_LOCALE): string {
@@ -25,6 +26,8 @@ export function folderTitle(view: MailboxView, locale: string = DEFAULT_LOCALE):
 			return translate(locale, 'nav.sent');
 		case 'trash':
 			return translate(locale, 'nav.bin');
+		case 'spam':
+			return translate(locale, 'nav.spam');
 		default: {
 			const _never: never = view;
 			return _never;
@@ -38,7 +41,8 @@ export const FOLDER_TITLE: Record<MailboxView, string> = {
 	starred: 'Starred',
 	drafts: 'Drafts',
 	sent: 'Sent',
-	trash: 'Bin'
+	trash: 'Bin',
+	spam: 'Spam'
 };
 
 export function viewFromLocation(pathname: string, search: URLSearchParams): MailboxView {
@@ -49,6 +53,7 @@ export function viewFromLocation(pathname: string, search: URLSearchParams): Mai
 	if (pathname === '/sent') return 'sent';
 	if (pathname === '/starred') return 'starred';
 	if (pathname === '/trash') return 'trash';
+	if (pathname === '/spam') return 'spam';
 	return 'inbox';
 }
 
@@ -59,10 +64,12 @@ export function folderPath(view: MailboxView): string {
 export function mailboxViewForEmail(email: {
 	deleted_at: string | null;
 	archived_at: string | null;
+	spam_at?: string | null;
 	status: string | null;
 	direction: 'inbound' | 'outbound';
 }): MailboxView {
 	if (email.deleted_at) return 'trash';
+	if (email.spam_at) return 'spam';
 	if (email.status === 'draft') return 'drafts';
 	if (email.archived_at) return 'archive';
 	if (email.direction === 'outbound') return 'sent';

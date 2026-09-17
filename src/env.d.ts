@@ -18,6 +18,7 @@ declare global {
 		TELEGRAM_CHAT_ID?: string;
 		TELEGRAM_THREAD_ID?: string;
 		APP_URL?: string;
+		TYPESAFE_API_KEY?: string;
 	}
 }
 

@@ -11,7 +11,8 @@ import {
 } from './client.ts';
 import { loadAccounts } from './config.ts';
 
-const views = ['inbox', 'starred', 'drafts', 'sent', 'trash'] as const;
+const views = ['inbox', 'archive', 'starred', 'drafts', 'sent', 'trash', 'spam'] as const;
+const categories = ['primary', 'social', 'promotions', 'updates', 'forums'] as const;
 
 function textResult(value: unknown, isError = false) {
 	return {
@@ -172,6 +173,7 @@ export async function startMcpServer(): Promise<void> {
 				: 'List mailbox conversations for the authenticated Quickinbox user.',
 			inputSchema: {
 				view: z.enum(views).optional().describe('Mailbox to list. Defaults to inbox.'),
+				category: z.enum(categories).optional().describe('Inbox tab when view is inbox.'),
 				q: z.string().optional().describe('Search participants, subject, and body.'),
 				page: z.number().int().positive().optional().describe('Page number, applied per account.'),
 				unread: z.boolean().optional(),
@@ -179,11 +181,12 @@ export async function startMcpServer(): Promise<void> {
 				account: accountArgForListing(accounts)
 			}
 		},
-		async ({ view, q, page, unread, domain, account }) => {
+		async ({ view, category, q, page, unread, domain, account }) => {
 			try {
 				return textResult(
 					await listThreadsAcross(accounts.many(account), {
 						view: view as MailboxView | undefined,
+						category,
 						q,
 						page,
 						unread,
@@ -224,14 +227,20 @@ export async function startMcpServer(): Promise<void> {
 			inputSchema: {
 				q: z.string().describe('Search text.'),
 				view: z.enum(views).optional(),
+				category: z.enum(categories).optional(),
 				page: z.number().int().positive().optional().describe('Page number, applied per account.'),
 				account: accountArgForListing(accounts)
 			}
 		},
-		async ({ q, view, page, account }) => {
+		async ({ q, view, category, page, account }) => {
 			try {
 				return textResult(
-					await listThreadsAcross(accounts.many(account), { q, view: view as MailboxView | undefined, page })
+					await listThreadsAcross(accounts.many(account), {
+						q,
+						view: view as MailboxView | undefined,
+						category,
+						page
+					})
 				);
 			} catch (error) {
 				return fail(error);
@@ -323,6 +332,82 @@ export async function startMcpServer(): Promise<void> {
 					}))
 				);
 				return textResult({ account: found.account.name, threadId: found.thread.threadId, attachments });
+			} catch (error) {
+				return fail(error);
+			}
+		}
+	);
+
+	server.registerTool(
+		'update_thread',
+		{
+			description: `Mark a conversation read/unread, star it, archive it, move it to spam, or set its inbox tab.${idLookupHint(accounts)}`,
+			inputSchema: {
+				id: z.string().describe('Thread id or message id.'),
+				isRead: z.boolean().optional(),
+				isStarred: z.boolean().optional(),
+				archived: z.boolean().optional(),
+				trashed: z.boolean().optional(),
+				spam: z.boolean().optional(),
+				category: z.enum(categories).optional(),
+				account: accountArgForIdLookup(accounts)
+			}
+		},
+		async ({ id, account, ...flags }) => {
+			if (Object.values(flags).every((value) => value === undefined)) {
+				return textResult(
+					'Pass at least one of isRead, isStarred, archived, trashed, spam, category',
+					true
+				);
+			}
+			try {
+				const found = await findThreadAcross(account ? [accounts.one(account)] : accounts.searchOrder, id);
+				const result = await found.account.client.updateThread(id, flags);
+				return textResult({ account: found.account.name, ...result });
+			} catch (error) {
+				return fail(error);
+			}
+		}
+	);
+
+	server.registerTool(
+		'list_labels',
+		{
+			description: multi
+				? 'List custom labels. Without `account`, lists every configured account.'
+				: 'List custom labels (not inbox category tabs).',
+			inputSchema: { account: accountArgForListing(accounts) }
+		},
+		async ({ account }) => {
+			try {
+				const rows = await Promise.all(
+					accounts.many(account).map(async ({ name, client }) => ({
+						account: name,
+						labels: await client.listLabels()
+					}))
+				);
+				return textResult(account || accounts.all.length === 1 ? rows[0] : { accounts: rows });
+			} catch (error) {
+				return fail(error);
+			}
+		}
+	);
+
+	server.registerTool(
+		'set_thread_labels',
+		{
+			description: `Replace the custom labels on a conversation. Pass an empty list to clear them.${idLookupHint(accounts)}`,
+			inputSchema: {
+				id: z.string().describe('Thread id or message id.'),
+				labelIds: z.array(z.string()).describe('Label ids from list_labels.'),
+				account: accountArgForIdLookup(accounts)
+			}
+		},
+		async ({ id, labelIds, account }) => {
+			try {
+				const found = await findThreadAcross(account ? [accounts.one(account)] : accounts.searchOrder, id);
+				const result = await found.account.client.setThreadLabels(id, labelIds);
+				return textResult({ account: found.account.name, ...result });
 			} catch (error) {
 				return fail(error);
 			}

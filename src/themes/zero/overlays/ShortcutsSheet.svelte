@@ -31,6 +31,7 @@
 				{ keys: 'G D', label: t('shortcuts.drafts') },
 				{ keys: 'G T', label: t('shortcuts.sent') },
 				{ keys: 'G A', label: t('nav.archive') },
+				{ keys: 'G P', label: t('nav.spam') },
 				{ keys: 'G B', label: t('nav.bin') },
 				{ keys: 'G S', label: t('nav.settings') }
 			]

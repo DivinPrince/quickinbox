@@ -18,10 +18,11 @@
 	import { formatDeviceActivity } from '$lib/device-activity';
 	import { intlLocale, t } from '$lib/i18n';
 	import { clientBrand, clientInitials } from '$lib/oauth-brand';
-	import type { ApiTokenSummary, ConnectedApp, Domain, MailAddress } from '$lib/types';
+	import type { ApiTokenSummary, ConnectedApp, Domain, MailAddress, MailLabel } from '$lib/types';
 	import type { SettingsSection } from '$lib/settings-section';
 	import UiThemePicker from './UiThemePicker.svelte';
 	import LocalePicker from './LocalePicker.svelte';
+	import LabelsSettings from './LabelsSettings.svelte';
 
 	type DeviceSession = {
 		id: string;
@@ -73,6 +74,7 @@
 		{ keys: 'G then T', label: t('shortcuts.goToSent') },
 		{ keys: 'G then A', label: t('shortcuts.goToArchive') },
 		{ keys: 'G then B', label: t('shortcuts.goToBin') },
+		{ keys: 'G then P', label: t('shortcuts.goToSpam') },
 		{ keys: 'G then S', label: t('shortcuts.goToSettings') },
 		{ keys: '1 / 2 / 3', label: t('shortcuts.filters') },
 		{ keys: '⌘↵', label: t('shortcuts.send') },
@@ -90,6 +92,8 @@
 				return t('nav.connections');
 			case 'notifications':
 				return t('nav.notifications');
+			case 'labels':
+				return t('nav.labels');
 			case 'shortcuts':
 				return t('nav.shortcuts');
 			case 'all':
@@ -1002,6 +1006,10 @@
 		{#if pairError}<p class="error" role="status">{pairError}</p>{/if}
 		{#if deviceError}<p class="error" role="alert">{deviceError}</p>{/if}
 	</section>
+	{/if}
+
+	{#if show('labels')}
+		<LabelsSettings labels={($page.data.labels ?? []) as MailLabel[]} />
 	{/if}
 
 	{#if section === 'shortcuts'}

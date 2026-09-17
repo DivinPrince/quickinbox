@@ -40,6 +40,7 @@
 			activeDomainId: data.activeDomainId,
 			accounts: data.accounts,
 			counts: data.counts,
+			labels: data.labels ?? [],
 			uiTheme: data.uiTheme
 		};
 	});

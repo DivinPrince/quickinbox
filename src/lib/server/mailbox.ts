@@ -1,4 +1,5 @@
 import { listMailbox } from './mail-store';
+import { mailboxCategoryFilter, parseInboxCategory } from '$lib/mail/categories';
 import type { MailboxFilters, MailboxPage, MailboxView } from '$lib/types';
 import type { D1Database } from '@cloudflare/workers-types';
 
@@ -8,7 +9,9 @@ export function readFilters(url: URL): MailboxFilters {
 		unreadOnly: url.searchParams.get('unread') === '1',
 		starredOnly: url.searchParams.get('starred') === '1',
 		attachmentsOnly: url.searchParams.get('attachments') === '1',
-		addressId: url.searchParams.get('address')?.trim() ?? ''
+		addressId: url.searchParams.get('address')?.trim() ?? '',
+		category: parseInboxCategory(url.searchParams.get('category')),
+		labelId: url.searchParams.get('label')?.trim() ?? ''
 	};
 }
 
@@ -36,7 +39,14 @@ export async function loadMailbox(
 		unreadOnly: filters.unreadOnly,
 		starredOnly: filters.starredOnly,
 		attachmentsOnly: filters.attachmentsOnly,
-		page: Number(url.searchParams.get('page')) || 1
+		page: Number(url.searchParams.get('page')) || 1,
+		category: mailboxCategoryFilter({
+			view,
+			categoryParam: url.searchParams.get('category'),
+			labelId: filters.labelId,
+			q: filters.q
+		}),
+		labelId: filters.labelId || null
 	});
 
 	return { view, mailbox, filters };

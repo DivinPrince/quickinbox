@@ -1,17 +1,13 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { DeliveryStatus } from '$lib/types';
 import { insertAttachmentBytes } from './attachments';
+import { scheduleInboundClassification } from './classify';
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL, MAX_BODY_BYTES } from './constants';
 import { collectInboundRecipients, parseEmailIdentity } from './email-address';
 import { recordUnroutedEmail, resolveInboundRoute } from './domains';
 import { stripHtml } from './html';
-import {
-	emailExistsByProviderId,
-	getThreadKey,
-	insertEmail,
-	updateEmailStatusByProviderId
-} from './mail-store';
-import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
+import { emailExistsByProviderId, insertEmail, updateEmailStatusByProviderId } from './mail-store';
+import type { PushNotificationEnv } from './push-notifications';
 import type { ResendClient } from './resend';
 import {
 	scheduleTelegramNotification,
@@ -30,7 +26,8 @@ export type WebhookOutcome = {
 	note: string;
 };
 
-type InboundEnv = PushNotificationEnv & TelegramNotificationEnv & { ATTACHMENTS: R2Bucket };
+type InboundEnv = PushNotificationEnv &
+	TelegramNotificationEnv & { ATTACHMENTS: R2Bucket; TYPESAFE_API_KEY?: string };
 
 export type InboundAttachmentMetadata = {
 	disposition?: 'attachment' | 'inline';
@@ -190,19 +187,22 @@ async function handleInboundEmail(
 	});
 
 	const storedAttachments = await storeInboundAttachments(env, client, providerId, emailId);
-	await scheduleNewMailNotification(env, {
+	scheduleInboundClassification(env, {
 		emailId,
 		userId: route.userId,
-		from: sender.name || from,
-		subject
-	});
-	scheduleTelegramNotification(env, {
-		from: sender.name ? `${sender.name} <${from}>` : from,
+		from,
+		fromName: sender.name,
 		to: route.address,
 		subject,
-		body: received.text ?? (received.html ? stripHtml(received.html) : null),
-		attachments: storedAttachments,
-		threadKey: await getThreadKey(env.DB, emailId)
+		bodyText: received.text,
+		attachmentNames: storedAttachments.map((attachment) => attachment.filename),
+		telegram: {
+			from: sender.name ? `${sender.name} <${from}>` : from,
+			to: route.address,
+			subject,
+			body: received.text ?? (received.html ? stripHtml(received.html) : null),
+			attachments: storedAttachments
+		}
 	});
 
 	return {

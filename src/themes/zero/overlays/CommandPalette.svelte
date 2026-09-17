@@ -17,8 +17,10 @@
 		{ kind: 'nav', href: '/drafts', icon: 'Folder', label: t('nav.drafts') },
 		{ kind: 'nav', href: '/sent', icon: 'Plane2', label: t('nav.sent') },
 		{ kind: 'nav', href: '/archive', icon: 'Archive', label: t('nav.archive') },
+		{ kind: 'nav', href: '/spam', icon: 'Danger', label: t('nav.spam') },
 		{ kind: 'nav', href: '/trash', icon: 'Bin', label: t('nav.bin') },
 		{ kind: 'nav', href: '/starred', icon: 'Star2', label: t('nav.starred') },
+		{ kind: 'nav', href: '/settings/labels', icon: 'Tag', label: t('nav.labels') },
 		{ kind: 'nav', href: '/settings/general', icon: 'SettingsGear', label: t('nav.settings') }
 	]);
 

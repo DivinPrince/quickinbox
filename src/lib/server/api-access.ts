@@ -74,7 +74,32 @@ const BEARER_ROUTES: RouteRule[] = [
 	{
 		method: 'PATCH',
 		match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname),
-		scopes: ['mail:send']
+		scopes: ['mail:read', 'mail:send']
+	},
+	{
+		method: 'PUT',
+		match: (pathname) => /^\/api\/mail\/[^/]+\/labels$/.test(pathname),
+		scopes: ['mail:read']
+	},
+	{
+		method: 'GET',
+		match: (pathname) => pathname === '/api/labels',
+		scopes: ['mail:read']
+	},
+	{
+		method: 'POST',
+		match: (pathname) => pathname === '/api/labels',
+		scopes: ['mail:read']
+	},
+	{
+		method: 'PATCH',
+		match: (pathname) => /^\/api\/labels\/[^/]+$/.test(pathname),
+		scopes: ['mail:read']
+	},
+	{
+		method: 'DELETE',
+		match: (pathname) => /^\/api\/labels\/[^/]+$/.test(pathname),
+		scopes: ['mail:read']
 	},
 	{
 		method: 'DELETE',
@@ -163,6 +188,11 @@ const MOBILE_SESSION_ROUTES: Array<Pick<RouteRule, 'method' | 'match'>> = [
 		match: (pathname) => /^\/api\/mail\/thread\/[^/]+\/forward$/.test(pathname)
 	},
 	{ method: 'PATCH', match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname) },
+	{ method: 'PUT', match: (pathname) => /^\/api\/mail\/[^/]+\/labels$/.test(pathname) },
+	{ method: 'GET', match: (pathname) => pathname === '/api/labels' },
+	{ method: 'POST', match: (pathname) => pathname === '/api/labels' },
+	{ method: 'PATCH', match: (pathname) => /^\/api\/labels\/[^/]+$/.test(pathname) },
+	{ method: 'DELETE', match: (pathname) => /^\/api\/labels\/[^/]+$/.test(pathname) },
 	{ method: 'DELETE', match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname) },
 	{ method: 'GET', match: (pathname) => pathname === '/api/addresses' },
 	{ method: 'GET', match: (pathname) => pathname === '/api/devices' },
@@ -187,7 +217,11 @@ export const MAIL_ACTIONS = [
 	'restore',
 	'delete',
 	'read-all',
-	'empty-trash'
+	'empty-trash',
+	'spam',
+	'unspam',
+	'empty-spam',
+	'categorize'
 ] as const;
 
 export type MailAction = (typeof MAIL_ACTIONS)[number];
@@ -225,6 +259,9 @@ export function authorizeMailAction(input: {
 		case 'unstar':
 		case 'archive':
 		case 'unarchive':
+		case 'spam':
+		case 'unspam':
+		case 'categorize':
 			if (!input.scopes.includes('mail:read')) {
 				return { ok: false, status: 403, error: 'This API key needs mail:read.' };
 			}
@@ -234,6 +271,7 @@ export function authorizeMailAction(input: {
 		case 'delete':
 		case 'read-all':
 		case 'empty-trash':
+		case 'empty-spam':
 			if (!hasAllScopes(input.scopes, ['mail:read', 'mail:send'])) {
 				return {
 					ok: false,
@@ -247,6 +285,19 @@ export function authorizeMailAction(input: {
 			return _never;
 		}
 	}
+}
+
+/** Per-thread PATCH: flag moves need `mail:read`; trash still needs both scopes. */
+export function authorizeMailPatch(input: {
+	authMethod: AuthMethod;
+	scopes: readonly ApiScope[];
+	trashed?: boolean;
+}): ApiAuthDecision {
+	return authorizeMailAction({
+		action: input.trashed !== undefined ? 'trash' : 'star',
+		authMethod: input.authMethod,
+		scopes: input.scopes
+	});
 }
 
 /**

@@ -42,6 +42,7 @@ export default {
 			TELEGRAM_CHAT_ID: env.TELEGRAM_CHAT_ID,
 			TELEGRAM_THREAD_ID: env.TELEGRAM_THREAD_ID,
 			APP_URL: env.APP_URL,
+			TYPESAFE_API_KEY: env.TYPESAFE_API_KEY,
 			waitUntil: (promise) => ctx.waitUntil(promise)
 		};
 

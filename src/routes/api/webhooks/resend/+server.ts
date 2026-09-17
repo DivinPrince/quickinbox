@@ -64,6 +64,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 				TELEGRAM_CHAT_ID: platform?.env.TELEGRAM_CHAT_ID,
 				TELEGRAM_THREAD_ID: platform?.env.TELEGRAM_THREAD_ID,
 				APP_URL: platform?.env.APP_URL,
+				TYPESAFE_API_KEY: platform?.env.TYPESAFE_API_KEY,
 				waitUntil: platform?.ctx ? (promise) => platform.ctx.waitUntil(promise) : undefined
 			},
 			client

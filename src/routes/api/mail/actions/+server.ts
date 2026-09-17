@@ -1,7 +1,10 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { authorizeMailAction, isMailAction, type MailAction } from '$lib/server/api-access';
+import { isInboxCategory } from '$lib/mail/categories';
+import { rememberSenders } from '$lib/server/labels';
 import {
 	deleteEmailsPermanently,
+	emptySpam,
 	emptyTrash,
 	expandToThreads,
 	markAllRead,
@@ -10,11 +13,13 @@ import {
 } from '$lib/server/mail-store';
 
 /** Actions that operate on the whole mailbox rather than a selection. */
-const WHOLE_MAILBOX: MailAction[] = ['read-all', 'empty-trash'];
+const WHOLE_MAILBOX: MailAction[] = ['read-all', 'empty-trash', 'empty-spam'];
 
 type ActionBody = {
 	action?: MailAction;
 	ids?: string[];
+	category?: string;
+	labelId?: string;
 };
 
 export const POST: RequestHandler = async ({ request, locals, platform }) => {
@@ -77,6 +82,24 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		case 'restore':
 			affected = await setEmailFlags(db, locals.user.id, ids, { trashed: false });
 			break;
+		case 'spam':
+			affected = await setEmailFlags(db, locals.user.id, ids, { spam: true, spamSource: 'user' });
+			await rememberSenders(db, locals.user.id, ids, 'spam');
+			break;
+		case 'unspam':
+			affected = await setEmailFlags(db, locals.user.id, ids, { spam: false });
+			await rememberSenders(db, locals.user.id, ids, 'safe');
+			break;
+		case 'categorize': {
+			if (!isInboxCategory(body.category)) {
+				return json({ error: 'Unknown category' }, { status: 400 });
+			}
+			affected = await setEmailFlags(db, locals.user.id, ids, {
+				category: body.category,
+				categorySource: 'user'
+			});
+			break;
+		}
 		case 'delete':
 			affected = await deleteEmailsPermanently(
 				db,
@@ -86,10 +109,19 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 			);
 			break;
 		case 'read-all':
-			affected = await markAllRead(db, locals.user.id, locals.activeDomainId);
+			affected = await markAllRead(
+				db,
+				locals.user.id,
+				locals.activeDomainId,
+				isInboxCategory(body.category) ? body.category : null,
+				typeof body.labelId === 'string' && body.labelId ? body.labelId : null
+			);
 			break;
 		case 'empty-trash':
 			affected = await emptyTrash(db, platform?.env.ATTACHMENTS, locals.user.id);
+			break;
+		case 'empty-spam':
+			affected = await emptySpam(db, platform?.env.ATTACHMENTS, locals.user.id);
 			break;
 		default: {
 			const _never: never = action;

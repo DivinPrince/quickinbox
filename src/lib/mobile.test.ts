@@ -19,6 +19,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 test('treats mailbox roots as list screens', () => {
 	assert.equal(isMailboxPath('/inbox'), true);
 	assert.equal(isMailboxPath('/drafts'), true);
+	assert.equal(isMailboxPath('/spam'), true);
 	assert.equal(isMailboxPath('/mail/abc'), false);
 });
 
@@ -46,6 +47,7 @@ test('treats settings and admin as utility screens', () => {
 test('puts secondary destinations under More', () => {
 	assert.equal(isMorePath('/drafts'), true);
 	assert.equal(isMorePath('/trash'), true);
+	assert.equal(isMorePath('/spam'), true);
 	assert.equal(isMorePath('/settings'), true);
 	assert.equal(isMorePath('/admin'), true);
 	assert.equal(isMorePath('/inbox'), false);
@@ -104,6 +106,39 @@ test('Zero phone chrome clears the iOS status bar and keeps tap targets large', 
 	assert.match(phone, /\.z-mobile-nav a[\s\S]*min-width:\s*var\(--touch-target\)/);
 	assert.match(phone, /\.z-mobile-nav a[\s\S]*min-height:\s*var\(--touch-target\)/);
 	assert.match(phone, /\.z-list-tools \.z-icon-btn[\s\S]*--touch-target/);
+	assert.match(phone, /\.z-compose-stage/);
+	assert.match(phone, /\.z-palette-scrim/);
+});
+
+test('collapsed Zero sidebar keeps the brand mark and label colors', () => {
+	const header = readFileSync(join(root, 'src/themes/zero/AccountHeader.svelte'), 'utf8');
+	assert.match(header, /import Logo from '\$lib\/components\/Logo\.svelte'/);
+	assert.match(header, /class="z-brand"[\s\S]*<Logo size=\{36\} \/>/);
+	const shell = readFileSync(join(root, 'src/themes/zero/Shell.svelte'), 'utf8');
+	assert.match(shell, /data\.labels\.length > 0/);
+	assert.doesNotMatch(shell, /labels\.length > 0 && \(!collapsed/);
+	const css = readFileSync(join(root, 'src/themes/zero/shell.css'), 'utf8');
+	assert.match(css, /\.z-brand/);
+	assert.match(css, /\.z-nav-link > span:not\(\.z-icon\):not\(\.z-label-dot\)/);
+	assert.match(css, /\.z-nav-link \.z-label-dot/);
+});
+
+test('Zero mail layout follows the stage width across desktop and tablet', () => {
+	const css = readFileSync(join(root, 'src/themes/zero/shell.css'), 'utf8');
+	assert.match(css, /container: stage \/ inline-size/);
+	assert.match(css, /container: mail-list \/ inline-size/);
+	assert.match(css, /container: thread \/ inline-size/);
+	assert.match(css, /@container stage \(max-width: 56rem\)/);
+	assert.match(css, /@container mail-list \(max-width: 22rem\)/);
+	assert.match(css, /@container thread \(max-width: 32rem\)/);
+});
+
+test('app logo is not crushed by the global image reset', () => {
+	const source = readFileSync(join(root, 'src/lib/components/Logo.svelte'), 'utf8');
+	assert.match(source, /max-width:\s*none/);
+	assert.match(source, /object-fit:\s*contain/);
+	assert.match(source, /filter:\s*none/);
+	assert.match(source, /mix-blend-mode:\s*screen/);
 });
 
 test('phone gestures follow the 900px shell, not desktop pointer type', () => {

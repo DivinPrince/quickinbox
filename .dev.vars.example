@@ -38,3 +38,9 @@ RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # VAPID_PUBLIC_KEY=REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY
 # VAPID_PRIVATE_KEY=REPLACE_WITH_YOUR_VAPID_PRIVATE_KEY
 # VAPID_SUBJECT=mailto:admin@example.com
+
+# --- Inbox tabs (optional) ---
+# TypeSafe classifies inbound mail into Primary, Social, Promotions, Updates,
+# Forums, and spam. Keep the placeholder to skip — everything stays in Primary.
+# Production: wrangler secret put TYPESAFE_API_KEY
+TYPESAFE_API_KEY=REPLACE_WITH_YOUR_TYPESAFE_API_KEY

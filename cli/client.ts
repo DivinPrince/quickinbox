@@ -18,7 +18,7 @@ export class QuickInboxError extends Error {
 	}
 }
 
-export type MailboxView = 'inbox' | 'starred' | 'drafts' | 'sent' | 'trash';
+export type MailboxView = 'inbox' | 'archive' | 'starred' | 'drafts' | 'sent' | 'trash' | 'spam';
 
 export type ThreadSummary = {
 	thread_id: string;
@@ -100,6 +100,8 @@ export type ListThreadsQuery = {
 	starred?: boolean;
 	attachments?: boolean;
 	domain?: string;
+	category?: 'primary' | 'social' | 'promotions' | 'updates' | 'forums';
+	label?: string;
 };
 
 export class QuickInboxClient {
@@ -149,6 +151,8 @@ export class QuickInboxClient {
 		if (query.starred) params.set('starred', '1');
 		if (query.attachments) params.set('attachments', '1');
 		if (query.domain) params.set('domain', query.domain);
+		if (query.category) params.set('category', query.category);
+		if (query.label) params.set('label', query.label);
 		const suffix = params.size > 0 ? `?${params}` : '';
 		return this.request<MailboxPage>(`/api/mail${suffix}`);
 	}
@@ -176,6 +180,37 @@ export class QuickInboxClient {
 		return this.request(`/api/mail/${encodeURIComponent(id)}`, {
 			method: 'POST',
 			body: JSON.stringify(input)
+		});
+	}
+
+	async updateThread(
+		id: string,
+		flags: {
+			isRead?: boolean;
+			isStarred?: boolean;
+			archived?: boolean;
+			trashed?: boolean;
+			spam?: boolean;
+			category?: ListThreadsQuery['category'];
+		}
+	): Promise<{ ok: boolean }> {
+		return this.request(`/api/mail/${encodeURIComponent(id)}`, {
+			method: 'PATCH',
+			body: JSON.stringify(flags)
+		});
+	}
+
+	async listLabels(): Promise<{ id: string; name: string; color: string; slug: string }[]> {
+		const body = await this.request<{ labels: { id: string; name: string; color: string; slug: string }[] }>(
+			'/api/labels'
+		);
+		return body.labels;
+	}
+
+	async setThreadLabels(id: string, labelIds: string[]): Promise<{ ok: boolean }> {
+		return this.request(`/api/mail/${encodeURIComponent(id)}/labels`, {
+			method: 'PUT',
+			body: JSON.stringify({ labelIds })
 		});
 	}
 
