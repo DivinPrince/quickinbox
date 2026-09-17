@@ -43,6 +43,11 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		}
 	}
 
-	const step = await classifyNextExisting(db, apiKey, locals.user.id, cursor);
-	return json(step);
+	try {
+		const step = await classifyNextExisting(db, apiKey, locals.user.id, cursor);
+		return json(step);
+	} catch (error) {
+		console.error('Classify existing failed', error);
+		return json({ error: 'Classification failed' }, { status: 500 });
+	}
 };

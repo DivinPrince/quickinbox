@@ -366,6 +366,24 @@ export async function getSenderPref(
 	return row?.disposition ?? null;
 }
 
+/** One round trip for a classify window — per-address lookups overflow Miniflare/D1. */
+export async function listSenderPrefs(
+	db: D1Database,
+	userId: string
+): Promise<Map<string, SenderDisposition>> {
+	const { results } = await db
+		.prepare('SELECT from_addr, disposition FROM sender_prefs WHERE user_id = ?')
+		.bind(userId)
+		.all<{ from_addr: string; disposition: string }>();
+
+	const prefs = new Map<string, SenderDisposition>();
+	for (const row of results) {
+		if (row.disposition !== 'spam' && row.disposition !== 'safe') continue;
+		prefs.set(row.from_addr.trim().toLowerCase(), row.disposition);
+	}
+	return prefs;
+}
+
 export async function setSenderPref(
 	db: D1Database,
 	userId: string,

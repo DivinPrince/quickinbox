@@ -22,6 +22,17 @@ import type {
 	ThreadSummary
 } from '$lib/types';
 
+/** D1 caps bound parameters at 100; leave room for user_id and SET values. */
+const D1_IN_CHUNK = 80;
+
+function chunkIds(ids: string[], size = D1_IN_CHUNK): string[][] {
+	const groups: string[][] = [];
+	for (let i = 0; i < ids.length; i += size) {
+		groups.push(ids.slice(i, i + size));
+	}
+	return groups;
+}
+
 export async function getUserIdByEmail(db: D1Database, email: string): Promise<string | null> {
 	const row = await db
 		.prepare('SELECT id FROM users WHERE email = ?')
@@ -656,19 +667,23 @@ export async function expandToThreads(
 ): Promise<string[]> {
 	if (ids.length === 0) return [];
 
-	const placeholders = ids.map(() => '?').join(', ');
-	const { results } = await db
-		.prepare(
-			`SELECT id FROM emails
-			 WHERE user_id = ?
-			 AND COALESCE(thread_id, id) IN (
-				SELECT COALESCE(thread_id, id) FROM emails WHERE user_id = ? AND id IN (${placeholders})
-			 )`
-		)
-		.bind(userId, userId, ...ids)
-		.all<{ id: string }>();
+	const found = new Set<string>();
+	for (const group of chunkIds(ids)) {
+		const placeholders = group.map(() => '?').join(', ');
+		const { results } = await db
+			.prepare(
+				`SELECT id FROM emails
+				 WHERE user_id = ?
+				 AND COALESCE(thread_id, id) IN (
+					SELECT COALESCE(thread_id, id) FROM emails WHERE user_id = ? AND id IN (${placeholders})
+				 )`
+			)
+			.bind(userId, userId, ...group)
+			.all<{ id: string }>();
+		for (const row of results) found.add(row.id);
+	}
 
-	return results.map((row) => row.id);
+	return [...found];
 }
 
 export type MailFlagUpdate = {
@@ -727,18 +742,22 @@ export async function setEmailFlags(
 	if (assignments.length === 0) return 0;
 	if (bumpEpoch) assignments.push("updated_at = datetime('now')");
 
-	const placeholders = ids.map(() => '?').join(', ');
-	const result = await db
-		.prepare(
-			`UPDATE emails SET ${assignments.join(', ')}
-			 WHERE user_id = ? AND id IN (${placeholders})`
-		)
-		.bind(...bindings, userId, ...ids)
-		.run();
+	let changes = 0;
+	for (const group of chunkIds(ids)) {
+		const placeholders = group.map(() => '?').join(', ');
+		const result = await db
+			.prepare(
+				`UPDATE emails SET ${assignments.join(', ')}
+				 WHERE user_id = ? AND id IN (${placeholders})`
+			)
+			.bind(...bindings, userId, ...group)
+			.run();
+		changes += result.meta?.changes ?? 0;
+	}
 
 	if (bumpEpoch) await bumpMailboxEpoch(db, userId);
 
-	return result.meta?.changes ?? 0;
+	return changes;
 }
 
 /** Irreversible: drops the rows and the R2 objects their attachments point at. */
@@ -858,6 +877,28 @@ export async function getThreadUserCategory(
 		.first<{ category: string }>();
 
 	return row ? parseInboxCategory(row.category) : null;
+}
+
+/** One round trip for a classify window — per-thread lookups overflow Miniflare/D1. */
+export async function listThreadUserCategories(
+	db: D1Database,
+	userId: string
+): Promise<Map<string, InboxCategory>> {
+	const { results } = await db
+		.prepare(
+			`SELECT COALESCE(thread_id, id) AS thread_id, category
+			 FROM emails
+			 WHERE user_id = ? AND category_source = 'user'`
+		)
+		.bind(userId)
+		.all<{ thread_id: string; category: string }>();
+
+	const locked = new Map<string, InboxCategory>();
+	for (const row of results) {
+		if (!row.thread_id) continue;
+		locked.set(row.thread_id, parseInboxCategory(row.category));
+	}
+	return locked;
 }
 
 export async function emptyTrash(
