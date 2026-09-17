@@ -74,6 +74,9 @@
 			},
 			"RESEND_WEBHOOK_SECRET": {
 				"description": "Only for `EMAIL_PROVIDER=resend`: shown once when you create the webhook at [Resend webhooks](https://resend.com/webhooks). Keep the placeholder if using Cloudflare Email."
+			},
+			"TYPESAFE_API_KEY": {
+				"description": "Optional. TypeSafe key for inbox tabs (Primary, Social, Promotions, Updates, Forums) and spam. Keep the placeholder to skip — mail stays in Primary."
 			}
 		}
 	}

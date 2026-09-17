@@ -71,6 +71,8 @@ Options:
   --provider <name>    resend | cloudflare
   --d1-name <name>     D1 database name (e.g. quickmail)
   --r2-name <name>     R2 bucket name (e.g. quickmail-attachments)
+  --typesafe-api-key <key>
+                       Optional TypeSafe key for inbox tabs and spam
   --yes                Accept defaults (still requires --domain)
   --skip-deploy        Do not deploy at the end
   --help               Show this help
@@ -85,7 +87,8 @@ function parseArgs(argv) {
 		domain: null,
 		provider: null,
 		d1Name: null,
-		r2Name: null
+		r2Name: null,
+		typesafeApiKey: null
 	};
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i];
@@ -113,11 +116,17 @@ function parseArgs(argv) {
 			case '--r2-name':
 				out.r2Name = argv[++i] ?? '';
 				break;
+			case '--typesafe-api-key':
+				out.typesafeApiKey = argv[++i] ?? '';
+				break;
 			default:
 				if (arg.startsWith('--domain=')) out.domain = arg.slice('--domain='.length);
 				else if (arg.startsWith('--provider=')) out.provider = arg.slice('--provider='.length);
 				else if (arg.startsWith('--d1-name=')) out.d1Name = arg.slice('--d1-name='.length);
 				else if (arg.startsWith('--r2-name=')) out.r2Name = arg.slice('--r2-name='.length);
+				else if (arg.startsWith('--typesafe-api-key=')) {
+					out.typesafeApiKey = arg.slice('--typesafe-api-key='.length);
+				}
 				else {
 					console.error(`Unknown option: ${arg}`);
 					printHelp();
@@ -1010,6 +1019,25 @@ async function maybeCreateWebhook(apiKey, publicUrl) {
 	return secret;
 }
 
+async function setupTypesafe() {
+	log('  Optional. A TypeSafe key sorts inbound mail into inbox tabs and spam.');
+	log(`  ${c.dim('Leave blank to skip — everything stays in Primary.')}`);
+
+	let apiKey = typeof args.typesafeApiKey === 'string' ? args.typesafeApiKey.trim() : '';
+	if (!apiKey && stdinStream.isTTY && !args.yes) {
+		apiKey = await promptSecret('TypeSafe API key (blank to skip)');
+	} else if (!apiKey) {
+		warn('Skipped TypeSafe key. Set TYPESAFE_API_KEY later with wrangler secret put.');
+	}
+
+	if (!apiKey || /^REPLACE_WITH_/i.test(apiKey)) return '';
+
+	putSecret('TYPESAFE_API_KEY', apiKey);
+	upsertEnvFile(devVarsFile, { TYPESAFE_API_KEY: apiKey });
+	ok('wrote TYPESAFE_API_KEY to .dev.vars');
+	return apiKey;
+}
+
 function printNextSteps(state) {
 	log(`\n${c.bold('Next')}`);
 	const app = state.publicUrl ? `${state.publicUrl}/setup` : 'the deployed URL /setup (or http://localhost:5173/setup after bun run dev)';
@@ -1043,6 +1071,10 @@ function printNextSteps(state) {
 		log('  Local inbound needs a tunnel (cloudflared) — production uses the public Worker URL.');
 	}
 
+	if (!state.typesafeKey) {
+		log('  Optional inbox tabs: bunx wrangler secret put TYPESAFE_API_KEY && bun run deploy');
+	}
+
 	log(`\n  ${c.dim('wrangler.jsonc now has a real D1 id. Do not commit that back to the public template.')}`);
 	if (state.publicUrl) log(`\n  ${c.green(state.publicUrl)}`);
 }
@@ -1058,7 +1090,7 @@ async function main() {
 	log(`\n${c.bold('Quickinbox setup')}`);
 	log(c.dim('  A mailbox on your domain, on Cloudflare.\n'));
 
-	const total = 8;
+	const total = 9;
 
 	section(1, total, 'Tools');
 	await ensureRuntime();
@@ -1144,10 +1176,13 @@ async function main() {
 		}
 	}
 
-	section(7, total, 'Database');
+	section(7, total, 'Inbox tabs');
+	const typesafeKey = await setupTypesafe();
+
+	section(8, total, 'Database');
 	migrate(true, false);
 
-	section(8, total, 'Deploy');
+	section(9, total, 'Deploy');
 	let deployed = false;
 	let publicUrl = hostname ? `https://${hostname}` : null;
 	const shouldDeploy = args.skipDeploy ? false : await confirm('Deploy now?', true);
@@ -1186,7 +1221,8 @@ async function main() {
 		deployed,
 		publicUrl,
 		resendDomainOk: resend.domainOk,
-		webhookSecret: resend.webhookSecret
+		webhookSecret: resend.webhookSecret,
+		typesafeKey
 	});
 }
 

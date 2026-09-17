@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { D1Database } from '@cloudflare/workers-types';
+import { configuredTypesafeKey } from './typesafe-classify';
 import { classifyNextExisting } from './classify';
+
+test('deploy-button TypeSafe placeholders do not count as configured', () => {
+	assert.equal(configuredTypesafeKey(undefined), undefined);
+	assert.equal(configuredTypesafeKey(''), undefined);
+	assert.equal(configuredTypesafeKey('REPLACE_WITH_YOUR_TYPESAFE_API_KEY'), undefined);
+	assert.equal(configuredTypesafeKey('  real-key  '), 'real-key');
+});
 
 test('classifyNextExisting reports complete when the unclassified window is empty', async () => {
 	const db = {

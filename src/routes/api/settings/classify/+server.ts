@@ -2,10 +2,7 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { parseClassifyCursor } from '$lib/mail/classify-progress';
 import { classifyNextExisting } from '$lib/server/classify';
 import { countUnclassifiedInbound } from '$lib/server/mail-store';
-
-function classifyEnabled(apiKey: string | undefined): boolean {
-	return Boolean(apiKey?.trim());
-}
+import { configuredTypesafeKey } from '$lib/server/typesafe-classify';
 
 export const GET: RequestHandler = async ({ locals, platform }) => {
 	const db = platform?.env.DB;
@@ -13,7 +10,7 @@ export const GET: RequestHandler = async ({ locals, platform }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const enabled = classifyEnabled(platform.env.TYPESAFE_API_KEY);
+	const enabled = Boolean(configuredTypesafeKey(platform.env.TYPESAFE_API_KEY));
 	const remaining = await countUnclassifiedInbound(db, locals.user.id);
 	return json(
 		{ enabled, remaining },
@@ -27,7 +24,7 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const apiKey = platform.env.TYPESAFE_API_KEY?.trim();
+	const apiKey = configuredTypesafeKey(platform.env.TYPESAFE_API_KEY);
 	if (!apiKey) {
 		return json({ error: 'Classification is not configured' }, { status: 400 });
 	}

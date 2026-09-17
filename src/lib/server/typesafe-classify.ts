@@ -5,6 +5,13 @@ import type { ClassificationJudgments } from './classify-policy';
 const BODY_CHARS = 4_000;
 const REQUEST_TIMEOUT_MS = 8_000;
 
+/** Real keys only — deploy-button placeholders must not enable classification. */
+export function configuredTypesafeKey(value: string | undefined): string | undefined {
+	const key = value?.trim() ?? '';
+	if (!key || /^REPLACE_WITH_/i.test(key)) return undefined;
+	return key;
+}
+
 export type InboundJudgeInput = {
 	from: string;
 	fromName?: string | null;

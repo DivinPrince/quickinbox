@@ -14,7 +14,7 @@ import {
 import { listAutoLabels, setEmailAutoLabels, getSenderPref } from './labels';
 import { listAttachments } from './attachments';
 import { decideClassification, persistClassification } from './classify-policy';
-import { judgeInboundMail } from './typesafe-classify';
+import { configuredTypesafeKey, judgeInboundMail } from './typesafe-classify';
 import { stripHtml } from './html';
 import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
 import {
@@ -118,11 +118,12 @@ export async function classifyStoredEmail(
 		return { applied: false, notify: false, subject: email.subject };
 	}
 
+	const key = configuredTypesafeKey(apiKey);
 	const threadId = email.thread_id ?? email.id;
 	const [senderDisposition, userLockedCategory, autoLabels] = await Promise.all([
 		getSenderPref(db, input.userId, input.from),
 		getThreadUserCategory(db, input.userId, threadId),
-		apiKey?.trim() ? listAutoLabels(db, input.userId) : Promise.resolve([])
+		key ? listAutoLabels(db, input.userId) : Promise.resolve([])
 	]);
 
 	const judge = options?.judge ?? judgeInboundMail;
@@ -131,9 +132,9 @@ export async function classifyStoredEmail(
 		(await listAttachments(db, input.emailId)).map((file) => file.filename);
 
 	const judgments =
-		senderDisposition === 'spam' || !apiKey?.trim()
+		senderDisposition === 'spam' || !key
 			? null
-			: await judge(apiKey, {
+			: await judge(key, {
 					from: input.from,
 					fromName: input.fromName,
 					to: input.to,

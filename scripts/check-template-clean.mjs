@@ -21,6 +21,7 @@ const FORBIDDEN = [
 	{ label: 'Resend API key', pattern: /re_[A-Za-z0-9_-]{20,}/ },
 	{ label: 'Webhook signing secret', pattern: /whsec_[A-Za-z0-9+/=_-]{16,}/ },
 	{ label: 'GitHub token', pattern: /\b(ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|gho_[A-Za-z0-9]{30,})\b/ },
+	{ label: 'TypeSafe API key', pattern: /\bapikey_[A-Za-z0-9_]{20,}/ },
 	{ label: 'General Translation API key', pattern: /\bgtx-api-[a-f0-9]{32,}\b/ },
 	{ label: 'Cloudflare API token', pattern: /\bCLOUDFLARE_API_TOKEN\s*[:=]\s*["']?[A-Za-z0-9_-]{30,}/ },
 	{ label: 'Private key block', pattern: /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----/ },
