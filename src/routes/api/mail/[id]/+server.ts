@@ -14,6 +14,8 @@ import {
 } from '$lib/server/mail-store';
 import { resolveReplyFromAddress, sendAndStore } from '$lib/server/outbox';
 import { buildReferences, displaySubject } from '$lib/server/threads';
+import { isInboxCategory } from '$lib/mail/categories';
+import { rememberSenders } from '$lib/server/labels';
 import type { OutboundAttachmentInput } from '$lib/types';
 
 type ReplyBody = {
@@ -59,24 +61,39 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 		isStarred?: boolean;
 		archived?: boolean;
 		trashed?: boolean;
+		spam?: boolean;
+		category?: string;
 		/** Set to limit the change to this one message instead of the thread. */
 		messageOnly?: boolean;
 	};
 
-	const ids = body.messageOnly && body.archived === undefined
-		? [params.id!]
-		: await expandToThreads(db, locals.user.id, [params.id!]);
+	const threadWide = body.archived !== undefined || body.spam !== undefined || body.category !== undefined;
+	const ids =
+		body.messageOnly && !threadWide
+			? [params.id!]
+			: await expandToThreads(db, locals.user.id, [params.id!]);
+
+	if (body.category !== undefined && !isInboxCategory(body.category)) {
+		return json({ error: 'Unknown category' }, { status: 400 });
+	}
 
 	const changed = await setEmailFlags(db, locals.user.id, ids, {
 		isRead: body.isRead,
 		isStarred: body.isStarred,
 		archived: body.archived,
-		trashed: body.trashed
+		trashed: body.trashed,
+		spam: body.spam,
+		spamSource: body.spam === undefined ? undefined : 'user',
+		category: isInboxCategory(body.category) ? body.category : undefined,
+		categorySource: body.category !== undefined ? 'user' : undefined
 	});
 
 	if (changed === 0) {
 		return json({ error: 'Not found' }, { status: 404 });
 	}
+
+	if (body.spam === true) await rememberSenders(db, locals.user.id, ids, 'spam');
+	if (body.spam === false) await rememberSenders(db, locals.user.id, ids, 'safe');
 
 	return json({ ok: true });
 };

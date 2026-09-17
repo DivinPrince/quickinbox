@@ -93,17 +93,52 @@ export type MailAddress = {
 	created_at: string;
 };
 
-/** The mailboxes the sidebar can show. Drafts/Trash are flags, not folders. */
-export type MailboxView = 'inbox' | 'archive' | 'starred' | 'drafts' | 'sent' | 'trash';
+/** The mailboxes the sidebar can show. Drafts/Trash/Spam are flags, not folders. */
+export type MailboxView = 'inbox' | 'archive' | 'starred' | 'drafts' | 'sent' | 'trash' | 'spam';
+
+/** Exclusive Gmail-style inbox tabs. A message lives in exactly one. */
+export type InboxCategory = 'primary' | 'social' | 'promotions' | 'updates' | 'forums';
+
+export type ClassificationSource = 'auto' | 'user';
 
 export type MailboxCounts = {
 	inbox: number;
 	inbox_unread: number;
+	primary: number;
+	primary_unread: number;
+	social: number;
+	social_unread: number;
+	promotions: number;
+	promotions_unread: number;
+	updates: number;
+	updates_unread: number;
+	forums: number;
+	forums_unread: number;
 	archive: number;
 	starred: number;
 	drafts: number;
 	sent: number;
 	trash: number;
+	spam: number;
+};
+
+/** A user-created label (not an inbox category). */
+export type MailLabel = {
+	id: string;
+	name: string;
+	color: string;
+	slug: string;
+	auto_enabled: boolean;
+	auto_instructions: string | null;
+	sort_order: number;
+};
+
+/** Compact label shown on a thread or message. */
+export type ThreadLabel = {
+	id: string;
+	name: string;
+	color: string;
+	slug: string;
 };
 
 export type EmailRow = {
@@ -137,6 +172,11 @@ export type EmailRow = {
 	is_starred: number;
 	deleted_at: string | null;
 	archived_at: string | null;
+	category: InboxCategory;
+	category_source: ClassificationSource | null;
+	spam_at: string | null;
+	spam_source: ClassificationSource | null;
+	updated_at: string | null;
 	created_at: string;
 };
 
@@ -152,6 +192,7 @@ export type EmailSummary = {
 	is_starred: boolean;
 	is_draft: boolean;
 	is_archived: boolean;
+	is_spam: boolean;
 	has_attachments: boolean;
 	domain_id: string | null;
 	address_id: string | null;
@@ -182,12 +223,15 @@ export type ThreadSummary = {
 	is_starred: boolean;
 	is_draft: boolean;
 	is_archived: boolean;
+	is_spam: boolean;
 	has_attachments: boolean;
 	domain_id: string | null;
 	/** Which registered address the newest message arrived on, when known. */
 	address_id: string | null;
 	/** Delivery state of the newest message, when we sent it. */
 	status: DeliveryStatus | null;
+	category: InboxCategory;
+	labels: ThreadLabel[];
 	created_at: string;
 };
 
@@ -198,6 +242,10 @@ export type MailboxFilters = {
 	attachmentsOnly: boolean;
 	/** Registered address to narrow the list to; empty for all addresses. */
 	addressId: string;
+	/** Inbox tab. Ignored when `labelId` is set. */
+	category: InboxCategory;
+	/** Custom label id; shows all non-spam, non-trash mail with that label. */
+	labelId: string;
 };
 
 export type MailboxPage = {
@@ -227,8 +275,11 @@ export type ThreadMessage = {
 	is_starred: boolean;
 	deleted_at: string | null;
 	archived_at: string | null;
+	category: InboxCategory;
+	spam_at: string | null;
 	created_at: string;
 	attachments: EmailAttachmentMeta[];
+	labels: ThreadLabel[];
 };
 
 export type AttachmentDisposition = 'attachment' | 'inline';

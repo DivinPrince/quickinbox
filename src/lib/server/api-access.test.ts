@@ -105,6 +105,42 @@ describe('API key access', () => {
 			}),
 			{ ok: true }
 		);
+		assert.deepEqual(
+			authorizeApiRequest({
+				pathname: '/api/labels',
+				method: 'GET',
+				authMethod: 'api_token',
+				scopes: ['mail:read']
+			}),
+			{ ok: true }
+		);
+		assert.deepEqual(
+			authorizeApiRequest({
+				pathname: '/api/mail/abc/labels',
+				method: 'PUT',
+				authMethod: 'api_token',
+				scopes: ['mail:read']
+			}),
+			{ ok: true }
+		);
+		assert.equal(
+			authorizeApiRequest({
+				pathname: '/api/settings/classify',
+				method: 'POST',
+				authMethod: 'api_token',
+				scopes: ['mail:read', 'mail:send']
+			}).ok,
+			false
+		);
+		assert.equal(
+			authorizeApiRequest({
+				pathname: '/api/settings/classify',
+				method: 'GET',
+				authMethod: 'api_token',
+				scopes: ['mail:read']
+			}).ok,
+			false
+		);
 	});
 
 	test('forward routes allow mobile sessions and send-scoped API keys', () => {
@@ -312,6 +348,30 @@ describe('API key access', () => {
 				scopes: ['mail:read', 'mail:send']
 			}),
 			{ ok: true }
+		);
+		assert.deepEqual(
+			authorizeMailAction({
+				action: 'spam',
+				authMethod: 'api_token',
+				scopes: ['mail:read']
+			}),
+			{ ok: true }
+		);
+		assert.deepEqual(
+			authorizeMailAction({
+				action: 'categorize',
+				authMethod: 'api_token',
+				scopes: ['mail:read']
+			}),
+			{ ok: true }
+		);
+		assert.equal(
+			authorizeMailAction({
+				action: 'empty-spam',
+				authMethod: 'api_token',
+				scopes: ['mail:read']
+			}).ok,
+			false
 		);
 	});
 });

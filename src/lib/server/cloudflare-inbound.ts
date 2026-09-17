@@ -6,8 +6,9 @@ import { recordUnroutedEmail, resolveInboundRoute } from './domains';
 import { collectInboundRecipients, parseEmailAddress } from './email-address';
 import { stripHtml } from './html';
 import { inboundAttachmentMetadata } from './inbound';
-import { emailExistsByProviderId, getThreadKey, insertEmail } from './mail-store';
-import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
+import { emailExistsByProviderId, insertEmail } from './mail-store';
+import type { PushNotificationEnv } from './push-notifications';
+import { scheduleInboundClassification } from './classify';
 import { normalizeMessageId } from './send-mail';
 import {
 	scheduleTelegramNotification,
@@ -26,6 +27,7 @@ export type CloudflareInboundMessage = {
 export type CloudflareInboundEnv = PushNotificationEnv &
 	TelegramNotificationEnv & {
 		ATTACHMENTS: R2Bucket;
+		TYPESAFE_API_KEY?: string;
 	};
 
 /**
@@ -107,19 +109,22 @@ export async function handleCloudflareInbound(
 	});
 
 	const storedAttachments = await storeInboundAttachments(env, emailId, parsed.attachments);
-	await scheduleNewMailNotification(env, {
+	scheduleInboundClassification(env, {
 		emailId,
 		userId: route.userId,
-		from: sender?.name || from,
-		subject
-	});
-	scheduleTelegramNotification(env, {
-		from: sender?.name ? `${sender.name} <${from}>` : from,
+		from,
+		fromName: sender?.name,
 		to: route.address,
 		subject,
-		body: parsed.text ?? (parsed.html ? stripHtml(parsed.html) : null),
-		attachments: storedAttachments,
-		threadKey: await getThreadKey(env.DB, emailId)
+		bodyText: parsed.text ?? null,
+		attachmentNames: storedAttachments.map((attachment) => attachment.filename),
+		telegram: {
+			from: sender?.name ? `${sender.name} <${from}>` : from,
+			to: route.address,
+			subject,
+			body: parsed.text ?? (parsed.html ? stripHtml(parsed.html) : null),
+			attachments: storedAttachments
+		}
 	});
 }
 

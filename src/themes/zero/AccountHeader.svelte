@@ -5,6 +5,7 @@
 	import { initials } from '$lib/mail/folders';
 	import { setThemePreference } from '$lib/theme';
 	import { t } from '$lib/i18n';
+	import Logo from '$lib/components/Logo.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { ADD_ACCOUNT_HREF, switchAccount } from '$lib/account-switch';
 	import type { LinkedAccount, MailAddress } from '$lib/types';
@@ -130,8 +131,7 @@
 		<Tooltip text={displayEmail}>
 			<button
 				type="button"
-				class="z-tile"
-				class:active
+				class="z-brand"
 				aria-label={displayEmail}
 				aria-haspopup="menu"
 				aria-expanded={menuOpen}
@@ -141,7 +141,7 @@
 					menuOpen = !menuOpen;
 				}}
 			>
-				{active ? tileLabel(active) : initials(data.user.name || data.user.email)}
+				<Logo size={36} />
 			</button>
 		</Tooltip>
 	{:else}

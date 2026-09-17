@@ -1,6 +1,14 @@
 export const SERVICE_WORKER_URL = '/service-worker.js';
 
-export const MAILBOX_PATHS = ['/inbox', '/sent', '/starred', '/drafts', '/trash', '/archive'] as const;
+export const MAILBOX_PATHS = [
+	'/inbox',
+	'/sent',
+	'/starred',
+	'/drafts',
+	'/trash',
+	'/archive',
+	'/spam'
+] as const;
 export const PRIMARY_TABS = ['/inbox', '/starred', '/sent'] as const;
 
 export type NavDirection = 'forward' | 'back' | 'tab';
@@ -33,6 +41,7 @@ export function isMorePath(pathname: string): boolean {
 		pathname === '/drafts' ||
 		pathname === '/trash' ||
 		pathname === '/archive' ||
+		pathname === '/spam' ||
 		pathname === '/settings' ||
 		pathname === '/admin' ||
 		pathname.startsWith('/settings/') ||

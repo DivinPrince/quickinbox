@@ -3,6 +3,7 @@ export const SETTINGS_SECTIONS = [
 	'appearance',
 	'connections',
 	'notifications',
+	'labels',
 	'shortcuts'
 ] as const;
 

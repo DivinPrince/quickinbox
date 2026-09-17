@@ -57,6 +57,7 @@
 >
 	<Sidebar
 		counts={data.counts}
+		labels={data.labels}
 		domains={data.domains}
 		activeDomainId={data.activeDomainId}
 		isAdmin={data.user.is_admin}
@@ -87,6 +88,7 @@
 	{#if !stacked}
 		<MobileChrome
 			counts={data.counts}
+			labels={data.labels}
 			domains={data.domains}
 			activeDomainId={data.activeDomainId}
 			isAdmin={data.user.is_admin}

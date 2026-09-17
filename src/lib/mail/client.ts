@@ -1,11 +1,12 @@
 export async function runMailAction(
 	action: string,
-	ids: string[] = []
+	ids: string[] = [],
+	extra: Record<string, unknown> = {}
 ): Promise<{ ok: boolean; affected?: number; error?: string }> {
 	const response = await fetch('/api/mail/actions', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ action, ids })
+		body: JSON.stringify({ action, ids, ...extra })
 	});
 	const body = (await response.json()) as { ok?: boolean; affected?: number; error?: string };
 	if (!response.ok) {
@@ -14,7 +15,10 @@ export async function runMailAction(
 	return { ok: true, affected: body.affected };
 }
 
-export async function patchThread(id: string, flags: Record<string, boolean>): Promise<void> {
+export async function patchThread(
+	id: string,
+	flags: Record<string, boolean | string>
+): Promise<void> {
 	const response = await fetch(`/api/mail/${id}`, {
 		method: 'PATCH',
 		headers: { 'Content-Type': 'application/json' },

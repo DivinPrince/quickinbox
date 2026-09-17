@@ -33,8 +33,8 @@ Accounts:
   Every command accepts --account <name> (-a) to act on a specific account.
 
 Mail:
-  quickinbox inbox [--page N] [--unread] [--domain ID] [--all-accounts]
-  quickinbox search <query> [--view inbox|sent|drafts|starred|trash] [--all-accounts]
+  quickinbox inbox [--page N] [--unread] [--category primary|social|promotions|updates|forums] [--all-accounts]
+  quickinbox search <query> [--view inbox|sent|drafts|starred|trash|spam|archive] [--category …] [--all-accounts]
   quickinbox read <thread-or-message-id>
   quickinbox send --to <addr> --subject <text> [--body <text>] [--from <address-id>]
   quickinbox reply <id> [--body <text>]
@@ -223,15 +223,34 @@ async function resolveUserId(client: QuickInboxClient, idOrEmail: string): Promi
 function mailboxView(value: string | undefined): MailboxView {
 	switch (value) {
 		case 'inbox':
+		case 'archive':
 		case 'starred':
 		case 'drafts':
 		case 'sent':
 		case 'trash':
+		case 'spam':
 			return value;
 		case undefined:
 			return 'inbox';
 		default:
-			throw new Error('view must be inbox, sent, drafts, starred, or trash');
+			throw new Error('view must be inbox, archive, sent, drafts, starred, trash, or spam');
+	}
+}
+
+function inboxCategory(
+	value: string | undefined
+): 'primary' | 'social' | 'promotions' | 'updates' | 'forums' | undefined {
+	switch (value) {
+		case 'primary':
+		case 'social':
+		case 'promotions':
+		case 'updates':
+		case 'forums':
+			return value;
+		case undefined:
+			return undefined;
+		default:
+			throw new Error('category must be primary, social, promotions, updates, or forums');
 	}
 }
 
@@ -322,7 +341,8 @@ async function run(argv: string[]): Promise<number> {
 				view: 'inbox' as const,
 				page: Number(flagString(flags, 'page')) || 1,
 				unread: flagBool(flags, 'unread'),
-				domain: flagString(flags, 'domain')
+				domain: flagString(flags, 'domain'),
+				category: inboxCategory(flagString(flags, 'category'))
 			};
 			if (flagBool(flags, 'all-accounts')) {
 				const result = await listThreadsAcross(await clientsFromConfig(flags), query);
@@ -341,6 +361,7 @@ async function run(argv: string[]): Promise<number> {
 			const query = {
 				q,
 				view: mailboxView(flagString(flags, 'view')),
+				category: inboxCategory(flagString(flags, 'category')),
 				page: Number(flagString(flags, 'page')) || 1
 			};
 			if (flagBool(flags, 'all-accounts')) {

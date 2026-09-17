@@ -31,6 +31,9 @@
 	// Resend secrets (when EMAIL_PROVIDER=resend or unset):
 	//   wrangler secret put RESEND_API_KEY
 	//   wrangler secret put RESEND_WEBHOOK_SECRET
+	// Optional inbound classification:
+	//   wrangler secret put TYPESAFE_API_KEY
+	// Cloudflare Email uses the send_email binding below plus CLOUDFLARE_MAIL_DOMAINS.
 	// Cloudflare Email uses the send_email binding below plus CLOUDFLARE_MAIL_DOMAINS.
 	// Locally, put values in .dev.vars (copy .dev.vars.example).
 

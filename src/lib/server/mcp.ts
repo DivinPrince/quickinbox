@@ -10,12 +10,15 @@ import {
 	listMailbox,
 	listThreadMessages,
 	markThreadRead,
-	setEmailFlags
+	setEmailFlags,
+	bumpMailboxEpoch
 } from './mail-store';
 import { resolveReplyFromAddress, sendAndStore } from './outbox';
 import { buildReferences, displaySubject } from './threads';
 import type { EmailProvider } from './email-provider';
 import type { OAuthScope } from './oauth';
+import { rememberSenders, listLabels, setThreadLabels } from './labels';
+import { isInboxCategory, INBOX_CATEGORIES } from '$lib/mail/categories';
 import type { MailboxView, ThreadMessage, User } from '$lib/types';
 
 /**
@@ -40,7 +43,8 @@ export type McpContext = {
 	origin: string;
 };
 
-const views = ['inbox', 'archive', 'starred', 'drafts', 'sent', 'trash'] as const;
+const views = ['inbox', 'archive', 'starred', 'drafts', 'sent', 'trash', 'spam'] as const;
+const categories = INBOX_CATEGORIES;
 const MAX_BODY_CHARS = 20_000;
 
 type ToolResult = {
@@ -144,6 +148,10 @@ export function createMcpServer(ctx: McpContext): McpServer {
 					'List mailbox conversations, newest first. Each row is a whole thread; use its latest_id or thread_id with get_thread.',
 				inputSchema: {
 					view: z.enum(views).optional().describe('Mailbox to list. Defaults to inbox.'),
+					category: z
+						.enum(categories)
+						.optional()
+						.describe('Inbox tab when view is inbox. Omit to list every tab.'),
 					q: z.string().optional().describe('Search participants, subject, and body.'),
 					page: z.number().int().positive().optional(),
 					unread: z.boolean().optional().describe('Only conversations with unread messages.'),
@@ -151,10 +159,11 @@ export function createMcpServer(ctx: McpContext): McpServer {
 					address: z.string().optional().describe('Address id (see whoami) to narrow to one mailbox.')
 				}
 			},
-			async ({ view, q, page, unread, starred, address }) => {
+			async ({ view, category, q, page, unread, starred, address }) => {
 				try {
 					const mailbox = await listMailbox(ctx.db, ctx.user.id, {
 						view: (view ?? 'inbox') as MailboxView,
+						category: category ?? null,
 						q,
 						page,
 						unreadOnly: unread,
@@ -175,13 +184,19 @@ export function createMcpServer(ctx: McpContext): McpServer {
 				inputSchema: {
 					q: z.string().describe('Search text.'),
 					view: z.enum(views).optional().describe('Mailbox to search. Defaults to inbox.'),
+					category: z.enum(categories).optional().describe('Inbox tab when view is inbox.'),
 					page: z.number().int().positive().optional()
 				}
 			},
-			async ({ q, view, page }) => {
+			async ({ q, view, category, page }) => {
 				try {
 					return textResult(
-						await listMailbox(ctx.db, ctx.user.id, { view: (view ?? 'inbox') as MailboxView, q, page })
+						await listMailbox(ctx.db, ctx.user.id, {
+							view: (view ?? 'inbox') as MailboxView,
+							category: category ?? null,
+							q,
+							page
+						})
 					);
 				} catch (error) {
 					return fail(error);
@@ -235,6 +250,21 @@ export function createMcpServer(ctx: McpContext): McpServer {
 						}))
 					);
 					return textResult({ threadId: thread.threadId, attachments });
+				} catch (error) {
+					return fail(error);
+				}
+			}
+		);
+
+		server.registerTool(
+			'list_labels',
+			{
+				description: 'List custom labels (not inbox category tabs).',
+				inputSchema: {}
+			},
+			async () => {
+				try {
+					return textResult({ labels: await listLabels(ctx.db, ctx.user.id) });
 				} catch (error) {
 					return fail(error);
 				}
@@ -327,24 +357,64 @@ export function createMcpServer(ctx: McpContext): McpServer {
 		server.registerTool(
 			'update_thread',
 			{
-				description: 'Mark a conversation read/unread, star it, archive it, or move it to trash.',
+				description: 'Mark a conversation read/unread, star it, archive it, move it to spam, or set its inbox tab.',
 				inputSchema: {
 					id: z.string().describe('Thread id or message id.'),
 					isRead: z.boolean().optional(),
 					isStarred: z.boolean().optional(),
 					archived: z.boolean().optional(),
-					trashed: z.boolean().optional()
+					trashed: z.boolean().optional(),
+					spam: z.boolean().optional(),
+					category: z.enum(categories).optional()
 				}
 			},
-			async ({ id, ...flags }) => {
-				if (Object.values(flags).every((value) => value === undefined)) {
-					return textResult('Pass at least one of isRead, isStarred, archived, trashed', true);
+			async ({ id, isRead, isStarred, archived, trashed, spam, category }) => {
+				if (
+					[isRead, isStarred, archived, trashed, spam, category].every((value) => value === undefined)
+				) {
+					return textResult(
+						'Pass at least one of isRead, isStarred, archived, trashed, spam, category',
+						true
+					);
 				}
 				try {
 					const ids = await expandToThreads(ctx.db, ctx.user.id, [id]);
-					const changed = await setEmailFlags(ctx.db, ctx.user.id, ids, flags);
+					const changed = await setEmailFlags(ctx.db, ctx.user.id, ids, {
+						isRead,
+						isStarred,
+						archived,
+						trashed,
+						spam,
+						spamSource: spam === undefined ? undefined : 'user',
+						category: isInboxCategory(category) ? category : undefined,
+						categorySource: category !== undefined ? 'user' : undefined
+					});
 					if (changed === 0) return textResult(`No message or thread with id ${id}`, true);
+					if (spam === true) await rememberSenders(ctx.db, ctx.user.id, ids, 'spam');
+					if (spam === false) await rememberSenders(ctx.db, ctx.user.id, ids, 'safe');
 					return textResult({ ok: true, messages_changed: changed });
+				} catch (error) {
+					return fail(error);
+				}
+			}
+		);
+
+		server.registerTool(
+			'set_thread_labels',
+			{
+				description: 'Replace the custom labels on a conversation. Pass an empty list to clear them.',
+				inputSchema: {
+					id: z.string().describe('Thread id or message id.'),
+					labelIds: z.array(z.string()).describe('Label ids from list_labels.')
+				}
+			},
+			async ({ id, labelIds }) => {
+				try {
+					const ids = await expandToThreads(ctx.db, ctx.user.id, [id]);
+					if (ids.length === 0) return textResult(`No message or thread with id ${id}`, true);
+					await setThreadLabels(ctx.db, ctx.user.id, ids, labelIds);
+					await bumpMailboxEpoch(ctx.db, ctx.user.id);
+					return textResult({ ok: true, messages_changed: ids.length });
 				} catch (error) {
 					return fail(error);
 				}

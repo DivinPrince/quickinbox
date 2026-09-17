@@ -9,7 +9,9 @@
 	import { APP_NAME } from '$lib/constants';
 	import { plural, t } from '$lib/i18n';
 	import { page } from '$app/stores';
-	import type { OutboundAttachmentInput } from '$lib/types';
+	import { INBOX_CATEGORIES, categoryNavKey, inboxCategoryPath } from '$lib/mail/categories';
+	import type { MailLabel, OutboundAttachmentInput } from '$lib/types';
+	import LabelChip from '$lib/components/LabelChip.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -25,10 +27,20 @@
 	let forwardTo = $state('');
 	let forwardHtml = $state('');
 	let includeAttachments = $state(true);
+	let moreOpen = $state(false);
 
 	const messages = $derived(data.messages);
 	const latest = $derived(messages[messages.length - 1]);
 	const starred = $derived(messages.some((message) => message.is_starred));
+	const allLabels = $derived((($page.data.labels ?? []) as MailLabel[]) ?? []);
+	const threadLabelIds = $derived.by(() => {
+		const ids = new Set<string>();
+		for (const message of messages) {
+			for (const label of message.labels ?? []) ids.add(label.id);
+		}
+		return [...ids];
+	});
+	const threadLabels = $derived(allLabels.filter((label) => threadLabelIds.includes(label.id)));
 	const forwardOpen = $derived(forwardTarget !== null);
 	const forwardedMessages = $derived.by(() => {
 		const target = forwardTarget;
@@ -54,11 +66,13 @@
 	const backHref = $derived(
 		data.trashed
 			? '/trash'
-			: data.archived
-				? '/inbox?view=archive'
-				: latest?.direction === 'outbound'
-					? '/sent'
-					: '/inbox'
+			: data.spam
+				? '/spam'
+				: data.archived
+					? '/inbox?view=archive'
+					: latest?.direction === 'outbound'
+						? '/sent'
+						: inboxCategoryPath(latest?.category ?? 'primary')
 	);
 
 	/**
@@ -89,7 +103,7 @@
 	const collapsedCount = $derived(messages.filter((message) => !opened.has(message.id)).length);
 
 	/** Flags apply to the conversation, not to the message that opened it. */
-	async function patch(body: Record<string, boolean>): Promise<Response | undefined> {
+	async function patch(body: Record<string, boolean | string>): Promise<Response | undefined> {
 		if (!latest) return;
 		return fetch(`/api/mail/${latest.id}`, {
 			method: 'PATCH',
@@ -130,6 +144,62 @@
 	async function restore() {
 		await patch({ trashed: false });
 		goto('/inbox');
+	}
+
+	async function reportSpam() {
+		error = '';
+		try {
+			const response = await patch({ spam: true });
+			if (!response?.ok) {
+				error = t('mailbox.couldNotUpdateConversation');
+				return;
+			}
+			goto(inboxCategoryPath(latest?.category ?? 'primary'));
+		} catch {
+			error = t('mailbox.conversationNetwork');
+		}
+	}
+
+	async function notSpam() {
+		error = '';
+		try {
+			const response = await patch({ spam: false });
+			if (!response?.ok) {
+				error = t('mailbox.couldNotUpdateConversation');
+				return;
+			}
+			goto(inboxCategoryPath(latest?.category ?? 'primary'));
+		} catch {
+			error = t('mailbox.conversationNetwork');
+		}
+	}
+
+	async function moveTo(category: (typeof INBOX_CATEGORIES)[number]) {
+		moreOpen = false;
+		error = '';
+		try {
+			const response = await patch({ category });
+			if (!response?.ok) {
+				error = t('mailbox.couldNotUpdateConversation');
+				return;
+			}
+			goto(inboxCategoryPath(category));
+		} catch {
+			error = t('mailbox.conversationNetwork');
+		}
+	}
+
+	async function toggleLabel(labelId: string) {
+		if (!latest) return;
+		const next = threadLabelIds.includes(labelId)
+			? threadLabelIds.filter((id) => id !== labelId)
+			: [...threadLabelIds, labelId];
+		await fetch(`/api/mail/${latest.id}/labels`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ labelIds: next })
+		});
+		await invalidateAll();
 	}
 
 	function goBack() {
@@ -285,6 +355,13 @@
 				>
 					<Icon name="delete-bin-2-line" size={16} />
 				</button>
+			{:else if data.spam}
+				<button type="button" class="icon-btn" aria-label={t('mailbox.notSpam')} onclick={notSpam}>
+					<Icon name="inbox-line" size={16} />
+				</button>
+				<button type="button" class="icon-btn" aria-label={t('mailbox.moveToTrash')} onclick={trash}>
+					<Icon name="delete-bin-line" size={16} />
+				</button>
 			{:else}
 				<button type="button" class="icon-btn" aria-label={t('mailbox.markUnread')} onclick={markUnread}>
 					<Icon name="mail-line" size={16} />
@@ -297,10 +374,48 @@
 				>
 					<Icon name={data.archived ? 'inbox-line' : 'archive-line'} size={16} />
 				</button>
+				<button type="button" class="icon-btn" aria-label={t('mailbox.reportSpam')} onclick={reportSpam}>
+					<Icon name="spam-2-line" size={16} />
+				</button>
 				<button type="button" class="icon-btn" aria-label={t('mailbox.moveToTrash')} onclick={trash}>
 					<Icon name="delete-bin-line" size={16} />
 				</button>
 			{/if}
+
+			<div class="more">
+				<button
+					type="button"
+					class="icon-btn"
+					aria-label={t('thread.more')}
+					aria-expanded={moreOpen}
+					onclick={() => (moreOpen = !moreOpen)}
+				>
+					<Icon name="more-line" size={16} />
+				</button>
+				{#if moreOpen}
+					<button type="button" class="backdrop" aria-label={t('common.close')} onclick={() => (moreOpen = false)}
+					></button>
+					<div class="menu" role="menu">
+						{#each INBOX_CATEGORIES as category (category)}
+							<button type="button" class="menu-item" onclick={() => moveTo(category)}>
+								{t('thread.moveTo', { category: t(categoryNavKey(category)) })}
+							</button>
+						{/each}
+						{#if allLabels.length > 0}
+							<p class="menu-label">{t('thread.labels')}</p>
+							{#each allLabels as label (label.id)}
+								<button type="button" class="menu-item" onclick={() => toggleLabel(label.id)}>
+									<span class="swatch" style="background: {label.color}"></span>
+									{label.name}
+									{#if threadLabelIds.includes(label.id)}
+										<Icon name="check-line" size={14} />
+									{/if}
+								</button>
+							{/each}
+						{/if}
+					</div>
+				{/if}
+			</div>
 
 			<button
 				type="button"
@@ -331,6 +446,13 @@
 				<span class="thread-count">{plural($page.data.locale, 'thread.messagesCount', 'thread.messagesCount', messages.length)}</span>
 			{/if}
 		</div>
+		{#if threadLabels.length > 0}
+			<div class="thread-labels">
+				{#each threadLabels as label (label.id)}
+					<LabelChip {label} />
+				{/each}
+			</div>
+		{/if}
 
 		{#if collapsedCount > 0}
 			<button type="button" class="expand-all" onclick={expandAll}>
@@ -465,6 +587,71 @@
 		display: flex;
 		align-items: center;
 		gap: 0.375rem;
+		position: relative;
+	}
+
+	.more {
+		position: relative;
+	}
+
+	.backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 20;
+		background: transparent;
+		border: 0;
+	}
+
+	.menu {
+		position: absolute;
+		top: calc(100% + 0.25rem);
+		right: 0;
+		z-index: 21;
+		min-width: 12rem;
+		padding: 0.375rem;
+		border-radius: 0.75rem;
+		background: var(--color-surface);
+		box-shadow: var(--shadow-md);
+	}
+
+	.menu-item {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		width: 100%;
+		padding: 0.5rem 0.625rem;
+		border: 0;
+		border-radius: 0.5rem;
+		background: transparent;
+		font-size: 0.8125rem;
+		text-align: left;
+		color: var(--color-text);
+	}
+
+	.menu-item:hover {
+		background: var(--color-surface-muted);
+	}
+
+	.menu-label {
+		margin: 0.375rem 0.625rem 0.125rem;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--color-muted);
+	}
+
+	.swatch {
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: 999px;
+	}
+
+	.thread-labels {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.375rem;
+		margin: 0.5rem 0 0;
 	}
 
 	.toolbar-actions :global(.icon-btn.starred) {

@@ -12,8 +12,10 @@
 	import { runMailAction } from '$lib/mail/client';
 	import { MAIL_CHANGED_MESSAGE } from '$lib/mail/sync';
 	import { initials, parseAddressList, type AddressPart } from '$lib/mail/folders';
+	import { INBOX_CATEGORIES, categoryNavKey } from '$lib/mail/categories';
 	import { t } from '$lib/i18n';
-	import type { MailAddress, MailboxView, OutboundAttachmentInput, ThreadMessage } from '$lib/types';
+	import type { MailAddress, MailLabel, MailboxView, OutboundAttachmentInput, ThreadMessage } from '$lib/types';
+	import LabelChip from '$lib/components/LabelChip.svelte';
 	import type { ZeroIconName } from '../icons/names';
 	import Icon from '../icons/Icon.svelte';
 	import ComposerActions from '../overlays/ComposerActions.svelte';
@@ -131,6 +133,16 @@
 
 	const latest = $derived(thread?.messages[thread.messages.length - 1] ?? null);
 	const starred = $derived(thread?.messages.some((message) => message.is_starred) ?? false);
+	const currentCategory = $derived(latest?.category ?? 'primary');
+	const allLabels = $derived((($page.data.labels ?? []) as MailLabel[]) ?? []);
+	const threadLabelIds = $derived.by(() => {
+		const ids = new Set<string>();
+		for (const message of thread?.messages ?? []) {
+			for (const label of message.labels ?? []) ids.add(label.id);
+		}
+		return [...ids];
+	});
+	const threadLabels = $derived(allLabels.filter((label) => threadLabelIds.includes(label.id)));
 	const people = $derived(thread ? threadPeople(thread.messages, selfEmails) : []);
 	const forwarding = $derived(replyMode === 'forward' || replyMode === 'forwardAll');
 	const forwardedMessages = $derived(
@@ -241,12 +253,32 @@
 		return email;
 	}
 
-	async function act(action: string) {
+	async function act(action: string, extra: Record<string, unknown> = {}) {
 		if (!latest) return;
 		menuFor = null;
-		await runMailAction(action, [latest.id]);
+		await runMailAction(action, [latest.id], extra);
 		onClose();
 		await invalidateAll();
+	}
+
+	async function toggleLabel(labelId: string) {
+		if (!latest) return;
+		const next = threadLabelIds.includes(labelId)
+			? threadLabelIds.filter((id) => id !== labelId)
+			: [...threadLabelIds, labelId];
+		await fetch(`/api/mail/${latest.id}/labels`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ labelIds: next })
+		});
+		await invalidateAll();
+		if (thread) {
+			const selected = allLabels.filter((label) => next.includes(label.id));
+			thread = {
+				...thread,
+				messages: thread.messages.map((message) => ({ ...message, labels: selected }))
+			};
+		}
 	}
 
 	async function toggleStar() {
@@ -438,12 +470,13 @@
 						<Icon name="Star2" class={starred ? 'z-star-on' : ''} size={16} />
 					</button>
 				</Tooltip>
-				<Tooltip text={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}>
+				<Tooltip text={view === 'spam' ? t('mailbox.notSpam') : view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}>
 					<button
 						type="button"
 						class="z-thread-icon"
-						aria-label={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}
-						onclick={() => act(view === 'archive' ? 'unarchive' : 'archive')}
+						aria-label={view === 'spam' ? t('mailbox.notSpam') : view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}
+						onclick={() =>
+							act(view === 'spam' ? 'unspam' : view === 'archive' ? 'unarchive' : 'archive')}
 					>
 						<Icon name="Archive2" size={16} />
 					</button>
@@ -477,11 +510,40 @@
 									<Icon name="Inbox" size={14} />
 									{t('mailbox.moveToInbox')}
 								</button>
+							{:else if view === 'spam'}
+								<button type="button" onclick={() => act('unspam')}>
+									<Icon name="Inbox" size={14} />
+									{t('mailbox.notSpam')}
+								</button>
 							{:else}
 								<button type="button" onclick={() => act('archive')}>
 									<Icon name="Archive2" size={14} />
 									{t('nav.archive')}
 								</button>
+								<button type="button" onclick={() => act('spam')}>
+									<Icon name="Danger" size={14} />
+									{t('mailbox.reportSpam')}
+								</button>
+							{/if}
+							{#each INBOX_CATEGORIES as category (category)}
+								<button
+									type="button"
+									onclick={() => act('categorize', { category })}
+									aria-checked={currentCategory === category}
+								>
+									<Icon name="Inbox" size={14} />
+									{t('thread.moveTo', { category: t(categoryNavKey(category)) })}
+								</button>
+							{/each}
+							{#if allLabels.length > 0}
+								<div class="z-menu-label">{t('thread.labels')}</div>
+								{#each allLabels as label (label.id)}
+									<button type="button" onclick={() => toggleLabel(label.id)}>
+										<span class="z-label-dot" style="background: {label.color}"></span>
+										{label.name}
+										{#if threadLabelIds.includes(label.id)}<Icon name="Check" size={14} />{/if}
+									</button>
+								{/each}
 							{/if}
 						</div>
 					{/if}
@@ -497,6 +559,13 @@
 						<span class="z-thread-count">[{thread.messages.length}]</span>
 					{/if}
 				</h1>
+				{#if threadLabels.length > 0}
+					<div class="z-people">
+						{#each threadLabels as label (label.id)}
+							<LabelChip {label} />
+						{/each}
+					</div>
+				{/if}
 				{#if people.length > 0}
 					{@const chips = visiblePeople(people)}
 					<div class="z-people">

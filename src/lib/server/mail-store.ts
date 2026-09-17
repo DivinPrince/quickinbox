@@ -4,15 +4,20 @@ import { MAX_BODY_BYTES } from './constants';
 import { stripQuotedText } from '$lib/utils/quotes';
 import { displaySubject, normalizeSubject, resolveThreadId } from './threads';
 import { buildThreadParticipants } from './thread-participants';
+import { emptyMailboxCounts, parseInboxCategory } from '$lib/mail/categories';
+import { labelsForEmails } from './labels';
 import type {
+	ClassificationSource,
 	DeliveryStatus,
 	EmailAttachmentMeta,
 	EmailRow,
 	EmailSummary,
+	InboxCategory,
 	MailboxCounts,
 	MailboxPage,
 	MailboxView,
 	MailStatus,
+	ThreadLabel,
 	ThreadMessage,
 	ThreadSummary
 } from '$lib/types';
@@ -112,7 +117,7 @@ export async function insertEmail(
 	if (input.direction === 'inbound') {
 		await db
 			.prepare(
-				`UPDATE emails SET archived_at = NULL
+				`UPDATE emails SET archived_at = NULL, updated_at = datetime('now')
 				 WHERE user_id = ? AND COALESCE(thread_id, id) = ?`
 			)
 			.bind(input.userId, threadId)
@@ -185,17 +190,19 @@ export async function updateEmailStatusByProviderId(
 function viewFilter(view: MailboxView): string {
 	switch (view) {
 		case 'inbox':
-			return "e.deleted_at IS NULL AND e.archived_at IS NULL AND e.direction = 'inbound'";
+			return "e.deleted_at IS NULL AND e.archived_at IS NULL AND e.spam_at IS NULL AND e.direction = 'inbound'";
 		case 'archive':
-			return "e.deleted_at IS NULL AND e.archived_at IS NOT NULL AND (e.status IS NULL OR e.status <> 'draft')";
+			return "e.deleted_at IS NULL AND e.spam_at IS NULL AND e.archived_at IS NOT NULL AND (e.status IS NULL OR e.status <> 'draft')";
 		case 'sent':
-			return "e.deleted_at IS NULL AND e.direction = 'outbound' AND (e.status IS NULL OR e.status <> 'draft')";
+			return "e.deleted_at IS NULL AND e.spam_at IS NULL AND e.direction = 'outbound' AND (e.status IS NULL OR e.status <> 'draft')";
 		case 'drafts':
-			return "e.deleted_at IS NULL AND e.status = 'draft'";
+			return "e.deleted_at IS NULL AND e.spam_at IS NULL AND e.status = 'draft'";
 		case 'starred':
-			return "e.deleted_at IS NULL AND e.is_starred = 1 AND (e.status IS NULL OR e.status <> 'draft')";
+			return "e.deleted_at IS NULL AND e.spam_at IS NULL AND e.is_starred = 1 AND (e.status IS NULL OR e.status <> 'draft')";
 		case 'trash':
 			return 'e.deleted_at IS NOT NULL';
+		case 'spam':
+			return 'e.deleted_at IS NULL AND e.spam_at IS NOT NULL';
 		default: {
 			const _never: never = view;
 			return _never;
@@ -232,6 +239,10 @@ export type MailboxQuery = {
 	attachmentsOnly?: boolean;
 	page?: number;
 	pageSize?: number;
+	/** Inbox tab. Null means every category (used for unscoped search). */
+	category?: InboxCategory | null;
+	/** Custom label; ignores inbox category and includes archived mail. */
+	labelId?: string | null;
 };
 
 type ThreadMessageRow = {
@@ -246,6 +257,8 @@ type ThreadMessageRow = {
 	is_read: number;
 	is_starred: number;
 	archived_at: string | null;
+	spam_at: string | null;
+	category: string | null;
 	has_attachments: number;
 	domain_id: string | null;
 	address_id: string | null;
@@ -255,8 +268,22 @@ type ThreadMessageRow = {
 
 /** Builds the WHERE clause and bindings shared by the count and the page query. */
 function buildScope(userId: string, query: MailboxQuery): { where: string; bindings: unknown[] } {
-	const filters = ['e.user_id = ?', viewFilter(query.view)];
+	const filters = ['e.user_id = ?'];
 	const bindings: unknown[] = [userId];
+
+	if (query.labelId) {
+		filters.push(
+			`e.deleted_at IS NULL AND e.spam_at IS NULL
+			 AND EXISTS (SELECT 1 FROM email_labels el WHERE el.email_id = e.id AND el.label_id = ?)`
+		);
+		bindings.push(query.labelId);
+	} else {
+		filters.push(viewFilter(query.view));
+		if (query.view === 'inbox' && query.category) {
+			filters.push('e.category = ?');
+			bindings.push(query.category);
+		}
+	}
 
 	if (query.domainId) {
 		filters.push('e.domain_id = ?');
@@ -341,7 +368,7 @@ export async function listMailbox(
 	const { results: messages } = await db
 		.prepare(
 			`SELECT m.id, COALESCE(m.thread_id, m.id) AS thread_id, m.direction, m.from_addr, m.from_name, m.to_addr,
-			        m.subject, m.is_read, m.is_starred, m.archived_at, m.created_at, m.domain_id, m.address_id, m.status,
+			        m.subject, m.is_read, m.is_starred, m.archived_at, m.spam_at, m.category, m.created_at, m.domain_id, m.address_id, m.status,
 			        substr(COALESCE(m.body_text, ''), 1, 4000) AS body_head,
 			        EXISTS(SELECT 1 FROM email_attachments a WHERE a.email_id = m.id) AS has_attachments
 			 FROM emails m
@@ -358,19 +385,34 @@ export async function listMailbox(
 		else byThread.set(message.thread_id, [message]);
 	}
 
+	const labelsByEmail = await labelsForEmails(
+		db,
+		messages.map((message) => message.id)
+	);
+
 	const threads = threadIds
 		.map((threadId) => byThread.get(threadId))
 		.filter((group): group is ThreadMessageRow[] => Boolean(group?.length))
-		.map(toThreadSummary);
+		.map((group) => toThreadSummary(group, labelsByEmail));
 
 	return { threads, total, page, pageCount, pageSize };
 }
 
 /** `messages` is the whole conversation, oldest first. */
-function toThreadSummary(messages: ThreadMessageRow[]): ThreadSummary {
+function toThreadSummary(
+	messages: ThreadMessageRow[],
+	labelsByEmail: Map<string, ThreadLabel[]> = new Map()
+): ThreadSummary {
 	const oldest = messages[0];
 	const latest = messages[messages.length - 1];
 	const participants = buildThreadParticipants(messages);
+	const latestInbound = [...messages].reverse().find((message) => message.direction === 'inbound');
+	const labels: ThreadLabel[] = [];
+	for (const message of messages) {
+		for (const label of labelsByEmail.get(message.id) ?? []) {
+			if (!labels.some((entry) => entry.id === label.id)) labels.push(label);
+		}
+	}
 
 	return {
 		thread_id: oldest.thread_id,
@@ -384,10 +426,13 @@ function toThreadSummary(messages: ThreadMessageRow[]): ThreadSummary {
 		is_starred: messages.some((message) => message.is_starred === 1),
 		is_draft: latest.status === 'draft',
 		is_archived: messages.every((message) => message.archived_at !== null),
+		is_spam: messages.some((message) => message.spam_at !== null),
 		has_attachments: messages.some((message) => message.has_attachments === 1),
 		domain_id: latest.domain_id,
 		address_id: latest.address_id,
 		status: latest.status === 'draft' ? null : latest.status,
+		category: parseInboxCategory(latestInbound?.category ?? latest.category),
+		labels,
 		created_at: latest.created_at
 	};
 }
@@ -414,7 +459,7 @@ export async function listEmails(
 	const { results } = await db
 		.prepare(
 				`SELECT e.id, e.direction, e.from_addr, e.to_addr, e.subject, e.is_read, e.is_starred, e.archived_at,
-				        e.created_at, e.domain_id, e.address_id, e.status,
+				        e.spam_at, e.created_at, e.domain_id, e.address_id, e.status,
 			        substr(COALESCE(e.body_text, ''), 1, 4000) AS body_head,
 			        EXISTS(SELECT 1 FROM email_attachments a WHERE a.email_id = e.id) AS has_attachments
 			 FROM emails e
@@ -436,6 +481,7 @@ export async function listEmails(
 		is_starred: row.is_starred === 1,
 		is_draft: row.status === 'draft',
 		is_archived: row.archived_at !== null,
+		is_spam: row.spam_at !== null,
 		has_attachments: row.has_attachments === 1,
 		domain_id: row.domain_id,
 		address_id: row.address_id,
@@ -449,8 +495,13 @@ export async function listEmails(
  * (read, star, archive) do not move this, so a live poll can refresh on new
  * mail without fighting the user's current selection.
  */
-export function encodeMailboxCursor(messageCount: number, latestRowid: number): string {
-	return `${messageCount}:${latestRowid}`;
+export function encodeMailboxCursor(
+	messageCount: number,
+	latestRowid: number,
+	epoch = 0
+): string {
+	if (!epoch) return `${messageCount}:${latestRowid}`;
+	return `${messageCount}:${latestRowid}:${epoch}`;
 }
 
 export async function getMailboxCursor(
@@ -465,15 +516,32 @@ export async function getMailboxCursor(
 		bindings.push(domainId);
 	}
 
-	const row = await db
-		.prepare(
-			`SELECT COUNT(*) AS message_count, COALESCE(MAX(rowid), 0) AS latest_rowid
-			 FROM emails WHERE ${scope}`
-		)
-		.bind(...bindings)
-		.first<{ message_count: number | string | null; latest_rowid: number | string | null }>();
+	const [row, epochRow] = await Promise.all([
+		db
+			.prepare(
+				`SELECT COUNT(*) AS message_count, COALESCE(MAX(rowid), 0) AS latest_rowid
+				 FROM emails WHERE ${scope}`
+			)
+			.bind(...bindings)
+			.first<{ message_count: number | string | null; latest_rowid: number | string | null }>(),
+		db
+			.prepare('SELECT COALESCE(mailbox_epoch, 0) AS mailbox_epoch FROM users WHERE id = ?')
+			.bind(userId)
+			.first<{ mailbox_epoch: number | string | null }>()
+	]);
 
-	return encodeMailboxCursor(Number(row?.message_count ?? 0), Number(row?.latest_rowid ?? 0));
+	return encodeMailboxCursor(
+		Number(row?.message_count ?? 0),
+		Number(row?.latest_rowid ?? 0),
+		Number(epochRow?.mailbox_epoch ?? 0)
+	);
+}
+
+export async function bumpMailboxEpoch(db: D1Database, userId: string): Promise<void> {
+	await db
+		.prepare('UPDATE users SET mailbox_epoch = COALESCE(mailbox_epoch, 0) + 1 WHERE id = ?')
+		.bind(userId)
+		.run();
 }
 
 /**
@@ -494,30 +562,77 @@ export async function getMailboxCounts(
 
 	const thread = 'COALESCE(thread_id, id)';
 
+	const inboxOpen =
+		"deleted_at IS NULL AND archived_at IS NULL AND spam_at IS NULL AND direction = 'inbound'";
+	const byCategory = (category: InboxCategory, unread = false) =>
+		`COUNT(DISTINCT CASE WHEN ${inboxOpen} AND category = '${category}'${unread ? ' AND is_read = 0' : ''} THEN ${thread} END)`;
+
 	const row = await db
 		.prepare(
 			`SELECT
-				COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND archived_at IS NULL AND direction = 'inbound' THEN ${thread} END) AS inbox,
-				COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND archived_at IS NULL AND direction = 'inbound' AND is_read = 0 THEN ${thread} END) AS inbox_unread,
-				COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND archived_at IS NOT NULL AND (status IS NULL OR status <> 'draft') THEN ${thread} END) AS archive,
-				COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND is_starred = 1 AND (status IS NULL OR status <> 'draft') THEN ${thread} END) AS starred,
-				COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND status = 'draft' THEN ${thread} END) AS drafts,
-				COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND direction = 'outbound' AND (status IS NULL OR status <> 'draft') THEN ${thread} END) AS sent,
-				COUNT(DISTINCT CASE WHEN deleted_at IS NOT NULL THEN ${thread} END) AS trash
+				COUNT(DISTINCT CASE WHEN ${inboxOpen} THEN ${thread} END) AS inbox,
+				COUNT(DISTINCT CASE WHEN ${inboxOpen} AND is_read = 0 THEN ${thread} END) AS inbox_unread,
+				${byCategory('primary')} AS primary_count,
+				${byCategory('primary', true)} AS primary_unread,
+				${byCategory('social')} AS social,
+				${byCategory('social', true)} AS social_unread,
+				${byCategory('promotions')} AS promotions,
+				${byCategory('promotions', true)} AS promotions_unread,
+				${byCategory('updates')} AS updates,
+				${byCategory('updates', true)} AS updates_unread,
+				${byCategory('forums')} AS forums,
+				${byCategory('forums', true)} AS forums_unread,
+				COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND spam_at IS NULL AND archived_at IS NOT NULL AND (status IS NULL OR status <> 'draft') THEN ${thread} END) AS archive,
+				COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND spam_at IS NULL AND is_starred = 1 AND (status IS NULL OR status <> 'draft') THEN ${thread} END) AS starred,
+				COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND spam_at IS NULL AND status = 'draft' THEN ${thread} END) AS drafts,
+				COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND spam_at IS NULL AND direction = 'outbound' AND (status IS NULL OR status <> 'draft') THEN ${thread} END) AS sent,
+				COUNT(DISTINCT CASE WHEN deleted_at IS NOT NULL THEN ${thread} END) AS trash,
+				COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND spam_at IS NOT NULL THEN ${thread} END) AS spam
 			 FROM emails WHERE ${scope}`
 		)
 		.bind(...bindings)
-		.first<Record<keyof MailboxCounts, number | null>>();
+		.first<{
+			inbox: number | null;
+			inbox_unread: number | null;
+			primary_count: number | null;
+			primary_unread: number | null;
+			social: number | null;
+			social_unread: number | null;
+			promotions: number | null;
+			promotions_unread: number | null;
+			updates: number | null;
+			updates_unread: number | null;
+			forums: number | null;
+			forums_unread: number | null;
+			archive: number | null;
+			starred: number | null;
+			drafts: number | null;
+			sent: number | null;
+			trash: number | null;
+			spam: number | null;
+		}>();
 
-	return {
-		inbox: row?.inbox ?? 0,
-		inbox_unread: row?.inbox_unread ?? 0,
-		archive: row?.archive ?? 0,
-		starred: row?.starred ?? 0,
-		drafts: row?.drafts ?? 0,
-		sent: row?.sent ?? 0,
-		trash: row?.trash ?? 0
-	};
+	const counts = emptyMailboxCounts();
+	if (!row) return counts;
+	counts.inbox = row.inbox ?? 0;
+	counts.inbox_unread = row.inbox_unread ?? 0;
+	counts.primary = row.primary_count ?? 0;
+	counts.primary_unread = row.primary_unread ?? 0;
+	counts.social = row.social ?? 0;
+	counts.social_unread = row.social_unread ?? 0;
+	counts.promotions = row.promotions ?? 0;
+	counts.promotions_unread = row.promotions_unread ?? 0;
+	counts.updates = row.updates ?? 0;
+	counts.updates_unread = row.updates_unread ?? 0;
+	counts.forums = row.forums ?? 0;
+	counts.forums_unread = row.forums_unread ?? 0;
+	counts.archive = row.archive ?? 0;
+	counts.starred = row.starred ?? 0;
+	counts.drafts = row.drafts ?? 0;
+	counts.sent = row.sent ?? 0;
+	counts.trash = row.trash ?? 0;
+	counts.spam = row.spam ?? 0;
+	return counts;
 }
 
 export async function countUnread(
@@ -561,9 +676,13 @@ export type MailFlagUpdate = {
 	isStarred?: boolean;
 	archived?: boolean;
 	trashed?: boolean;
+	spam?: boolean;
+	spamSource?: ClassificationSource;
+	category?: InboxCategory;
+	categorySource?: ClassificationSource | null;
 };
 
-/** Applies list actions (read/unread, star, archive, trash, restore) to a set of rows. */
+/** Applies list actions (read/unread, star, archive, trash, restore, spam, category) to a set of rows. */
 export async function setEmailFlags(
 	db: D1Database,
 	userId: string,
@@ -574,6 +693,7 @@ export async function setEmailFlags(
 
 	const assignments: string[] = [];
 	const bindings: unknown[] = [];
+	let bumpEpoch = false;
 
 	if (update.isRead !== undefined) {
 		assignments.push('is_read = ?');
@@ -589,8 +709,23 @@ export async function setEmailFlags(
 	if (update.trashed !== undefined) {
 		assignments.push(update.trashed ? "deleted_at = datetime('now')" : 'deleted_at = NULL');
 	}
+	if (update.spam !== undefined) {
+		if (update.spam) {
+			assignments.push("spam_at = datetime('now')", 'archived_at = NULL', 'spam_source = ?');
+			bindings.push(update.spamSource ?? 'user');
+		} else {
+			assignments.push('spam_at = NULL', 'spam_source = NULL');
+		}
+		bumpEpoch = true;
+	}
+	if (update.category !== undefined) {
+		assignments.push('category = ?', 'category_source = ?');
+		bindings.push(update.category, update.categorySource ?? 'user');
+		bumpEpoch = true;
+	}
 
 	if (assignments.length === 0) return 0;
+	if (bumpEpoch) assignments.push("updated_at = datetime('now')");
 
 	const placeholders = ids.map(() => '?').join(', ');
 	const result = await db
@@ -600,6 +735,8 @@ export async function setEmailFlags(
 		)
 		.bind(...bindings, userId, ...ids)
 		.run();
+
+	if (bumpEpoch) await bumpMailboxEpoch(db, userId);
 
 	return result.meta?.changes ?? 0;
 }
@@ -644,6 +781,11 @@ export async function deleteEmailsPermanently(
 		.run();
 
 	await db
+		.prepare(`DELETE FROM email_labels WHERE email_id IN (${ownedPlaceholders})`)
+		.bind(...ownedIds)
+		.run();
+
+	await db
 		.prepare(`DELETE FROM emails WHERE user_id = ? AND id IN (${ownedPlaceholders})`)
 		.bind(userId, ...ownedIds)
 		.run();
@@ -655,14 +797,19 @@ export async function deleteEmailsPermanently(
 export async function markAllRead(
 	db: D1Database,
 	userId: string,
-	domainId?: string | null
+	domainId?: string | null,
+	category?: InboxCategory | null
 ): Promise<number> {
 	const bindings: unknown[] = [userId];
 	let scope =
-		"user_id = ? AND direction = 'inbound' AND deleted_at IS NULL AND archived_at IS NULL AND is_read = 0";
+		"user_id = ? AND direction = 'inbound' AND deleted_at IS NULL AND archived_at IS NULL AND spam_at IS NULL AND is_read = 0";
 	if (domainId) {
 		scope += ' AND domain_id = ?';
 		bindings.push(domainId);
+	}
+	if (category) {
+		scope += ' AND category = ?';
+		bindings.push(category);
 	}
 
 	const result = await db
@@ -671,6 +818,41 @@ export async function markAllRead(
 		.run();
 
 	return result.meta?.changes ?? 0;
+}
+
+export async function emptySpam(
+	db: D1Database,
+	bucket: R2Bucket | undefined,
+	userId: string
+): Promise<number> {
+	const { results } = await db
+		.prepare('SELECT id FROM emails WHERE user_id = ? AND spam_at IS NOT NULL AND deleted_at IS NULL')
+		.bind(userId)
+		.all<{ id: string }>();
+
+	return deleteEmailsPermanently(
+		db,
+		bucket,
+		userId,
+		results.map((row) => row.id)
+	);
+}
+
+export async function getThreadUserCategory(
+	db: D1Database,
+	userId: string,
+	threadId: string
+): Promise<InboxCategory | null> {
+	const row = await db
+		.prepare(
+			`SELECT category FROM emails
+			 WHERE user_id = ? AND COALESCE(thread_id, id) = ? AND category_source = 'user'
+			 LIMIT 1`
+		)
+		.bind(userId, threadId)
+		.first<{ category: string }>();
+
+	return row ? parseInboxCategory(row.category) : null;
 }
 
 export async function emptyTrash(
@@ -841,7 +1023,7 @@ export async function listThreadMessages(
 			`SELECT e.id, e.direction, e.from_addr, e.from_name, e.to_addr, e.cc_addr, e.subject,
 			        e.body_text, e.body_html, e.message_id, e.references_header,
 			        e.status, e.status_detail, e.is_read, e.is_starred, e.deleted_at,
-			        e.archived_at, e.created_at
+			        e.archived_at, e.category, e.spam_at, e.created_at
 			 FROM emails e
 			 WHERE e.user_id = ?
 			 AND COALESCE(e.thread_id, e.id) = ?
@@ -858,6 +1040,11 @@ export async function listThreadMessages(
 		>();
 
 	if (results.length === 0) return [];
+
+	const labelsByEmail = await labelsForEmails(
+		db,
+		results.map((message) => message.id)
+	);
 
 	// Every message in the thread can carry attachments — one round trip for all.
 	const placeholders = results.map(() => '?').join(', ');
@@ -876,9 +1063,11 @@ export async function listThreadMessages(
 	// and needs no further narrowing here.
 	return results.map((message) => ({
 		...message,
+		category: parseInboxCategory(message.category),
 		is_read: message.is_read === 1,
 		is_starred: message.is_starred === 1,
-		attachments: files.filter((file) => file.email_id === message.id)
+		attachments: files.filter((file) => file.email_id === message.id),
+		labels: labelsByEmail.get(message.id) ?? []
 	}));
 }
 
@@ -895,6 +1084,56 @@ export async function markThreadRead(
 		)
 		.bind(userId, email.thread_id ?? email.id)
 		.run();
+}
+
+/** Inbound mail that has never been auto- or user-classified (and is not trashed). */
+export const UNCLASSIFIED_INBOUND_WHERE = `direction = 'inbound'
+	AND deleted_at IS NULL
+	AND category_source IS NULL
+	AND spam_source IS NULL
+	AND (status IS NULL OR status <> 'draft')`;
+
+export type UnclassifiedCursor = {
+	createdAt: string;
+	id: string;
+};
+
+export async function countUnclassifiedInbound(db: D1Database, userId: string): Promise<number> {
+	const row = await db
+		.prepare(
+			`SELECT COUNT(*) AS n FROM emails
+			 WHERE user_id = ? AND ${UNCLASSIFIED_INBOUND_WHERE}`
+		)
+		.bind(userId)
+		.first<{ n: number }>();
+
+	return Number(row?.n ?? 0);
+}
+
+export async function listUnclassifiedInbound(
+	db: D1Database,
+	userId: string,
+	options: { after?: UnclassifiedCursor | null; limit: number }
+): Promise<EmailRow[]> {
+	const clauses = [`user_id = ? AND ${UNCLASSIFIED_INBOUND_WHERE}`];
+	const bindings: unknown[] = [userId];
+
+	if (options.after) {
+		clauses.push('(created_at > ? OR (created_at = ? AND id > ?))');
+		bindings.push(options.after.createdAt, options.after.createdAt, options.after.id);
+	}
+
+	const { results } = await db
+		.prepare(
+			`SELECT * FROM emails
+			 WHERE ${clauses.join(' AND ')}
+			 ORDER BY created_at ASC, id ASC
+			 LIMIT ?`
+		)
+		.bind(...bindings, options.limit)
+		.all<EmailRow>();
+
+	return results;
 }
 
 function truncate(value: string | null): string | null {

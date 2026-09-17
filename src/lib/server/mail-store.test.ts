@@ -4,9 +4,13 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { EmailRow } from '$lib/types';
 import { buildThreadParticipants } from './thread-participants';
 import {
+	countUnclassifiedInbound,
 	encodeMailboxCursor,
+	getMailboxCounts,
 	getMailboxCursor,
-	listForwardThreadMessages
+	listForwardThreadMessages,
+	listUnclassifiedInbound,
+	UNCLASSIFIED_INBOUND_WHERE
 } from './mail-store';
 
 describe('thread participants', () => {
@@ -140,6 +144,18 @@ test('mailbox cursor is a count plus latest rowid and can scope to a domain', as
 	const binds: unknown[][] = [];
 	const db = {
 		prepare(sql: string) {
+			if (sql.includes('mailbox_epoch')) {
+				return {
+					bind(...values: unknown[]) {
+						binds.push(values);
+						return {
+							async first() {
+								return { mailbox_epoch: 0 };
+							}
+						};
+					}
+				};
+			}
 			assert.match(sql, /COUNT\(\*\)/);
 			assert.match(sql, /MAX\(rowid\)/);
 			return {
@@ -161,5 +177,108 @@ test('mailbox cursor is a count plus latest rowid and can scope to a domain', as
 	assert.equal(encodeMailboxCursor(0, 0), '0:0');
 	assert.equal(await getMailboxCursor(db, 'user-1'), '9:41');
 	assert.equal(await getMailboxCursor(db, 'user-1', 'domain-9'), '4:41');
-	assert.deepEqual(binds, [['user-1'], ['user-1', 'domain-9']]);
+	assert.deepEqual(binds, [['user-1'], ['user-1'], ['user-1', 'domain-9'], ['user-1']]);
+});
+
+test('mailbox counts keep Primary unread separate from Social and exclude spam from every tab', async () => {
+	let sql = '';
+	const db = {
+		prepare(query: string) {
+			sql = query;
+			return {
+				bind() {
+					return {
+						async first() {
+							return {
+								inbox: 5,
+								inbox_unread: 3,
+								primary_count: 3,
+								primary_unread: 2,
+								social: 2,
+								social_unread: 1,
+								promotions: 0,
+								promotions_unread: 0,
+								updates: 0,
+								updates_unread: 0,
+								forums: 0,
+								forums_unread: 0,
+								archive: 0,
+								starred: 0,
+								drafts: 0,
+								sent: 0,
+								trash: 0,
+								spam: 4
+							};
+						}
+					};
+				}
+			};
+		}
+	} as unknown as D1Database;
+
+	const counts = await getMailboxCounts(db, 'user-1');
+	assert.equal(counts.primary_unread, 2);
+	assert.equal(counts.social_unread, 1);
+	assert.equal(counts.inbox_unread, 3);
+	assert.equal(counts.spam, 4);
+	assert.match(sql, /spam_at IS NULL/);
+	assert.match(sql, /spam_at IS NOT NULL/);
+	assert.match(sql, /category = 'primary'/);
+	assert.match(sql, /category = 'social'/);
+	assert.match(
+		sql,
+		/spam_at IS NULL AND direction = 'inbound' AND category = 'primary'/
+	);
+	assert.match(sql, /deleted_at IS NULL AND spam_at IS NOT NULL THEN/);
+});
+
+test('unclassified inbound mail is live inbound with no category or spam source', async () => {
+	let countSql = '';
+	let listSql = '';
+	const binds: unknown[][] = [];
+	const db = {
+		prepare(query: string) {
+			if (query.includes('COUNT(*)')) {
+				countSql = query;
+				return {
+					bind(...values: unknown[]) {
+						binds.push(values);
+						return {
+							async first() {
+								return { n: 3 };
+							}
+						};
+					}
+				};
+			}
+			listSql = query;
+			return {
+				bind(...values: unknown[]) {
+					binds.push(values);
+					return {
+						async all() {
+							return { results: [] };
+						}
+					};
+				}
+			};
+		}
+	} as unknown as D1Database;
+
+	assert.equal(await countUnclassifiedInbound(db, 'user-1'), 3);
+	await listUnclassifiedInbound(db, 'user-1', {
+		after: { createdAt: '2026-01-01 00:00:00', id: 'msg-1' },
+		limit: 1
+	});
+	assert.match(countSql, /COUNT\(\*\)/);
+	assert.match(countSql, /category_source IS NULL/);
+	assert.match(countSql, /spam_source IS NULL/);
+	assert.match(countSql, /direction = 'inbound'/);
+	assert.match(listSql, /created_at > \? OR \(created_at = \? AND id > \?\)/);
+	assert.match(listSql, /LIMIT \?/);
+	assert.match(UNCLASSIFIED_INBOUND_WHERE, /status <> 'draft'/);
+	assert.deepEqual(binds, [
+		['user-1'],
+		['user-1', '2026-01-01 00:00:00', '2026-01-01 00:00:00', 'msg-1', 1]
+	]);
 });

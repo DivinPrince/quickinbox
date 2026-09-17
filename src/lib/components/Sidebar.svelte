@@ -5,16 +5,18 @@
 	import DomainSwitcher from './DomainSwitcher.svelte';
 	import { APP_NAME } from '$lib/constants';
 	import { t } from '$lib/i18n';
-	import type { Domain, MailboxCounts } from '$lib/types';
+	import type { Domain, MailboxCounts, MailLabel } from '$lib/types';
 
 	let {
 		counts,
+		labels = [],
 		domains,
 		activeDomainId,
 		isAdmin,
 		collapsed = $bindable(false)
 	}: {
 		counts: MailboxCounts;
+		labels?: MailLabel[];
 		domains: Domain[];
 		activeDomainId: string | null;
 		isAdmin: boolean;
@@ -41,6 +43,7 @@
 		{ href: '/drafts', icon: 'draft-line', label: t('nav.drafts'), count: counts.drafts },
 		{ href: '/sent', icon: 'send-plane-line', label: t('nav.sent') },
 		{ href: '/starred', icon: 'star-line', label: t('nav.starred'), count: counts.starred },
+		{ href: '/spam', icon: 'spam-2-line', label: t('nav.spam'), count: counts.spam },
 		{ href: '/trash', icon: 'delete-bin-line', label: t('nav.trash'), count: counts.trash }
 	]);
 
@@ -59,6 +62,10 @@
 		if (pathname === '/inbox') {
 			const expectedView = new URLSearchParams(query).get('view');
 			const currentView = $page.url.searchParams.get('view');
+			const expectedLabel = new URLSearchParams(query).get('label');
+			const currentLabel = $page.url.searchParams.get('label');
+			if (expectedLabel) return currentLabel === expectedLabel;
+			if (currentLabel) return false;
 			return expectedView ? currentView === expectedView : currentView !== 'archive';
 		}
 
@@ -101,6 +108,25 @@
 			</a>
 		{/each}
 	</nav>
+
+	{#if labels.length > 0}
+		<div class="section">
+			{#if !collapsed}<p class="section-title">{t('nav.labels')}</p>{/if}
+			<nav class="nav">
+				{#each labels as label (label.id)}
+					<a
+						href={`/inbox?label=${encodeURIComponent(label.id)}`}
+						class="nav-link"
+						class:active={isActive(`/inbox?label=${encodeURIComponent(label.id)}`)}
+						title={collapsed ? label.name : undefined}
+					>
+						<span class="label-dot" style="background: {label.color}"></span>
+						{#if !collapsed}<span class="nav-label">{label.name}</span>{/if}
+					</a>
+				{/each}
+			</nav>
+		</div>
+	{/if}
 
 	{#if !collapsed && domains.length > 0}
 		<div class="section">
@@ -170,10 +196,20 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		min-width: 0;
 		font-size: 0.9375rem;
 		font-weight: 600;
 		letter-spacing: -0.02em;
 		color: var(--color-text);
+	}
+
+	.sidebar.collapsed .brand {
+		justify-content: center;
+		width: 100%;
+	}
+
+	.sidebar.collapsed :global(.logo) {
+		filter: none;
 	}
 
 	.new-message {
@@ -268,6 +304,13 @@
 		height: 0.4375rem;
 		border-radius: 9999px;
 		background: var(--color-accent);
+	}
+
+	.label-dot {
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: 9999px;
+		flex-shrink: 0;
 	}
 
 	.section {

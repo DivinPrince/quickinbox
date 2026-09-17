@@ -4,7 +4,7 @@ import { getEmailForUser, listThreadMessages, markThreadRead } from '$lib/server
 import { resolveReplyFromAddress } from '$lib/server/outbox';
 import { displaySubject } from '$lib/server/threads';
 import { listAddressesForUser } from '$lib/server/domains';
-import { folderPath, mailboxViewForEmail } from '$lib/mail/folders';
+	import { folderPath, mailboxViewForEmail } from '$lib/mail/folders';
 
 export const load: PageServerLoad = async ({ params, locals, platform }) => {
 	if (!locals.user || !platform?.env.DB) {
@@ -37,6 +37,7 @@ export const load: PageServerLoad = async ({ params, locals, platform }) => {
 		focusId: email.id,
 		trashed: Boolean(email.deleted_at),
 		archived: messages.length > 0 && messages.every((message) => Boolean(message.archived_at)),
+		spam: Boolean(email.spam_at),
 		subject: displaySubject(messages[0]?.subject ?? email.subject),
 		replyFrom: replyIdentity?.address ?? null,
 		replyFromName: replyIdentity?.label?.trim() || null,

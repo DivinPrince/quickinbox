@@ -88,6 +88,13 @@
 					badge: data.counts.archive || undefined,
 					shortcut: 'g a'
 				},
+				{
+					href: '/spam',
+					icon: 'Danger',
+					label: t('nav.spam'),
+					badge: data.counts.spam || undefined,
+					shortcut: 'g p'
+				},
 				{ href: '/trash', icon: 'Bin', label: t('nav.bin'), badge: data.counts.trash || undefined, shortcut: 'g b' }
 			]
 		}
@@ -99,13 +106,21 @@
 		{ href: '/settings/appearance', icon: 'Stars', label: t('nav.appearance') },
 		{ href: '/settings/connections', icon: 'Users', label: t('nav.connections') },
 		{ href: '/settings/notifications', icon: 'Bell', label: t('nav.notifications') },
+		{ href: '/settings/labels', icon: 'Tag', label: t('nav.labels') },
 		{ href: '/settings/shortcuts', icon: 'Tabs', label: t('nav.shortcuts'), shortcut: '?' },
 		...(data.user.is_admin ? [{ href: '/admin', icon: 'SettingsGear', label: t('nav.admin') }] : [])
 	]);
 
 	function isActive(href: string): boolean {
+		if (href.startsWith('/inbox?label=')) {
+			return $page.url.searchParams.get('label') === new URLSearchParams(href.split('?')[1]).get('label');
+		}
 		if (href === '/inbox') {
-			return pathname === '/inbox' && $page.url.searchParams.get('view') !== 'archive';
+			return (
+				pathname === '/inbox' &&
+				$page.url.searchParams.get('view') !== 'archive' &&
+				!$page.url.searchParams.get('label')
+			);
 		}
 		return pathname === href || pathname.startsWith(`${href}/`);
 	}
@@ -205,6 +220,7 @@
 				d: '/drafts',
 				t: '/sent',
 				a: '/archive',
+				p: '/spam',
 				b: '/trash',
 				s: '/settings/general'
 			};
@@ -298,6 +314,29 @@
 						{/each}
 					</div>
 				{/each}
+				{#if data.labels.length > 0}
+					<div class="z-nav-section">
+						{#if !collapsed || mobileOpen}<div class="z-nav-title">{t('nav.labels')}</div>{/if}
+						{#each data.labels as label (label.id)}
+							<Tooltip
+								text={label.name}
+								side="right"
+								enabled={collapsed && !mobileOpen}
+								stretch
+							>
+								<a
+									href={`/inbox?label=${encodeURIComponent(label.id)}`}
+									class="z-nav-link"
+									class:active={isActive(`/inbox?label=${encodeURIComponent(label.id)}`)}
+									aria-label={collapsed && !mobileOpen ? label.name : undefined}
+								>
+									<span class="z-label-dot" style="background: {label.color}"></span>
+									{#if !collapsed || mobileOpen}<span>{label.name}</span>{/if}
+								</a>
+							</Tooltip>
+						{/each}
+					</div>
+				{/if}
 			{/if}
 		</nav>
 

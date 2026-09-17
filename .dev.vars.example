@@ -38,3 +38,9 @@ RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # VAPID_PUBLIC_KEY=REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY
 # VAPID_PRIVATE_KEY=REPLACE_WITH_YOUR_VAPID_PRIVATE_KEY
 # VAPID_SUBJECT=mailto:admin@example.com
+
+# --- Inbound classification (optional) ---
+# TypeSafe System One classifies inbound mail into inbox tabs (Primary, Social,
+# Promotions, Updates, Forums) and spam. Without this key everything lands in
+# Primary; users can still move tabs, report spam, and apply labels.
+# TYPESAFE_API_KEY=

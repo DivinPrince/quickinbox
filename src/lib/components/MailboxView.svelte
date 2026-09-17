@@ -10,14 +10,18 @@
 	import PullToRefresh from './PullToRefresh.svelte';
 	import { formatRelativeDate } from '$lib/utils/date';
 	import { haptic, isPrimaryTab } from '$lib/app-chrome';
+	import { INBOX_CATEGORIES, categoryNavKey, categoryUnread } from '$lib/mail/categories';
 	import { plural, t } from '$lib/i18n';
 	import type {
 		MailAddress,
+		MailLabel,
+		MailboxCounts,
 		MailboxFilters,
 		MailboxPage,
 		MailboxView,
 		ThreadSummary
 	} from '$lib/types';
+	import LabelChip from './LabelChip.svelte';
 
 	let {
 		view,
@@ -35,10 +39,19 @@
 		starred: { title: t('nav.starred'), icon: 'star-line', empty: t('mailbox.empty.starred') },
 		drafts: { title: t('nav.drafts'), icon: 'draft-line', empty: t('mailbox.empty.drafts') },
 		sent: { title: t('nav.sent'), icon: 'send-plane-line', empty: t('mailbox.empty.sent') },
-		trash: { title: t('nav.trash'), icon: 'delete-bin-line', empty: t('mailbox.empty.trash') }
+		trash: { title: t('nav.trash'), icon: 'delete-bin-line', empty: t('mailbox.empty.trash') },
+		spam: { title: t('nav.spam'), icon: 'spam-2-line', empty: t('mailbox.empty.spam') }
 	});
 
-	const meta = $derived(META[view]);
+	const labels = $derived((($currentPage.data.labels ?? []) as MailLabel[]) ?? []);
+	const counts = $derived(($currentPage.data.counts ?? null) as MailboxCounts | null);
+	const activeLabel = $derived(labels.find((label) => label.id === filters.labelId) ?? null);
+	const meta = $derived(
+		activeLabel
+			? { title: activeLabel.name, icon: 'price-tag-3-line', empty: t('mailbox.empty.label') }
+			: META[view]
+	);
+	const showCategoryTabs = $derived(view === 'inbox' && !filters.labelId);
 	const addresses = $derived(($currentPage.data.addresses ?? []) as MailAddress[]);
 
 	/** The identity a conversation arrived on — shown only when it disambiguates. */
@@ -55,6 +68,7 @@
 	let actionError = $state('');
 	let filterOpen = $state(false);
 	let moreOpen = $state(false);
+	let moveOpen = $state(false);
 	let selectMenuOpen = $state(false);
 	let selecting = $state(false);
 	let hadSelection = $state(false);
@@ -137,7 +151,7 @@
 	}
 
 	/** One entry point for every list action, so the UI always refreshes after. */
-	async function run(action: string, ids: string[] = selected) {
+	async function run(action: string, ids: string[] = selected, extra: Record<string, unknown> = {}) {
 		if (busy) return;
 		actionError = '';
 		busy = true;
@@ -145,7 +159,7 @@
 			const response = await fetch('/api/mail/actions', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ action, ids })
+				body: JSON.stringify({ action, ids, ...extra })
 			});
 			if (!response.ok) {
 				actionError = t('mailbox.updateFailed');
@@ -183,12 +197,14 @@
 	}
 
 	function swipeLeftAction(thread: ThreadSummary) {
-		if (view === 'trash') return { icon: 'delete-bin-2-line', label: t('mailbox.delete'), tone: 'danger' as const };
+		if (view === 'trash' || view === 'spam')
+			return { icon: 'delete-bin-2-line', label: t('mailbox.delete'), tone: 'danger' as const };
 		return { icon: 'delete-bin-line', label: t('nav.trash'), tone: 'danger' as const };
 	}
 
 	function swipeRightAction(thread: ThreadSummary) {
 		if (view === 'trash') return { icon: 'arrow-go-back-line', label: t('mailbox.restore'), tone: 'good' as const };
+		if (view === 'spam') return { icon: 'inbox-line', label: t('mailbox.notSpam'), tone: 'good' as const };
 		return {
 			icon: thread.is_starred ? 'star-fill' : 'star-line',
 			label: thread.is_starred ? t('mailbox.unstar') : t('mailbox.star'),
@@ -197,12 +213,13 @@
 	}
 
 	function onSwipeLeft(thread: ThreadSummary) {
-		if (view === 'trash') void run('delete', [thread.latest_id]);
+		if (view === 'trash' || view === 'spam') void run('delete', [thread.latest_id]);
 		else void run('trash', [thread.latest_id]);
 	}
 
 	function onSwipeRight(thread: ThreadSummary) {
 		if (view === 'trash') void run('restore', [thread.latest_id]);
+		else if (view === 'spam') void run('unspam', [thread.latest_id]);
 		else void toggleStar(thread);
 	}
 
@@ -335,7 +352,17 @@
 					>
 						<Icon name="star-off-line" size={16} />
 					</button>
-					{#if view === 'archive'}
+					{#if view === 'spam'}
+						<button
+							type="button"
+							class="tool-btn"
+							title={t('mailbox.notSpam')}
+							disabled={busy}
+							onclick={() => run('unspam')}
+						>
+							<Icon name="inbox-line" size={16} />
+						</button>
+					{:else if view === 'archive'}
 						<button
 							type="button"
 							class="tool-btn"
@@ -355,6 +382,49 @@
 						>
 							<Icon name="archive-line" size={16} />
 						</button>
+						<button
+							type="button"
+							class="tool-btn"
+							title={t('mailbox.reportSpam')}
+							disabled={busy}
+							onclick={() => run('spam')}
+						>
+							<Icon name="spam-2-line" size={16} />
+						</button>
+						<div class="more">
+							<button
+								type="button"
+								class="tool-btn"
+								title={t('mailbox.moveTo')}
+								disabled={busy}
+								aria-expanded={moveOpen}
+								onclick={() => (moveOpen = !moveOpen)}
+							>
+								<Icon name="folder-transfer-line" size={16} />
+							</button>
+							{#if moveOpen}
+								<button
+									type="button"
+									class="backdrop"
+									aria-label={t('mailbox.closeMenu')}
+									onclick={() => (moveOpen = false)}
+								></button>
+								<div class="menu menu-left" role="menu">
+									{#each INBOX_CATEGORIES as category (category)}
+										<button
+											type="button"
+											class="menu-item"
+											onclick={() => {
+												moveOpen = false;
+												void run('categorize', selected, { category });
+											}}
+										>
+											{t(categoryNavKey(category))}
+										</button>
+									{/each}
+								</div>
+							{/if}
+						</div>
 					{/if}
 
 					{#if view === 'trash'}
@@ -505,7 +575,16 @@
 									<Icon name="close-circle-line" size={15} /> {t('mailbox.clearFilters')}
 								</button>
 							{/if}
-							<button type="button" class="menu-item" onclick={() => run('read-all', [])}>
+							<button
+								type="button"
+								class="menu-item"
+								onclick={() =>
+									run(
+										'read-all',
+										[],
+										view === 'inbox' && !filters.labelId ? { category: filters.category } : {}
+									)}
+							>
 								<Icon name="mail-open-line" size={15} /> {t('mailbox.markAllRead')}
 							</button>
 							<button type="button" class="menu-item" onclick={() => invalidateAll()}>
@@ -518,6 +597,15 @@
 									onclick={() => run('empty-trash', [])}
 								>
 									<Icon name="delete-bin-2-line" size={15} /> {t('mailbox.emptyTrash')}
+								</button>
+							{/if}
+							{#if view === 'spam'}
+								<button
+									type="button"
+									class="menu-item danger"
+									onclick={() => run('empty-spam', [])}
+								>
+									<Icon name="delete-bin-2-line" size={15} /> {t('mailbox.emptySpam')}
 								</button>
 							{/if}
 						</div>
@@ -645,6 +733,28 @@
 		</div>
 	</header>
 
+	{#if showCategoryTabs}
+		<nav class="category-tabs" aria-label={t('nav.inbox')}>
+			{#each INBOX_CATEGORIES as category (category)}
+				{@const unread = counts ? categoryUnread(counts, category) : 0}
+				<a
+					href={withParams({
+						category: category === 'primary' ? null : category,
+						label: null,
+						page: null
+					})}
+					class="category-tab"
+					class:active={filters.category === category}
+				>
+					{t(categoryNavKey(category))}
+					{#if unread > 0}
+						<span class="tab-unread">{unread > 99 ? '99+' : unread}</span>
+					{/if}
+				</a>
+			{/each}
+		</nav>
+	{/if}
+
 	{#if actionError}
 		<p class="action-error" role="alert">{actionError}</p>
 	{/if}
@@ -739,6 +849,13 @@
 								{#if identity(thread)}
 									<span class="tag">{identity(thread)?.label || identity(thread)?.address}</span>
 								{/if}
+								{#if thread.labels?.length}
+									<span class="row-labels">
+										{#each thread.labels as label (label.id)}
+											<LabelChip {label} />
+										{/each}
+									</span>
+								{/if}
 							</span>
 
 							<span class="body">
@@ -777,6 +894,23 @@
 									onclick={() => run('delete', [thread.latest_id])}
 								>
 									<Icon name="delete-bin-2-line" size={15} />
+								</button>
+							{:else if view === 'spam'}
+								<button
+									type="button"
+									class="tool-btn"
+									title={t('mailbox.notSpam')}
+									onclick={() => run('unspam', [thread.latest_id])}
+								>
+									<Icon name="inbox-line" size={15} />
+								</button>
+								<button
+									type="button"
+									class="tool-btn"
+									title={t('mailbox.moveToTrash')}
+									onclick={() => run('trash', [thread.latest_id])}
+								>
+									<Icon name="delete-bin-line" size={15} />
 								</button>
 							{:else}
 								<button
@@ -855,6 +989,56 @@
 		gap: 0.75rem;
 		padding: 0.625rem 0.875rem;
 		box-shadow: inset 0 -1px 0 var(--color-line);
+	}
+
+	.category-tabs {
+		display: flex;
+		gap: 0.125rem;
+		padding: 0 0.75rem;
+		overflow-x: auto;
+		overscroll-behavior-x: contain;
+		scrollbar-width: none;
+		box-shadow: inset 0 -1px 0 var(--color-line);
+	}
+
+	.category-tabs::-webkit-scrollbar {
+		display: none;
+	}
+
+	.category-tab {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		flex-shrink: 0;
+		padding: 0.625rem 0.75rem 0.5rem;
+		font-size: 0.8125rem;
+		color: var(--color-muted);
+		border-bottom: 2px solid transparent;
+	}
+
+	.category-tab.active {
+		color: var(--color-text);
+		font-weight: 600;
+		border-bottom-color: var(--color-accent);
+	}
+
+	.tab-unread {
+		min-width: 1.125rem;
+		padding: 0 0.3125rem;
+		border-radius: 999px;
+		font-size: 0.625rem;
+		font-weight: 600;
+		text-align: center;
+		color: var(--color-on-accent);
+		background: var(--color-accent);
+	}
+
+	.row-labels {
+		display: inline-flex;
+		flex-wrap: wrap;
+		gap: 0.25rem;
+		margin-left: 0.375rem;
+		vertical-align: middle;
 	}
 
 	.toolbar-left,

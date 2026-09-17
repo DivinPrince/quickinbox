@@ -228,6 +228,27 @@ fails and the notification falls back to a text card followed by the files.
 Delivery is fire-and-forget: a Telegram outage is logged and ignored rather
 than failing the inbound handler, which the provider would then retry.
 
+### Inbox tabs (optional)
+
+Inbound mail can be sorted into Gmail-style tabs — Primary, Social, Promotions,
+Updates, Forums — with spam in its own mailbox. Set a TypeSafe API key:
+
+```bash
+bunx wrangler secret put TYPESAFE_API_KEY
+bun run deploy
+```
+
+Without the key, everything lands in Primary. Users can still move conversations
+between tabs, report spam, and create custom labels in Settings. Classification
+errors also fail open into Primary so mail is never hidden.
+
+Mail that arrived before the key was set stays in Primary until the owner runs
+**Classify** under Settings → Labels → Inbox tabs. The page updates after every
+message; notifications are not sent for that backfill.
+
+Promotions and Social do not send push/Telegram notifications. High-confidence
+spam is filed silently.
+
 ## Development
 
 ```bash

@@ -5,9 +5,17 @@
 	import { formatRelativeDate } from '$lib/utils/date';
 	import { runMailAction } from '$lib/mail/client';
 	import { initials, participantName } from '$lib/mail/folders';
+	import { INBOX_CATEGORIES, categoryNavKey, categoryUnread } from '$lib/mail/categories';
 	import { t } from '$lib/i18n';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
+	import LabelChip from '$lib/components/LabelChip.svelte';
+	import type {
+		MailboxCounts,
+		MailboxFilters,
+		MailboxPage,
+		MailboxView,
+		ThreadSummary
+	} from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import ThreadPane from './ThreadPane.svelte';
 
@@ -39,6 +47,8 @@
 	});
 
 	const threadId = $derived($page.url.searchParams.get('thread'));
+	const counts = $derived(($page.data.counts ?? null) as MailboxCounts | null);
+	const showCategoryTabs = $derived(view === 'inbox' && !filters.labelId);
 	const chip = $derived(
 		filters.unreadOnly ? 'unread' : filters.starredOnly ? 'starred' : 'all'
 	);
@@ -75,6 +85,16 @@
 		if (next === 'unread') url.searchParams.set('unread', '1');
 		if (next === 'starred') url.searchParams.set('starred', '1');
 		viewsOpen = false;
+		void goto(`${url.pathname}?${url.searchParams.toString()}`.replace(/\?$/, ''));
+	}
+
+	function setCategory(category: (typeof INBOX_CATEGORIES)[number]) {
+		const url = new URL($page.url);
+		url.searchParams.delete('label');
+		url.searchParams.delete('page');
+		url.searchParams.delete('thread');
+		if (category === 'primary') url.searchParams.delete('category');
+		else url.searchParams.set('category', category);
 		void goto(`${url.pathname}?${url.searchParams.toString()}`.replace(/\?$/, ''));
 	}
 
@@ -163,10 +183,11 @@
 
 		if (event.key === 'e') {
 			event.preventDefault();
-			void act(view === 'archive' ? 'unarchive' : 'archive', ids);
+			if (view === 'spam') void act('unspam', ids);
+			else void act(view === 'archive' ? 'unarchive' : 'archive', ids);
 		} else if (event.key === 'd' || event.key === 'Backspace') {
 			event.preventDefault();
-			void act(view === 'trash' ? 'restore' : 'trash', ids);
+			void act(view === 'trash' ? 'restore' : view === 'spam' ? 'delete' : 'trash', ids);
 		} else if (event.key === 's') {
 			event.preventDefault();
 			void act(current?.is_starred ? 'unstar' : 'star', ids);
@@ -256,6 +277,25 @@
 			<div class="z-load-bar" class:on={refreshing}></div>
 		</div>
 
+		{#if showCategoryTabs}
+			<nav class="z-category-tabs" aria-label={t('nav.inbox')}>
+				{#each INBOX_CATEGORIES as category (category)}
+					{@const unread = counts ? categoryUnread(counts, category) : 0}
+					<button
+						type="button"
+						class="z-category-tab"
+						class:active={filters.category === category}
+						onclick={() => setCategory(category)}
+					>
+						{t(categoryNavKey(category))}
+						{#if unread > 0}
+							<span class="z-tab-unread">{unread > 99 ? '99+' : unread}</span>
+						{/if}
+					</button>
+				{/each}
+			</nav>
+		{/if}
+
 		<div class="z-chips">
 			<button type="button" class="z-chip" class:active={chip === 'all'} data-chip="all" onclick={() => setChip('all')}>
 				{t('mailbox.allMailChip')}
@@ -321,13 +361,16 @@
 									<Icon name="Star2" class={thread.is_starred ? 'z-star-on' : ''} size={14} />
 								</button>
 							</Tooltip>
-							<Tooltip text={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}>
+							<Tooltip text={view === 'spam' ? t('mailbox.notSpam') : view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}>
 								<button
 									type="button"
-									aria-label={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}
+									aria-label={view === 'spam' ? t('mailbox.notSpam') : view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}
 									onclick={(event) => {
 										event.stopPropagation();
-										void act(view === 'archive' ? 'unarchive' : 'archive', [thread.latest_id]);
+										void act(
+											view === 'spam' ? 'unspam' : view === 'archive' ? 'unarchive' : 'archive',
+											[thread.latest_id]
+										);
 									}}
 								>
 									<Icon name="Archive2" size={14} />
@@ -370,6 +413,13 @@
 									<Icon name="Paper" size={12} />
 								{/if}
 							</span>
+							{#if thread.labels?.length}
+								<span class="z-row-labels">
+									{#each thread.labels as label (label.id)}
+										<LabelChip {label} />
+									{/each}
+								</span>
+							{/if}
 							{#if thread.preview}
 								<span class="z-row-preview">{thread.preview}</span>
 							{/if}
