@@ -5,6 +5,7 @@ import {
 	emptyMailboxCounts,
 	inboxCategoryPath,
 	isQuietCategory,
+	mailboxCategoryFilter,
 	parseInboxCategory
 } from './categories';
 
@@ -12,6 +13,17 @@ test('unknown or missing category values fall back to Primary', () => {
 	assert.equal(parseInboxCategory(null), 'primary');
 	assert.equal(parseInboxCategory('newsletter'), 'primary');
 	assert.equal(parseInboxCategory('social'), 'social');
+});
+
+test('inbox search without a tab spans every category', () => {
+	assert.equal(mailboxCategoryFilter({ view: 'inbox', q: 'hello' }), null);
+	assert.equal(
+		mailboxCategoryFilter({ view: 'inbox', categoryParam: 'social', q: 'hello' }),
+		'social'
+	);
+	assert.equal(mailboxCategoryFilter({ view: 'inbox' }), 'primary');
+	assert.equal(mailboxCategoryFilter({ view: 'inbox', labelId: 'abc' }), null);
+	assert.equal(mailboxCategoryFilter({ view: 'spam' }), null);
 });
 
 test('promotions and social are quiet; Primary, Updates, and Forums are not', () => {

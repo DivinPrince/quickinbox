@@ -43,7 +43,7 @@
 		spam: { title: t('nav.spam'), icon: 'spam-2-line', empty: t('mailbox.empty.spam') }
 	});
 
-	const labels = $derived((($currentPage.data.labels ?? []) as MailLabel[]) ?? []);
+	const labels = $derived(($currentPage.data.labels ?? []) as MailLabel[]);
 	const counts = $derived(($currentPage.data.counts ?? null) as MailboxCounts | null);
 	const activeLabel = $derived(labels.find((label) => label.id === filters.labelId) ?? null);
 	const meta = $derived(

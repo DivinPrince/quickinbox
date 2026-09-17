@@ -1,5 +1,5 @@
 import { listMailbox } from './mail-store';
-import { parseInboxCategory } from '$lib/mail/categories';
+import { mailboxCategoryFilter, parseInboxCategory } from '$lib/mail/categories';
 import type { MailboxFilters, MailboxPage, MailboxView } from '$lib/types';
 import type { D1Database } from '@cloudflare/workers-types';
 
@@ -40,7 +40,12 @@ export async function loadMailbox(
 		starredOnly: filters.starredOnly,
 		attachmentsOnly: filters.attachmentsOnly,
 		page: Number(url.searchParams.get('page')) || 1,
-		category: view === 'inbox' && !filters.labelId ? filters.category : null,
+		category: mailboxCategoryFilter({
+			view,
+			categoryParam: url.searchParams.get('category'),
+			labelId: filters.labelId,
+			q: filters.q
+		}),
 		labelId: filters.labelId || null
 	});
 

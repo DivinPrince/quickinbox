@@ -6,8 +6,8 @@ import {
 } from '$lib/server/context';
 import { deleteDraft, listMailbox } from '$lib/server/mail-store';
 import { sendAndStore } from '$lib/server/outbox';
-import type { InboxCategory, MailboxView, OutboundAttachmentInput } from '$lib/types';
-import { parseInboxCategory } from '$lib/mail/categories';
+import type { MailboxView, OutboundAttachmentInput } from '$lib/types';
+import { mailboxCategoryFilter } from '$lib/mail/categories';
 
 type SendMailBody = {
 	/** Set when the composer was editing a draft — it is removed once sent. */
@@ -56,12 +56,12 @@ export const GET: RequestHandler = async ({ locals, platform, url }) => {
 	}
 
 	const view = mailboxView(url);
-	const categoryParam = url.searchParams.get('category');
-	let category: InboxCategory | null = null;
-	if (view === 'inbox' && !url.searchParams.get('label')) {
-		if (categoryParam) category = parseInboxCategory(categoryParam);
-		else if (!url.searchParams.get('q')) category = 'primary';
-	}
+	const category = mailboxCategoryFilter({
+		view,
+		categoryParam: url.searchParams.get('category'),
+		labelId: url.searchParams.get('label'),
+		q: url.searchParams.get('q')
+	});
 
 	const mailbox = await listMailbox(db, locals.user.id, {
 		view,

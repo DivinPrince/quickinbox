@@ -134,7 +134,7 @@
 	const latest = $derived(thread?.messages[thread.messages.length - 1] ?? null);
 	const starred = $derived(thread?.messages.some((message) => message.is_starred) ?? false);
 	const currentCategory = $derived(latest?.category ?? 'primary');
-	const allLabels = $derived((($page.data.labels ?? []) as MailLabel[]) ?? []);
+	const allLabels = $derived(($page.data.labels ?? []) as MailLabel[]);
 	const threadLabelIds = $derived.by(() => {
 		const ids = new Set<string>();
 		for (const message of thread?.messages ?? []) {
@@ -529,7 +529,7 @@
 								<button
 									type="button"
 									onclick={() => act('categorize', { category })}
-									aria-checked={currentCategory === category}
+									aria-pressed={currentCategory === category}
 								>
 									<Icon name="Inbox" size={14} />
 									{t('thread.moveTo', { category: t(categoryNavKey(category)) })}

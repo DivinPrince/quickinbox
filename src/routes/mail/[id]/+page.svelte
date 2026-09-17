@@ -32,7 +32,7 @@
 	const messages = $derived(data.messages);
 	const latest = $derived(messages[messages.length - 1]);
 	const starred = $derived(messages.some((message) => message.is_starred));
-	const allLabels = $derived((($page.data.labels ?? []) as MailLabel[]) ?? []);
+	const allLabels = $derived(($page.data.labels ?? []) as MailLabel[]);
 	const threadLabelIds = $derived.by(() => {
 		const ids = new Set<string>();
 		for (const message of messages) {

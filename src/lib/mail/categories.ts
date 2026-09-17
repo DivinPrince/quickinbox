@@ -20,6 +20,19 @@ export function parseInboxCategory(value: string | null | undefined): InboxCateg
 	return isInboxCategory(value) ? value : DEFAULT_INBOX_CATEGORY;
 }
 
+/** SQL category slice for a mailbox list. Search with no tab spans every tab. */
+export function mailboxCategoryFilter(input: {
+	view: string;
+	categoryParam?: string | null;
+	labelId?: string | null;
+	q?: string | null;
+}): InboxCategory | null {
+	if (input.view !== 'inbox' || input.labelId) return null;
+	if (input.categoryParam) return parseInboxCategory(input.categoryParam);
+	if (input.q?.trim()) return null;
+	return DEFAULT_INBOX_CATEGORY;
+}
+
 /** Categories that should not ping the user after auto-classify. */
 export function isQuietCategory(category: InboxCategory): boolean {
 	switch (category) {
