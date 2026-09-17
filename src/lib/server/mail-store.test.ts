@@ -10,6 +10,7 @@ import {
 	getMailboxCursor,
 	listForwardThreadMessages,
 	listUnclassifiedInbound,
+	markAllRead,
 	UNCLASSIFIED_INBOUND_WHERE
 } from './mail-store';
 
@@ -281,4 +282,30 @@ test('unclassified inbound mail is live inbound with no category or spam source'
 		['user-1'],
 		['user-1', '2026-01-01 00:00:00', '2026-01-01 00:00:00', 'msg-1', 1]
 	]);
+});
+
+test('markAllRead scopes to a label without rewriting the rest of the mailbox', async () => {
+	let sql = '';
+	let binds: unknown[] = [];
+	const db = {
+		prepare(query: string) {
+			sql = query;
+			return {
+				bind(...values: unknown[]) {
+					binds = values;
+					return {
+						async run() {
+							return { meta: { changes: 2 } };
+						}
+					};
+				}
+			};
+		}
+	} as unknown as D1Database;
+
+	assert.equal(await markAllRead(db, 'user-1', 'domain-1', 'primary', 'label-9'), 2);
+	assert.match(sql, /EXISTS \(SELECT 1 FROM email_labels el WHERE el.email_id = emails.id AND el.label_id = \?\)/);
+	assert.doesNotMatch(sql, /direction = 'inbound'/);
+	assert.doesNotMatch(sql, /category = \?/);
+	assert.deepEqual(binds, ['user-1', 'label-9', 'domain-1']);
 });

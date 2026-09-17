@@ -26,6 +26,66 @@ export function isLabelColor(value: string): boolean {
 	return COLOR_SET.has(value);
 }
 
+export type LabelWriteFields = {
+	name?: string;
+	color?: string;
+	autoEnabled?: boolean;
+	autoInstructions?: string | null;
+};
+
+export function parseLabelWriteBody(
+	body: unknown,
+	mode: 'create' | 'update'
+): { ok: true; fields: LabelWriteFields } | { ok: false; error: string } {
+	if (!body || typeof body !== 'object' || Array.isArray(body)) {
+		return { ok: false, error: 'Invalid body' };
+	}
+
+	const raw = body as Record<string, unknown>;
+	const fields: LabelWriteFields = {};
+
+	if (mode === 'create' || raw.name !== undefined) {
+		if (typeof raw.name !== 'string') {
+			return { ok: false, error: 'Name is required' };
+		}
+		const name = raw.name.trim();
+		if (!name) return { ok: false, error: 'Name is required' };
+		if (name.length > MAX_LABEL_NAME) {
+			return { ok: false, error: `Name must be ${MAX_LABEL_NAME} characters or fewer` };
+		}
+		fields.name = name;
+	}
+
+	if (raw.color !== undefined) {
+		if (typeof raw.color !== 'string' || !isLabelColor(raw.color)) {
+			return { ok: false, error: 'Unknown color' };
+		}
+		fields.color = raw.color;
+	}
+
+	if (raw.autoEnabled !== undefined) {
+		if (typeof raw.autoEnabled !== 'boolean') {
+			return { ok: false, error: 'Invalid auto-apply flag' };
+		}
+		fields.autoEnabled = raw.autoEnabled;
+	}
+
+	if (raw.autoInstructions !== undefined) {
+		if (raw.autoInstructions !== null && typeof raw.autoInstructions !== 'string') {
+			return { ok: false, error: 'Invalid auto-apply description' };
+		}
+		if (
+			typeof raw.autoInstructions === 'string' &&
+			raw.autoInstructions.length > MAX_LABEL_INSTRUCTIONS
+		) {
+			return { ok: false, error: 'Auto-apply description is too long' };
+		}
+		fields.autoInstructions = raw.autoInstructions;
+	}
+
+	return { ok: true, fields };
+}
+
 export function slugifyLabel(name: string): string {
 	const slug = name
 		.toLowerCase()

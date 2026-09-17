@@ -575,18 +575,19 @@
 									<Icon name="close-circle-line" size={15} /> {t('mailbox.clearFilters')}
 								</button>
 							{/if}
-							<button
-								type="button"
-								class="menu-item"
-								onclick={() =>
-									run(
-										'read-all',
-										[],
-										view === 'inbox' && !filters.labelId ? { category: filters.category } : {}
-									)}
-							>
-								<Icon name="mail-open-line" size={15} /> {t('mailbox.markAllRead')}
-							</button>
+							{#if !filters.q}
+								<button
+									type="button"
+									class="menu-item"
+									onclick={() =>
+										run('read-all', [], {
+											...(view === 'inbox' && !filters.labelId ? { category: filters.category } : {}),
+											...(filters.labelId ? { labelId: filters.labelId } : {})
+										})}
+								>
+									<Icon name="mail-open-line" size={15} /> {t('mailbox.markAllRead')}
+								</button>
+							{/if}
 							<button type="button" class="menu-item" onclick={() => invalidateAll()}>
 								<Icon name="refresh-line" size={15} /> {t('common.refresh')}
 							</button>

@@ -798,16 +798,21 @@ export async function markAllRead(
 	db: D1Database,
 	userId: string,
 	domainId?: string | null,
-	category?: InboxCategory | null
+	category?: InboxCategory | null,
+	labelId?: string | null
 ): Promise<number> {
 	const bindings: unknown[] = [userId];
-	let scope =
-		"user_id = ? AND direction = 'inbound' AND deleted_at IS NULL AND archived_at IS NULL AND spam_at IS NULL AND is_read = 0";
+	let scope = labelId
+		? "user_id = ? AND deleted_at IS NULL AND spam_at IS NULL AND is_read = 0 AND EXISTS (SELECT 1 FROM email_labels el WHERE el.email_id = emails.id AND el.label_id = ?)"
+		: "user_id = ? AND direction = 'inbound' AND deleted_at IS NULL AND archived_at IS NULL AND spam_at IS NULL AND is_read = 0";
+	if (labelId) {
+		bindings.push(labelId);
+	}
 	if (domainId) {
 		scope += ' AND domain_id = ?';
 		bindings.push(domainId);
 	}
-	if (category) {
+	if (!labelId && category) {
 		scope += ' AND category = ?';
 		bindings.push(category);
 	}

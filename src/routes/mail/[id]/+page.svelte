@@ -28,6 +28,7 @@
 	let forwardHtml = $state('');
 	let includeAttachments = $state(true);
 	let moreOpen = $state(false);
+	let labelsBusy = $state(false);
 
 	const messages = $derived(data.messages);
 	const latest = $derived(messages[messages.length - 1]);
@@ -190,16 +191,27 @@
 	}
 
 	async function toggleLabel(labelId: string) {
-		if (!latest) return;
+		if (!latest || labelsBusy) return;
+		labelsBusy = true;
 		const next = threadLabelIds.includes(labelId)
 			? threadLabelIds.filter((id) => id !== labelId)
 			: [...threadLabelIds, labelId];
-		await fetch(`/api/mail/${latest.id}/labels`, {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ labelIds: next })
-		});
-		await invalidateAll();
+		try {
+			const response = await fetch(`/api/mail/${latest.id}/labels`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ labelIds: next })
+			});
+			if (!response.ok) {
+				error = t('mailbox.couldNotUpdateConversation');
+				return;
+			}
+			await invalidateAll();
+		} catch {
+			error = t('mailbox.conversationNetwork');
+		} finally {
+			labelsBusy = false;
+		}
 	}
 
 	function goBack() {
@@ -404,7 +416,12 @@
 						{#if allLabels.length > 0}
 							<p class="menu-label">{t('thread.labels')}</p>
 							{#each allLabels as label (label.id)}
-								<button type="button" class="menu-item" onclick={() => toggleLabel(label.id)}>
+								<button
+									type="button"
+									class="menu-item"
+									disabled={labelsBusy}
+									onclick={() => toggleLabel(label.id)}
+								>
 									<span class="swatch" style="background: {label.color}"></span>
 									{label.name}
 									{#if threadLabelIds.includes(label.id)}

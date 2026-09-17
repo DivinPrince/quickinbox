@@ -16,6 +16,7 @@ import { resolveReplyFromAddress, sendAndStore } from '$lib/server/outbox';
 import { buildReferences, displaySubject } from '$lib/server/threads';
 import { isInboxCategory } from '$lib/mail/categories';
 import { rememberSenders } from '$lib/server/labels';
+import { authorizeMailPatch } from '$lib/server/api-access';
 import type { OutboundAttachmentInput } from '$lib/types';
 
 type ReplyBody = {
@@ -66,6 +67,17 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 		/** Set to limit the change to this one message instead of the thread. */
 		messageOnly?: boolean;
 	};
+
+	if (locals.authMethod === 'api_token') {
+		const access = authorizeMailPatch({
+			authMethod: 'api_token',
+			scopes: locals.apiScopes,
+			trashed: body.trashed
+		});
+		if (!access.ok) {
+			return json({ error: access.error }, { status: access.status });
+		}
+	}
 
 	const threadWide = body.archived !== undefined || body.spam !== undefined || body.category !== undefined;
 	const ids =

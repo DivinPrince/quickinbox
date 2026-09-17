@@ -62,6 +62,7 @@
 	let dark = $state(false);
 	let detailsFor = $state<string | null>(null);
 	let menuFor = $state<string | null>(null);
+	let labelsBusy = $state(false);
 
 	const selfEmails = $derived(
 		new Set(
@@ -262,22 +263,28 @@
 	}
 
 	async function toggleLabel(labelId: string) {
-		if (!latest) return;
+		if (!latest || labelsBusy) return;
+		labelsBusy = true;
 		const next = threadLabelIds.includes(labelId)
 			? threadLabelIds.filter((id) => id !== labelId)
 			: [...threadLabelIds, labelId];
-		await fetch(`/api/mail/${latest.id}/labels`, {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ labelIds: next })
-		});
-		await invalidateAll();
-		if (thread) {
-			const selected = allLabels.filter((label) => next.includes(label.id));
-			thread = {
-				...thread,
-				messages: thread.messages.map((message) => ({ ...message, labels: selected }))
-			};
+		try {
+			const response = await fetch(`/api/mail/${latest.id}/labels`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ labelIds: next })
+			});
+			if (!response.ok) return;
+			await invalidateAll();
+			if (thread) {
+				const selected = allLabels.filter((label) => next.includes(label.id));
+				thread = {
+					...thread,
+					messages: thread.messages.map((message) => ({ ...message, labels: selected }))
+				};
+			}
+		} finally {
+			labelsBusy = false;
 		}
 	}
 
@@ -538,7 +545,7 @@
 							{#if allLabels.length > 0}
 								<div class="z-menu-label">{t('thread.labels')}</div>
 								{#each allLabels as label (label.id)}
-									<button type="button" onclick={() => toggleLabel(label.id)}>
+									<button type="button" disabled={labelsBusy} onclick={() => toggleLabel(label.id)}>
 										<span class="z-label-dot" style="background: {label.color}"></span>
 										{label.name}
 										{#if threadLabelIds.includes(label.id)}<Icon name="Check" size={14} />{/if}

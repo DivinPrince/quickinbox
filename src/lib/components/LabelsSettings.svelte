@@ -21,8 +21,8 @@
 	const classifyPercent = $derived(
 		classifyTotal > 0 ? Math.min(100, Math.round((classified / classifyTotal) * 100)) : 0
 	);
-	const showSortSection = $derived(classifyEnabled && remaining != null);
-	const showSort = $derived(showSortSection && remaining != null && remaining > 0);
+	const showSortSection = $derived((classifyEnabled && remaining != null) || Boolean(classifyError));
+	const showSort = $derived(classifyEnabled && remaining != null && remaining > 0);
 
 	onMount(() => {
 		void loadClassifyStatus();
@@ -224,7 +224,7 @@
 					{t('settings.classifyExisting')}
 				</button>
 			</div>
-		{:else}
+		{:else if remaining != null}
 			<p class="caught-up">
 				<Icon name="check-line" size={16} />
 				{t('settings.classifyExistingCaughtUp')}

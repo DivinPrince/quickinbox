@@ -59,7 +59,7 @@
 	overflow: visible;
 }
 
-[data-ui-theme='zero'] .z-brand :global(img) {
+[data-ui-theme='zero'] .z-brand img {
 	display: block;
 	filter: none;
 	opacity: 1;

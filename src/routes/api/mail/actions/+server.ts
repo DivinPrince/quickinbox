@@ -19,6 +19,7 @@ type ActionBody = {
 	action?: MailAction;
 	ids?: string[];
 	category?: string;
+	labelId?: string;
 };
 
 export const POST: RequestHandler = async ({ request, locals, platform }) => {
@@ -112,7 +113,8 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 				db,
 				locals.user.id,
 				locals.activeDomainId,
-				isInboxCategory(body.category) ? body.category : null
+				isInboxCategory(body.category) ? body.category : null,
+				typeof body.labelId === 'string' && body.labelId ? body.labelId : null
 			);
 			break;
 		case 'empty-trash':

@@ -3,6 +3,7 @@ import { describe, test } from 'node:test';
 import {
 	authorizeApiRequest,
 	authorizeMailAction,
+	authorizeMailPatch,
 	canAccessDuringFirstLogin
 } from './api-access';
 import { parseScopes } from './api-tokens';
@@ -372,6 +373,34 @@ describe('API key access', () => {
 				scopes: ['mail:read']
 			}).ok,
 			false
+		);
+	});
+
+	test('thread PATCH allows mail:read for flags and still requires both scopes to trash', () => {
+		assert.deepEqual(
+			authorizeApiRequest({
+				pathname: '/api/mail/abc',
+				method: 'PATCH',
+				authMethod: 'api_token',
+				scopes: ['mail:read']
+			}),
+			{ ok: true }
+		);
+		assert.deepEqual(
+			authorizeMailPatch({ authMethod: 'api_token', scopes: ['mail:read'] }),
+			{ ok: true }
+		);
+		assert.equal(
+			authorizeMailPatch({ authMethod: 'api_token', scopes: ['mail:read'], trashed: true }).ok,
+			false
+		);
+		assert.deepEqual(
+			authorizeMailPatch({
+				authMethod: 'api_token',
+				scopes: ['mail:read', 'mail:send'],
+				trashed: false
+			}),
+			{ ok: true }
 		);
 	});
 });

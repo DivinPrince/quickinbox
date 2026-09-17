@@ -74,7 +74,7 @@ const BEARER_ROUTES: RouteRule[] = [
 	{
 		method: 'PATCH',
 		match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname),
-		scopes: ['mail:send']
+		scopes: ['mail:read', 'mail:send']
 	},
 	{
 		method: 'PUT',
@@ -285,6 +285,19 @@ export function authorizeMailAction(input: {
 			return _never;
 		}
 	}
+}
+
+/** Per-thread PATCH: flag moves need `mail:read`; trash still needs both scopes. */
+export function authorizeMailPatch(input: {
+	authMethod: AuthMethod;
+	scopes: readonly ApiScope[];
+	trashed?: boolean;
+}): ApiAuthDecision {
+	return authorizeMailAction({
+		action: input.trashed !== undefined ? 'trash' : 'star',
+		authMethod: input.authMethod,
+		scopes: input.scopes
+	});
 }
 
 /**

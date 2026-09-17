@@ -63,33 +63,24 @@ export type MailJudge = typeof judgeInboundMail;
  * quiet category. Designed to run inside `waitUntil`.
  */
 export async function classifyThenNotify(env: ClassifyEnv, input: InboundClassifyInput): Promise<void> {
+	let notify = true;
 	try {
-		const notify = await classifyInboundEmail(env.DB, env.TYPESAFE_API_KEY, input);
-		if (!notify) return;
-
-		await scheduleNewMailNotification(env, {
-			emailId: input.emailId,
-			userId: input.userId,
-			from: input.fromName || input.from,
-			subject: input.subject
-		});
-		scheduleTelegramNotification(env, {
-			...input.telegram,
-			threadKey: await getThreadKey(env.DB, input.emailId)
-		});
+		notify = await classifyInboundEmail(env.DB, env.TYPESAFE_API_KEY, input);
 	} catch (error) {
 		console.error('Inbound classification failed', input.emailId, error);
-		await scheduleNewMailNotification(env, {
-			emailId: input.emailId,
-			userId: input.userId,
-			from: input.fromName || input.from,
-			subject: input.subject
-		});
-		scheduleTelegramNotification(env, {
-			...input.telegram,
-			threadKey: await getThreadKey(env.DB, input.emailId)
-		});
 	}
+	if (!notify) return;
+
+	await scheduleNewMailNotification(env, {
+		emailId: input.emailId,
+		userId: input.userId,
+		from: input.fromName || input.from,
+		subject: input.subject
+	});
+	scheduleTelegramNotification(env, {
+		...input.telegram,
+		threadKey: await getThreadKey(env.DB, input.emailId)
+	});
 }
 
 export function scheduleInboundClassification(
