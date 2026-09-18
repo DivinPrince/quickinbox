@@ -19,7 +19,7 @@ export class QuickInboxError extends Error {
 	}
 }
 
-export type MailboxView = 'inbox' | 'archive' | 'starred' | 'drafts' | 'sent' | 'trash' | 'spam';
+export type MailboxView = 'inbox' | 'snoozed' | 'archive' | 'starred' | 'drafts' | 'sent' | 'trash' | 'spam';
 
 export type ThreadSummary = {
 	thread_id: string;

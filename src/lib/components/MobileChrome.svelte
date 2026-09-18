@@ -199,7 +199,9 @@
 					</a>
 				{/each}
 			{/if}
-			<a href="/outbox" class="sheet-link"><Icon name="time-line" size={20} /><span>{t('nav.outbox')}</span></a>
+			<a href="/search" class="sheet-link"><Icon name="search-line" size={20} /><span>{t('common.search')}</span></a>
+				<a href="/snoozed" class="sheet-link"><Icon name="time-line" size={20} /><span>{t('cleanup.snoozed')}</span></a>
+				<a href="/outbox" class="sheet-link"><Icon name="time-line" size={20} /><span>{t('nav.outbox')}</span></a>
 			<a href="/settings" class="sheet-link" class:active={$page.url.pathname === '/settings'}>
 				<Icon name="user-settings-line" size={20} />
 				<span>{t('nav.settings')}</span>

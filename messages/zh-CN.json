@@ -739,5 +739,68 @@
 		"storageGuide": "使用 rclone 备份 R2",
 		"checked": "检查时间：{time}",
 		"unknown": "不可用"
+	},
+	"draftSafety": {
+		"saving": "正在保存草稿…",
+		"saved": "草稿和附件已保存",
+		"unsaved": "有未保存的更改",
+		"retry": "重试保存",
+		"discardFailed": "无法删除草稿，请重试。"
+	},
+	"searchFlow": {
+		"title": "搜索邮件",
+		"words": "关键词或短语",
+		"placeholder": "搜索主题、联系人和正文",
+		"to": "收件人或抄送/密送",
+		"after": "起始日期",
+		"before": "结束日期",
+		"attachments": "有附件",
+		"hidden": "包含垃圾邮件和回收站",
+		"clear": "清除筛选",
+		"count": "{count} 封匹配邮件",
+		"empty": "没有符合筛选条件的邮件。",
+		"hasAttachments": "有附件",
+		"pages": "搜索结果分页",
+		"viewAll": "查看所有结果和筛选条件",
+		"failed": "搜索失败",
+		"from": "发件人"
+	},
+	"cleanup": {
+		"snoozed": "已延后",
+		"empty": "没有已延后的会话。",
+		"snooze": "延后处理",
+		"wakeNow": "返回收件箱",
+		"snoozeHint": "隐藏到指定时间，收到新回复时会提前返回。",
+		"later": "四小时后",
+		"tomorrow": "明天上午 9 点",
+		"chooseTime": "选择本地日期和时间",
+		"retry": "重试",
+		"undo": "撤销",
+		"undoFailed": "无法撤销此操作。",
+		"undone": "已撤销操作。",
+		"changed": "已保留较新的更改。",
+		"updated": "邮件已更新。",
+		"done": {
+			"archive": "会话已归档。",
+			"trash": "会话已移至回收站。",
+			"snooze": "会话已延后。",
+			"unsnooze": "会话已返回收件箱。"
+		}
+	},
+	"rules": {
+		"title": "发件人规则",
+		"hint": "应用于来自指定完整地址的新邮件。匹配规则可以添加标签并归档会话，不影响现有邮件。",
+		"failed": "无法更新发件人规则，请重试。",
+		"sender": "发件人邮箱",
+		"subject": "主题包含（可选）",
+		"anySubject": "任意主题",
+		"label": "添加标签",
+		"noLabel": "无标签",
+		"archive": "自动归档",
+		"add": "添加规则",
+		"empty": "尚无发件人规则。",
+		"contains": "主题包含：{text}",
+		"enabled": "已启用",
+		"remove": "删除"
 	}
 }

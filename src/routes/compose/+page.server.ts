@@ -1,6 +1,6 @@
-import { redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { getDraft } from '$lib/server/mail-store';
+import { readSavedDraft } from '$lib/server/drafts';
 
 export const load: PageServerLoad = async ({ locals, platform, url }) => {
 	if (locals.uiTheme !== 'classic') {
@@ -15,7 +15,8 @@ export const load: PageServerLoad = async ({ locals, platform, url }) => {
 	const db = platform?.env.DB;
 
 	const draft =
-		draftId && db && locals.user ? await getDraft(db, locals.user.id, draftId) : null;
+		draftId && db && locals.user ? await readSavedDraft(platform!.env, locals.user.id, draftId) : null;
+	if (draftId && !draft) throw error(404, 'Draft not found');
 
 	return { addresses: locals.addresses, draft };
 };

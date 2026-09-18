@@ -43,7 +43,7 @@ export type McpContext = {
 	origin: string;
 };
 
-const views = ['inbox', 'archive', 'starred', 'drafts', 'sent', 'trash', 'spam'] as const;
+const views = ['inbox', 'snoozed', 'archive', 'starred', 'drafts', 'sent', 'trash', 'spam'] as const;
 const categories = INBOX_CATEGORIES;
 const MAX_BODY_CHARS = 20_000;
 

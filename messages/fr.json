@@ -739,5 +739,68 @@
 		"storageGuide": "Sauvegarde R2 avec rclone",
 		"checked": "Vérifié le {time}",
 		"unknown": "Indisponible"
+	},
+	"draftSafety": {
+		"saving": "Enregistrement du brouillon…",
+		"saved": "Brouillon enregistré avec les pièces jointes",
+		"unsaved": "Modifications non enregistrées",
+		"retry": "Réessayer",
+		"discardFailed": "Impossible de supprimer le brouillon. Réessayez."
+	},
+	"searchFlow": {
+		"title": "Rechercher des messages",
+		"words": "Mots ou expression",
+		"placeholder": "Rechercher dans les objets, contacts et messages",
+		"to": "À ou Cc/Cci",
+		"after": "À partir du",
+		"before": "Jusqu’au",
+		"attachments": "Avec pièces jointes",
+		"hidden": "Inclure les indésirables et la corbeille",
+		"clear": "Effacer les filtres",
+		"count": "{count} messages correspondants",
+		"empty": "Aucun message ne correspond.",
+		"hasAttachments": "Avec pièces jointes",
+		"pages": "Pages des résultats",
+		"viewAll": "Voir tous les résultats et filtres",
+		"failed": "Échec de la recherche",
+		"from": "De"
+	},
+	"cleanup": {
+		"snoozed": "En attente",
+		"empty": "Aucune conversation en attente.",
+		"snooze": "Mettre en attente",
+		"wakeNow": "Remettre dans la boîte de réception",
+		"snoozeHint": "Masquer jusqu’à l’heure choisie. Une nouvelle réponse la réaffiche plus tôt.",
+		"later": "Dans quatre heures",
+		"tomorrow": "Demain à 9 h",
+		"chooseTime": "Choisir une date et une heure locales",
+		"retry": "Réessayer",
+		"undo": "Annuler",
+		"undoFailed": "Impossible d’annuler cette action.",
+		"undone": "Action annulée.",
+		"changed": "Une modification plus récente a été conservée.",
+		"updated": "Messages mis à jour.",
+		"done": {
+			"archive": "Conversation archivée.",
+			"trash": "Conversation déplacée dans la corbeille.",
+			"snooze": "Conversation mise en attente.",
+			"unsnooze": "Conversation remise dans la boîte de réception."
+		}
+	},
+	"rules": {
+		"title": "Règles d’expéditeur",
+		"hint": "S’appliquent aux nouveaux messages provenant d’une adresse exacte. Elles peuvent ajouter une étiquette et archiver la conversation. Les messages existants ne changent pas.",
+		"failed": "Impossible de mettre à jour les règles. Réessayez.",
+		"sender": "Adresse de l’expéditeur",
+		"subject": "L’objet contient (facultatif)",
+		"anySubject": "Tout objet",
+		"label": "Ajouter une étiquette",
+		"noLabel": "Aucune étiquette",
+		"archive": "Archiver automatiquement",
+		"add": "Ajouter une règle",
+		"empty": "Aucune règle pour le moment.",
+		"contains": "L’objet contient : {text}",
+		"enabled": "Activée",
+		"remove": "Supprimer"
 	}
 }

@@ -739,5 +739,68 @@
 		"storageGuide": "Copia de R2 con rclone",
 		"checked": "Comprobado: {time}",
 		"unknown": "No disponible"
+	},
+	"draftSafety": {
+		"saving": "Guardando borrador…",
+		"saved": "Borrador guardado, incluidos los adjuntos",
+		"unsaved": "Cambios sin guardar",
+		"retry": "Reintentar guardado",
+		"discardFailed": "No se pudo descartar el borrador. Inténtalo de nuevo."
+	},
+	"searchFlow": {
+		"title": "Buscar correo",
+		"words": "Palabras o frase",
+		"placeholder": "Buscar asuntos, personas y texto",
+		"to": "Para o Cc/Cco",
+		"after": "Desde",
+		"before": "Hasta",
+		"attachments": "Tiene adjuntos",
+		"hidden": "Incluir Spam y Papelera",
+		"clear": "Borrar filtros",
+		"count": "{count} mensajes coincidentes",
+		"empty": "No hay mensajes que coincidan.",
+		"hasAttachments": "Tiene adjuntos",
+		"pages": "Páginas de resultados",
+		"viewAll": "Ver todos los resultados y filtros",
+		"failed": "Error de búsqueda",
+		"from": "De"
+	},
+	"cleanup": {
+		"snoozed": "Pospuestos",
+		"empty": "No hay conversaciones pospuestas.",
+		"snooze": "Posponer",
+		"wakeNow": "Volver a la bandeja de entrada",
+		"snoozeHint": "Ocultar hasta la hora elegida. Una nueva respuesta la devuelve antes.",
+		"later": "En cuatro horas",
+		"tomorrow": "Mañana a las 9",
+		"chooseTime": "Elegir fecha y hora local",
+		"retry": "Reintentar",
+		"undo": "Deshacer",
+		"undoFailed": "No se pudo deshacer.",
+		"undone": "Acción deshecha.",
+		"changed": "Se conservó un cambio más reciente.",
+		"updated": "Correo actualizado.",
+		"done": {
+			"archive": "Conversación archivada.",
+			"trash": "Conversación movida a la Papelera.",
+			"snooze": "Conversación pospuesta.",
+			"unsnooze": "Conversación devuelta a la bandeja de entrada."
+		}
+	},
+	"rules": {
+		"title": "Reglas de remitentes",
+		"hint": "Se aplican a nuevos mensajes de una dirección exacta. Pueden añadir una etiqueta y archivar la conversación. No modifican mensajes existentes.",
+		"failed": "No se pudieron actualizar las reglas. Inténtalo de nuevo.",
+		"sender": "Correo del remitente",
+		"subject": "El asunto contiene (opcional)",
+		"anySubject": "Cualquier asunto",
+		"label": "Añadir etiqueta",
+		"noLabel": "Sin etiqueta",
+		"archive": "Archivar automáticamente",
+		"add": "Añadir regla",
+		"empty": "Aún no hay reglas.",
+		"contains": "El asunto contiene: {text}",
+		"enabled": "Activada",
+		"remove": "Eliminar"
 	}
 }

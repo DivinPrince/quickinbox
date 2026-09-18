@@ -99,6 +99,32 @@ the **entire** R2 bucket, including `outbox/`, and preserve configuration and
 secrets separately. Pause sending and review pending jobs before enabling the
 scheduled worker on a restored database, to avoid replaying old sends.
 
+### Drafts, search, and inbox cleanup
+
+Migration `0027_mail_workflows.sql` adds the search index, draft versions, sender
+rules, and cleanup history. Apply it before deploying this version; it indexes
+existing messages and maintains the index as mail changes.
+
+- Both composers autosave after a short pause, including attachments. The URL
+  points to the saved draft for refresh recovery. A failed save keeps the composer
+  open and offers retry; another tab cannot silently overwrite a newer version.
+  Refreshing with unsaved changes prompts before leaving. Saved snapshots are in
+  R2 under `drafts/` and are included in mail archives.
+- **Search** covers mail across folders with sender, recipient (including Cc/Bcc),
+  date, and attachment filters, highlighted matches, and paginated results. Spam
+  and Trash are optional. Search matches word prefixes using D1 FTS5; multiple
+  words must all occur. The command palette links to the full results page.
+- Archive and Trash show **Undo** for ten minutes. Undo restores prior state only
+  for messages that have not received a newer cleanup action. Failed actions
+  offer retry, reusing the original request identifier.
+- **Snooze** offers presets and a local date/time picker. Snoozed conversations
+  leave the inbox and unread count until their wake time; a new inbound reply
+  wakes them sooner. **Snoozed** lets you bring them back immediately. The existing
+  minute-by-minute scheduled worker processes due conversations.
+- **Settings → General → Sender rules** can label and archive new incoming mail
+  from an exact address, optionally matching text in the subject. Rules are
+  account-specific, run atomically with ingestion, and can be disabled or removed.
+
 ## Choosing a mail provider
 
 One provider is active per deploy, selected by `EMAIL_PROVIDER` (`resend` is

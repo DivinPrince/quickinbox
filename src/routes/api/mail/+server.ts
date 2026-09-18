@@ -26,6 +26,7 @@ function mailboxView(url: URL): MailboxView {
 	const view = url.searchParams.get('view');
 	switch (view) {
 		case 'inbox':
+		case 'snoozed':
 		case 'archive':
 		case 'starred':
 		case 'drafts':
@@ -112,7 +113,7 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		);
 
 		if (body.draftId) {
-			try { await deleteDraft(db, locals.user.id, body.draftId); }
+			try { await deleteDraft(db, locals.user.id, body.draftId, bucket); }
 			catch { console.error('Could not remove draft after queuing', body.draftId); }
 		}
 

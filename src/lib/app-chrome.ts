@@ -7,7 +7,8 @@ export const MAILBOX_PATHS = [
 	'/drafts',
 	'/trash',
 	'/archive',
-	'/spam'
+	'/spam',
+	'/snoozed'
 ] as const;
 export const PRIMARY_TABS = ['/inbox', '/starred', '/sent'] as const;
 
@@ -42,6 +43,8 @@ export function isMorePath(pathname: string): boolean {
 		pathname === '/trash' ||
 		pathname === '/archive' ||
 		pathname === '/spam' ||
+		pathname === '/snoozed' ||
+		pathname === '/search' ||
 		pathname === '/settings' ||
 		pathname === '/admin' ||
 		pathname.startsWith('/settings/') ||

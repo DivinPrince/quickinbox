@@ -1,6 +1,8 @@
 <script lang="ts">
+	import DraftAutosave from '$lib/components/DraftAutosave.svelte';
 	import { createMailSender } from '$lib/mail/send';
 	const sendMail = createMailSender();
+	import { page } from '$app/stores';
 	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import Icon from '$lib/components/Icon.svelte';
@@ -21,80 +23,49 @@
 	);
 
 	// Falls back to the default identity until the composer picks another.
-	let chosenAddressId = $state('');
+	let chosenAddressId = $state(untrack(() => data.draft?.address_id ?? ''));
 	const fromAddressId = $derived(chosenAddressId || defaultAddressId);
 
 	// The draft seeds the form once; after that the fields own their values.
 	const draft = untrack(() => data.draft);
 
-	let draftId = $state<string | null>(draft?.id ?? null);
+	let draftId = $state(draft?.id ?? crypto.randomUUID());
+	let autosave: DraftAutosave | undefined = $state();
 	let to = $state(draft?.to_addr ?? '');
 	let cc = $state(draft?.cc_addr ?? '');
 	let bcc = $state(draft?.bcc_addr ?? '');
 	let subject = $state(draft?.subject ?? '');
 	let html = $state(draft?.body_html || draft?.body_text || '');
-	let attachments = $state<OutboundAttachmentInput[]>([]);
+	let attachments = $state<OutboundAttachmentInput[]>(draft?.attachments ?? []);
 	let showCopies = $state(Boolean(draft?.cc_addr || draft?.bcc_addr));
 	let error = $state('');
 	let sending = $state(false);
 	let savingDraft = $state(false);
-	let savedAt = $state('');
+	const hasSavedDraft = $derived(Boolean(draft) || $page.url.searchParams.has('draft'));
 
-	const hasDraftText = $derived(Boolean(to.trim() || subject.trim() || !isHtmlEmpty(html)));
-
+	const hasDraftText = $derived(Boolean(to.trim() || cc.trim() || bcc.trim() || subject.trim() || !isHtmlEmpty(html) || attachments.length));
+	const draftPayload = $derived({ fromAddressId, to, cc, bcc, subject, html, text: typeof window === 'undefined' || isHtmlEmpty(html) ? '' : htmlToPlainText(html), attachments });
 	async function saveDraft(): Promise<boolean> {
-		if (savingDraft || !hasDraftText) return false;
 		savingDraft = true;
-		error = '';
-
-		try {
-			const res = await fetch('/api/drafts', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					id: draftId,
-					fromAddressId,
-					to,
-					cc: cc.trim() || undefined,
-					bcc: bcc.trim() || undefined,
-					subject,
-					html,
-					text: isHtmlEmpty(html) ? '' : htmlToPlainText(html)
-				})
-			});
-			const body = await res.json();
-			if (!res.ok) {
-				error = body.error ?? t('compose.couldNotSaveDraft');
-				return false;
-			}
-			draftId = body.id;
-			savedAt = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-			return true;
-		} catch {
-			error = t('common.networkError');
-			return false;
-		} finally {
-			savingDraft = false;
-		}
+		try { return await autosave?.flush() ?? false; } finally { savingDraft = false; }
 	}
 
 	async function closeComposer() {
-		if (hasDraftText && !(await saveDraft())) return;
-		if (attachments.length > 0) {
-			error = t('compose.attachmentsNotSaved');
-			return;
-		}
+		if (sending || !(await saveDraft())) return;
+		autosave?.finish();
 		requestSkipViewTransition();
-		await goto(draftId ? '/drafts' : '/inbox');
+		await goto(hasSavedDraft ? '/drafts' : '/inbox');
 	}
 
 	async function discardDraft() {
-		if (!draftId) {
-			window.location.href = '/inbox';
-			return;
-		}
-		await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' });
-		window.location.href = '/drafts';
+		if (sending) return;
+		try {
+			if (!(await saveDraft())) return;
+			const response = await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' });
+			if (!response.ok) throw new Error(t('draftSafety.discardFailed'));
+			autosave?.finish();
+			await goto('/drafts');
+		} catch { error = t('draftSafety.discardFailed'); }
 	}
 
 	async function submit(event: SubmitEvent) {
@@ -104,6 +75,7 @@
 			return;
 		}
 
+		if (sending || !(await saveDraft())) return;
 		sending = true;
 		error = '';
 
@@ -128,6 +100,7 @@
 				error = body.error ?? t('compose.failedToSend');
 				return;
 			}
+			autosave?.finish();
 			window.location.href = '/sent';
 		} catch {
 			error = t('common.networkError');
@@ -138,10 +111,10 @@
 </script>
 
 <svelte:head>
-	<title>{draftId ? t('compose.draftTitle', { app: APP_NAME }) : t('compose.title', { app: APP_NAME })}</title>
+	<title>{hasSavedDraft ? t('compose.draftTitle', { app: APP_NAME }) : t('compose.title', { app: APP_NAME })}</title>
 </svelte:head>
 
-<form class="compose-page" onsubmit={submit}>
+<form class="compose-page" onsubmit={submit} inert={sending}>
 	<header class="compose-mobile-bar">
 		<button
 			type="button"
@@ -153,8 +126,8 @@
 			<Icon name="close-line" size={22} />
 		</button>
 		<div class="compose-heading">
-			<h1 class="page-title">{draftId ? t('compose.draft') : t('nav.compose')}</h1>
-			{#if savedAt}<span class="saved">{t('common.savedAt', { time: savedAt })}</span>{/if}
+			<h1 class="page-title">{hasSavedDraft ? t('compose.draft') : t('nav.compose')}</h1>
+
 		</div>
 		<button type="submit" class="btn-primary" disabled={sending}>
 			{sending ? t('common.sending') : t('common.send')}
@@ -163,8 +136,8 @@
 
 	<header class="compose-header">
 		<div class="compose-heading">
-			<h1 class="page-title">{draftId ? t('compose.draft') : t('nav.compose')}</h1>
-			{#if savedAt}<span class="saved">{t('common.savedAt', { time: savedAt })}</span>{/if}
+			<h1 class="page-title">{hasSavedDraft ? t('compose.draft') : t('nav.compose')}</h1>
+
 		</div>
 
 		<div class="compose-actions">
@@ -180,7 +153,7 @@
 				<Icon name="save-line" size={15} />
 				{savingDraft ? t('common.saving') : t('compose.saveDraft')}
 			</button>
-			{#if draftId}
+			{#if hasSavedDraft}
 				<button type="button" class="btn-ghost" onclick={discardDraft} aria-label={t('compose.discardDraft')}>
 					<Icon name="delete-bin-line" size={15} />
 				</button>
@@ -191,6 +164,8 @@
 			</button>
 		</div>
 	</header>
+
+	<DraftAutosave bind:this={autosave} id={draftId} revision={draft?.draft_revision ?? 0} payload={draftPayload} hasContent={hasDraftText} disabled={sending} />
 
 	<div class="surface compose-fields">
 		<!-- With several domains connected, choosing the identity matters. -->
@@ -283,7 +258,7 @@
 				>
 					<Icon name="save-line" size={18} />
 				</button>
-				{#if draftId}
+				{#if hasSavedDraft}
 					<button
 						type="button"
 						class="icon-btn danger"
@@ -326,10 +301,6 @@
 		gap: 0.625rem;
 	}
 
-	.saved {
-		font-size: 0.75rem;
-		color: var(--color-muted);
-	}
 
 	.compose-actions {
 		display: flex;

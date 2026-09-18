@@ -1,5 +1,6 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { deleteDraft, getDraft } from '$lib/server/mail-store';
+import { readSavedDraft } from '$lib/server/drafts';
+import { deleteDraft } from '$lib/server/mail-store';
 
 export const GET: RequestHandler = async ({ params, locals, platform }) => {
 	const db = platform?.env.DB;
@@ -7,7 +8,7 @@ export const GET: RequestHandler = async ({ params, locals, platform }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const draft = await getDraft(db, locals.user.id, params.id!);
+	const draft = await readSavedDraft(platform!.env, locals.user.id, params.id!);
 	if (!draft) {
 		return json({ error: 'Not found' }, { status: 404 });
 	}
@@ -21,8 +22,10 @@ export const GET: RequestHandler = async ({ params, locals, platform }) => {
 		body_html: draft.body_html,
 		body_text: draft.body_text,
 		from_addr: draft.from_addr,
-		address_id: draft.address_id
-	});
+		address_id: draft.address_id,
+		draft_revision: draft.draft_revision,
+		attachments: draft.attachments
+	}, { headers: { 'Cache-Control': 'private, no-store' } });
 };
 
 export const DELETE: RequestHandler = async ({ params, locals, platform }) => {
@@ -31,7 +34,7 @@ export const DELETE: RequestHandler = async ({ params, locals, platform }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	await deleteDraft(db, locals.user.id, params.id!);
+	await deleteDraft(db, locals.user.id, params.id!, platform?.env.ATTACHMENTS);
 
 	return json({ ok: true });
 };

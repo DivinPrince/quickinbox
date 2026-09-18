@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SnoozeControl from '$lib/components/SnoozeControl.svelte';
 	import { untrack } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -142,8 +143,8 @@
 	}
 
 	async function act(action: string, ids: string[]) {
-		await runMailAction(action, ids);
-		await invalidateAll();
+		try { await runMailAction(action, ids); await invalidateAll(); }
+		catch { /* The shared notice offers retry. */ }
 	}
 
 	function onRowClick(thread: ThreadSummary, event: MouseEvent) {
@@ -219,6 +220,7 @@
 	<section class="z-panel z-list">
 		<div class="z-list-head">
 			<div class="z-list-tools">
+				{#if selected.length && !['drafts', 'spam', 'trash'].includes(view)}<SnoozeControl ids={items.filter((item) => selected.includes(item.thread_id)).map((item) => item.latest_id)} snoozed={view === 'snoozed'} />{/if}
 				<Tooltip text={t('nav.toggleSidebar')}>
 					<button type="button" class="z-icon-btn" aria-label={t('nav.toggleSidebar')} onclick={toggleSidebar}>
 						<Icon name="PanelLeftOpen" size={16} />

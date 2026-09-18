@@ -1,5 +1,6 @@
 import { deploymentPolicyResponse } from './lib/server/deployment-policy';
 import { getEmailProvider } from './lib/server/context';
+import { wakeSnoozedMail } from './lib/server/mail-cleanup';
 import { flushOutbox } from './lib/server/durable-outbox';
 import { recordOperationalFailure } from './lib/server/operational-events';
 import type { ScheduledController, ExecutionContext } from '@cloudflare/workers-types';
@@ -34,7 +35,7 @@ export default {
 	},
 
 	async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-		await flushOutbox(env, getEmailProvider({ env, ctx }));
+		await Promise.all([wakeSnoozedMail(env.DB), flushOutbox(env, getEmailProvider({ env, ctx }))]);
 	},
 
 	async email(message: CloudflareInboundMessage, env: Env, ctx: ExecutionContext) {

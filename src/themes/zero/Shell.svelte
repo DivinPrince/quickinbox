@@ -76,7 +76,9 @@
 					shortcut: 'g d'
 				},
 				{ href: '/sent', icon: 'Plane2', label: t('nav.sent'), shortcut: 'g t' },
-				{ href: '/outbox', icon: 'Plane2', label: t('nav.outbox') }
+				{ href: '/outbox', icon: 'Plane2', label: t('nav.outbox') },
+				{ href: '/snoozed', icon: 'Clock', label: t('cleanup.snoozed') },
+				{ href: '/search', icon: 'Search', label: t('common.search') }
 			]
 		},
 		{
@@ -174,6 +176,7 @@
 	});
 
 	function onKey(event: KeyboardEvent) {
+		if (event.defaultPrevented || (composeOpen && event.key === 'Escape')) return;
 		const target = event.target as HTMLElement | null;
 		const typing =
 			target &&

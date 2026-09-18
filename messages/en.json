@@ -739,5 +739,68 @@
 		"storageGuide": "R2 backup with rclone",
 		"checked": "Checked {time}",
 		"unknown": "Unavailable"
+	},
+	"draftSafety": {
+		"saving": "Saving draft…",
+		"saved": "Draft saved, including attachments",
+		"unsaved": "Unsaved changes",
+		"retry": "Retry save",
+		"discardFailed": "Could not discard the draft. Try again."
+	},
+	"searchFlow": {
+		"title": "Search mail",
+		"words": "Words or phrase",
+		"placeholder": "Search subjects, people, and message text",
+		"to": "To or Cc/Bcc",
+		"after": "On or after",
+		"before": "On or before",
+		"attachments": "Has attachments",
+		"hidden": "Include Spam and Trash",
+		"clear": "Clear filters",
+		"count": "{count} matching messages",
+		"empty": "No messages match these filters.",
+		"hasAttachments": "Has attachments",
+		"pages": "Search result pages",
+		"viewAll": "View all results and filters",
+		"failed": "Search failed",
+		"from": "From"
+	},
+	"cleanup": {
+		"snoozed": "Snoozed",
+		"empty": "No snoozed conversations.",
+		"snooze": "Snooze",
+		"wakeNow": "Return to inbox",
+		"snoozeHint": "Hide this conversation until the chosen time. A new reply brings it back sooner.",
+		"later": "In four hours",
+		"tomorrow": "Tomorrow at 9 AM",
+		"chooseTime": "Choose a local date and time",
+		"retry": "Retry",
+		"undo": "Undo",
+		"undoFailed": "Could not undo this action.",
+		"undone": "Action undone.",
+		"changed": "A newer change was preserved.",
+		"updated": "Mail updated.",
+		"done": {
+			"archive": "Conversation archived.",
+			"trash": "Conversation moved to Trash.",
+			"snooze": "Conversation snoozed.",
+			"unsnooze": "Conversation returned to the inbox."
+		}
+	},
+	"rules": {
+		"title": "Sender rules",
+		"hint": "Apply to new incoming mail from an exact sender address. Matching rules can add a label and archive the conversation. Existing mail is unchanged.",
+		"failed": "Could not update sender rules. Try again.",
+		"sender": "Sender email",
+		"subject": "Subject contains (optional)",
+		"anySubject": "Any subject",
+		"label": "Add label",
+		"noLabel": "No label",
+		"archive": "Archive automatically",
+		"add": "Add rule",
+		"empty": "No sender rules yet.",
+		"contains": "Subject contains: {text}",
+		"enabled": "Enabled",
+		"remove": "Remove"
 	}
 }

@@ -10,6 +10,7 @@ const TABLES = [
   { table: 'emails', columns: '*' },
   { table: 'email_labels', columns: '*' },
   { table: 'trusted_image_senders', columns: '*' },
+  { table: 'sender_rules', columns: '*' },
   { table: 'unrouted_emails', columns: '*' },
   { table: 'email_attachments', columns: '*' }
 ] as const;
@@ -41,6 +42,11 @@ export async function* mailArchive(db: D1Database, bucket: R2Bucket): AsyncGener
           data.content_base64 = bytes ? bytesToBase64(bytes) : null;
           data.missing = !bytes;
           if (!bytes) missingAttachments++;
+        }
+        if (table === 'emails' && typeof data.draft_payload_key === 'string') {
+          const draft = await bucket.get(data.draft_payload_key);
+          data.draft_content = draft ? await draft.json() : null;
+          if (!draft) missingAttachments++;
         }
         counts[table]++;
         yield JSON.stringify({ type: table, data }) + '\n';

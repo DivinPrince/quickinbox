@@ -23,6 +23,7 @@
 	import UiThemePicker from './UiThemePicker.svelte';
 	import LocalePicker from './LocalePicker.svelte';
 	import LabelsSettings from './LabelsSettings.svelte';
+	import SenderRulesSettings from './SenderRulesSettings.svelte';
 	import ImagePrivacySettings from './ImagePrivacySettings.svelte';
 	import TwoFactorSettings from './TwoFactorSettings.svelte';
 
@@ -693,6 +694,7 @@
 
 	{#if show('general')}
 	<ImagePrivacySettings />
+	<SenderRulesSettings labels={($page.data.labels ?? []) as MailLabel[]} />
 	{#key $page.data.user?.id}<TwoFactorSettings status={data.mfa} />{/key}
 	<section class="surface-lg card">
 		<h2><Icon name="pencil-line" size={18} /> {t('settings.signature')}</h2>

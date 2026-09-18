@@ -17,6 +17,8 @@ function isPrefix(pathname: string, prefix: string): boolean {
 }
 
 const BEARER_ROUTES: RouteRule[] = [
+	{ method: 'GET', match: (pathname) => pathname === '/api/search', scopes: ['mail:read'] },
+	{ method: 'POST', match: (pathname) => pathname === '/api/mail/undo', scopes: ['mail:read', 'mail:send'], allScopes: true },
 	{ method: 'POST', match: (pathname) => /^\/api\/outbox\/[^/]+$/.test(pathname), scopes: ['mail:send'] },
 	{
 		method: 'GET',
@@ -212,6 +214,8 @@ export function canAccessDuringFirstLogin(pathname: string, method: string): boo
 
 /** Bulk mailbox actions. Per-action scopes are enforced in `authorizeMailAction`. */
 export const MAIL_ACTIONS = [
+	'snooze',
+	'unsnooze',
 	'read',
 	'unread',
 	'star',
@@ -264,6 +268,8 @@ export function authorizeMailAction(input: {
 		case 'unstar':
 		case 'archive':
 		case 'unarchive':
+		case 'snooze':
+		case 'unsnooze':
 		case 'spam':
 		case 'unspam':
 		case 'categorize':

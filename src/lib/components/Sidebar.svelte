@@ -43,6 +43,8 @@
 		{ href: '/drafts', icon: 'draft-line', label: t('nav.drafts'), count: counts.drafts },
 		{ href: '/sent', icon: 'send-plane-line', label: t('nav.sent') },
 		{ href: '/outbox', icon: 'time-line', label: t('nav.outbox') },
+		{ href: '/snoozed', icon: 'time-line', label: t('cleanup.snoozed') },
+		{ href: '/search', icon: 'search-line', label: t('common.search') },
 		{ href: '/starred', icon: 'star-line', label: t('nav.starred'), count: counts.starred },
 		{ href: '/spam', icon: 'spam-2-line', label: t('nav.spam'), count: counts.spam },
 		{ href: '/trash', icon: 'delete-bin-line', label: t('nav.trash'), count: counts.trash }

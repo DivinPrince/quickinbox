@@ -53,11 +53,7 @@
 		}
 	}
 
-	// Search applies to whichever mailbox is open; anywhere else it lands in Inbox.
-	const MAILBOXES = ['/inbox', '/sent', '/starred', '/drafts', '/trash'];
-	const searchTarget = $derived(
-		MAILBOXES.find((path) => $page.url.pathname === path) ?? '/inbox'
-	);
+	const searchTarget = '/search';
 
 	let query = $state('');
 	let menuOpen = $state(false);

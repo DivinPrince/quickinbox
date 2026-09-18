@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
+	import DraftAutosave from '$lib/components/DraftAutosave.svelte';
 	import { createMailSender } from '$lib/mail/send';
 	const sendMail = createMailSender();
 	import { goto, invalidateAll } from '$app/navigation';
@@ -26,7 +28,10 @@
 	let chosenAddressId = $state('');
 	const fromAddressId = $derived(chosenAddressId || defaultAddressId);
 
-	let activeDraft = $state<string | null>(null);
+	let activeDraft = $state(untrack(() => draftId ?? crypto.randomUUID()));
+	let loaded = $state(!untrack(() => draftId));
+	let revision = $state(0);
+	let autosave: DraftAutosave | undefined = $state();
 	let to = $state('');
 	let cc = $state('');
 	let bcc = $state('');
@@ -40,12 +45,9 @@
 	let savingDraft = $state(false);
 
 	$effect(() => {
-		activeDraft = draftId;
-	});
-
-	$effect(() => {
 		const id = draftId;
-		if (!id) return;
+		if (!id || (id === activeDraft && loaded)) return;
+		loaded = false;
 		void fetch(`/api/drafts/${id}`)
 			.then(async (response) => {
 				const draft = (await response.json()) as {
@@ -57,6 +59,8 @@
 					body_html?: string | null;
 					body_text?: string | null;
 					address_id?: string | null;
+					draft_revision?: number;
+					attachments?: OutboundAttachmentInput[];
 					error?: string;
 				};
 				if (!response.ok || !draft.id) {
@@ -72,46 +76,20 @@
 				if (draft.address_id) chosenAddressId = draft.address_id;
 				showCc = Boolean(draft.cc_addr);
 				showBcc = Boolean(draft.bcc_addr);
+				attachments = draft.attachments ?? [];
+				revision = draft.draft_revision ?? 0;
+				loaded = true;
 			})
 			.catch(() => {
 				error = t('compose.couldNotLoadDraft');
 			});
 	});
 
-	const hasDraftText = $derived(Boolean(to.trim() || subject.trim() || !isHtmlEmpty(html)));
-
+	const hasDraftText = $derived(Boolean(to.trim() || cc.trim() || bcc.trim() || subject.trim() || !isHtmlEmpty(html) || attachments.length));
+	const draftPayload = $derived({ fromAddressId, to, cc, bcc, subject, html, text: typeof window === 'undefined' || isHtmlEmpty(html) ? '' : htmlToPlainText(html), attachments });
 	async function saveDraft(): Promise<boolean> {
-		if (savingDraft || !hasDraftText) return false;
 		savingDraft = true;
-		error = '';
-		try {
-			const response = await fetch('/api/drafts', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					id: activeDraft,
-					fromAddressId,
-					to,
-					cc: cc.trim() || undefined,
-					bcc: bcc.trim() || undefined,
-					subject,
-					html,
-					text: isHtmlEmpty(html) ? '' : htmlToPlainText(html)
-				})
-			});
-			const body = (await response.json()) as { id?: string; error?: string };
-			if (!response.ok) {
-				error = body.error ?? t('compose.couldNotSaveDraft');
-				return false;
-			}
-			activeDraft = body.id ?? activeDraft;
-			return true;
-		} catch {
-			error = t('common.networkError');
-			return false;
-		} finally {
-			savingDraft = false;
-		}
+		try { return await autosave?.flush() ?? false; } finally { savingDraft = false; }
 	}
 
 	async function send(event: SubmitEvent) {
@@ -120,6 +98,7 @@
 			error = t('compose.writeMessage');
 			return;
 		}
+		if (!loaded || sending || !(await saveDraft())) return;
 		sending = true;
 		error = '';
 		try {
@@ -143,6 +122,7 @@
 				error = body.error ?? t('compose.failedToSend');
 				return;
 			}
+			autosave?.finish();
 			await invalidateAll();
 			onClose();
 			if (body.id) await goto(`/sent?thread=${encodeURIComponent(body.id)}`);
@@ -154,7 +134,10 @@
 	}
 
 	async function close() {
-		if (hasDraftText) await saveDraft();
+		if (sending) return;
+		if (!loaded) { onClose(); return; }
+		if (!(await saveDraft())) return;
+		autosave?.finish();
 		onClose();
 	}
 
@@ -165,6 +148,7 @@
 		}
 		if (event.key === 'Escape') {
 			event.preventDefault();
+			event.stopPropagation();
 			void close();
 		}
 	}
@@ -177,7 +161,7 @@
 			<span>esc</span>
 		</button>
 
-		<form class="z-composer" onsubmit={send}>
+		<form class="z-composer" onsubmit={send} inert={!loaded || sending}>
 			<div class="z-composer-fields">
 				<div class="z-composer-row">
 					<span class="z-composer-label">{t('compose.toColon')}</span>
@@ -230,6 +214,7 @@
 				<RichTextEditor bind:html embedded minHeight={200} placeholder={t('compose.writeMessagePlaceholder')} />
 			</div>
 
+			{#if loaded}{#key activeDraft}<DraftAutosave bind:this={autosave} id={activeDraft} {revision} payload={draftPayload} hasContent={hasDraftText} disabled={sending} />{/key}{/if}
 			<ComposerActions bind:attachments sending={sending} error={error}>
 				{#snippet extra()}
 					<button

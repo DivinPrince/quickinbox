@@ -1,4 +1,6 @@
 <script lang="ts">
+	import SnoozeControl from '$lib/components/SnoozeControl.svelte';
+	import { runMailAction } from '$lib/mail/client';
 	import { createMailSender } from '$lib/mail/send';
 	const sendMail = createMailSender();
 	import { goto, invalidateAll } from '$app/navigation';
@@ -108,11 +110,9 @@
 	/** Flags apply to the conversation, not to the message that opened it. */
 	async function patch(body: Record<string, boolean | string>): Promise<Response | undefined> {
 		if (!latest) return;
-		return fetch(`/api/mail/${latest.id}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(body)
-		});
+		const action = body.archived !== undefined ? (body.archived ? 'archive' : 'unarchive') : body.trashed !== undefined ? (body.trashed ? 'trash' : 'restore') : body.isRead !== undefined ? (body.isRead ? 'read' : 'unread') : body.isStarred !== undefined ? (body.isStarred ? 'star' : 'unstar') : body.spam !== undefined ? (body.spam ? 'spam' : 'unspam') : 'categorize';
+		try { await runMailAction(action, [latest.id], action === 'categorize' ? { category: body.category } : {}); return Response.json({ ok: true }); }
+		catch { return Response.json({ ok: false }, { status: 400 }); }
 	}
 
 	async function toggleStar() {
@@ -121,8 +121,7 @@
 	}
 
 	async function markUnread() {
-		await patch({ isRead: false });
-		goto(backHref);
+		if ((await patch({ isRead: false }))?.ok) await goto(backHref);
 	}
 
 	async function toggleArchive() {
@@ -140,13 +139,11 @@
 	}
 
 	async function trash() {
-		await patch({ trashed: true });
-		goto(backHref);
+		if ((await patch({ trashed: true }))?.ok) await goto(backHref);
 	}
 
 	async function restore() {
-		await patch({ trashed: false });
-		goto('/inbox');
+		if ((await patch({ trashed: false }))?.ok) await goto('/inbox');
 	}
 
 	async function reportSpam() {
@@ -347,6 +344,7 @@
 		</a>
 
 		<div class="toolbar-actions">
+			{#if latest && !data.trashed && !data.spam}<SnoozeControl ids={[latest.id]} snoozed={Boolean(data.snoozedUntil)} onDone={() => { void goto('/inbox'); }} />{/if}
 			<button
 				type="button"
 				class="icon-btn"

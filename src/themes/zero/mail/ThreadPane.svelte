@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SnoozeControl from '$lib/components/SnoozeControl.svelte';
 	import DeliveryStatus from '$lib/components/DeliveryStatus.svelte';
 	import { createMailSender } from '$lib/mail/send';
 	const sendMail = createMailSender();
@@ -260,9 +261,8 @@
 	async function act(action: string, extra: Record<string, unknown> = {}) {
 		if (!latest) return;
 		menuFor = null;
-		await runMailAction(action, [latest.id], extra);
-		onClose();
-		await invalidateAll();
+		try { await runMailAction(action, [latest.id], extra); onClose(); await invalidateAll(); }
+		catch { /* The shared notice offers retry. */ }
 	}
 
 	async function toggleLabel(labelId: string) {
@@ -293,7 +293,7 @@
 
 	async function toggleStar() {
 		if (!latest) return;
-		await runMailAction(starred ? 'unstar' : 'star', [latest.id]);
+		try { await runMailAction(starred ? 'unstar' : 'star', [latest.id]); } catch { return; }
 		await invalidateAll();
 		if (thread) {
 			thread = {
@@ -458,6 +458,7 @@
 				</button>
 			</Tooltip>
 			<div class="z-thread-bar-right">
+				{#if view !== 'spam' && view !== 'trash'}<SnoozeControl ids={[latest.id]} snoozed={view === 'snoozed'} onDone={onClose} />{/if}
 				<button type="button" class="z-thread-replyall" onclick={startForwardAll}>
 					<Icon name="Forward" size={14} />
 					<span>{t('thread.forwardAll')}</span>
