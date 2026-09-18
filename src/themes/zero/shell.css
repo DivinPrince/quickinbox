@@ -420,7 +420,7 @@
 	background: color-mix(in srgb, var(--z-fg) 6%, transparent);
 }
 
-[data-ui-theme='zero'] .z-icon-btn.spin :global(.z-icon) {
+[data-ui-theme='zero'] .z-icon-btn.spin .z-icon {
 	animation: z-spin 0.7s linear infinite;
 }
 
@@ -1659,8 +1659,8 @@
 	display: none;
 }
 
-[data-ui-theme='zero'] .z-composer-foot :global(.icon-btn),
-[data-ui-theme='zero'] .z-reply :global(.icon-btn) {
+[data-ui-theme='zero'] .z-composer-foot .icon-btn,
+[data-ui-theme='zero'] .z-reply .icon-btn {
 	width: 1.75rem;
 	height: 1.75rem;
 	min-width: 0;
@@ -1877,7 +1877,9 @@
 	overflow: hidden;
 }
 
-[data-ui-theme='zero'] .z-stage > :global(*) {
+/* Plain CSS, not a Svelte <style>: `:global(...)` is invalid here and the whole
+   rule is dropped, so descendants are addressed directly. */
+[data-ui-theme='zero'] .z-stage > * {
 	flex: 1;
 	min-width: 0;
 	min-height: 0;
@@ -2001,7 +2003,7 @@
 		height: 3.5rem;
 	}
 
-	[data-ui-theme='zero'] .z-mobile-nav :global(.tip-wrap) {
+	[data-ui-theme='zero'] .z-mobile-nav .tip-wrap {
 		flex: 1;
 		height: 100%;
 	}
