@@ -369,6 +369,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
 				}
 			},
 			async ({ id, isRead, isStarred, archived, trashed, spam, category }) => {
+				if (!canRead) return textResult('This operation needs mail:read and mail:send.', true);
 				if (
 					[isRead, isStarred, archived, trashed, spam, category].every((value) => value === undefined)
 				) {
@@ -409,6 +410,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
 				}
 			},
 			async ({ id, labelIds }) => {
+				if (!canRead) return textResult('This operation needs mail:read and mail:send.', true);
 				try {
 					const ids = await expandToThreads(ctx.db, ctx.user.id, [id]);
 					if (ids.length === 0) return textResult(`No message or thread with id ${id}`, true);

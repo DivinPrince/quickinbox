@@ -148,10 +148,12 @@ export async function login(
 	const sessionId = crypto.randomUUID();
 	const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-	await db
-		.prepare('INSERT INTO sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)')
-		.bind(sessionId, user.id, token_hash, expiresAt)
+	const issued = await db
+		.prepare(`INSERT INTO sessions (id, user_id, token_hash, expires_at)
+		 SELECT ?, id, ?, ? FROM users WHERE id = ? AND password_hash = ?`)
+		.bind(sessionId, token_hash, expiresAt, user.id, user.password_hash)
 		.run();
+	if (!issued.meta.changes) return null;
 
 	const { password_hash: _, ...safeUser } = user;
 	return { user: safeUser, token };
@@ -412,22 +414,14 @@ export async function setUserPassword(
 	}
 
 	const password_hash = await hashPassword(password);
-	const result = await db
-		.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
-		.bind(password_hash, userId)
-		.run();
-
-	if ((result.meta.changes ?? 0) === 0) {
-		throw new Error('User not found');
-	}
-
-	// Password rotation must cut off every login path, including long-lived keys.
-	await db.batch([
-		db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
-		db.prepare('DELETE FROM api_tokens WHERE user_id = ?').bind(userId),
-		db.prepare('DELETE FROM oauth_grants WHERE user_id = ?').bind(userId),
-		db.prepare('DELETE FROM oauth_codes WHERE user_id = ?').bind(userId)
+	// Commit the new password and all credential revocations atomically.
+	const [result] = await db.batch([
+		db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(password_hash, userId),
+		...['sessions', 'api_tokens', 'pairing_codes', 'oauth_grants', 'oauth_codes'].map((table) =>
+			db.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(userId)
+		)
 	]);
+	if ((result.meta.changes ?? 0) === 0) throw new Error('User not found');
 }
 
 export async function completeFirstLogin(
@@ -489,6 +483,27 @@ export async function completeFirstLogin(
 					SELECT 1 FROM users
 					WHERE id = ? AND password_hash = ? AND must_change_password = 0
 				   )`
+			)
+			.bind(userId, userId, password_hash),
+		db
+			.prepare(
+				`DELETE FROM pairing_codes
+				 WHERE user_id = ?
+				   AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ? AND must_change_password = 0)`
+			)
+			.bind(userId, userId, password_hash),
+		db
+			.prepare(
+				`DELETE FROM oauth_codes
+				 WHERE user_id = ?
+				   AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ? AND must_change_password = 0)`
+			)
+			.bind(userId, userId, password_hash),
+		db
+			.prepare(
+				`DELETE FROM oauth_grants
+				 WHERE user_id = ?
+				   AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ? AND must_change_password = 0)`
 			)
 			.bind(userId, userId, password_hash)
 	]);

@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { normalizeUrl } from './config.ts';
 
@@ -403,3 +404,8 @@ export async function findThreadAcross(
 
 /** Pre-rename aliases so scripts that imported the old names keep working. */
 export { QuickInboxClient as QuickMailClient, QuickInboxError as QuickMailError };
+
+/** Sender-supplied attachment names must never replace an existing local file. */
+export async function saveAttachmentFile(path: string, bytes: Uint8Array): Promise<void> {
+ await writeFile(path, bytes, { flag: 'wx', mode: 0o600 });
+}

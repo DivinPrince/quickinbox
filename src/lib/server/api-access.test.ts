@@ -144,7 +144,7 @@ describe('API key access', () => {
 		);
 	});
 
-	test('forward routes allow mobile sessions and send-scoped API keys', () => {
+	test('forward routes allow mobile sessions and keys with both scopes', () => {
 		for (const pathname of ['/api/mail/message-1/forward', '/api/mail/thread/thread-1/forward']) {
 			assert.deepEqual(
 				authorizeApiRequest({
@@ -160,7 +160,7 @@ describe('API key access', () => {
 					pathname,
 					method: 'POST',
 					authMethod: 'api_token',
-					scopes: ['mail:send']
+					scopes: ['mail:read', 'mail:send']
 				}),
 				{ ok: true }
 			);

@@ -9,6 +9,7 @@ type RouteRule = {
 	method: string;
 	match: (pathname: string) => boolean;
 	scopes: readonly ApiScope[];
+	allScopes?: boolean;
 };
 
 function isPrefix(pathname: string, prefix: string): boolean {
@@ -64,12 +65,14 @@ const BEARER_ROUTES: RouteRule[] = [
 	{
 		method: 'POST',
 		match: (pathname) => /^\/api\/mail\/[^/]+\/forward$/.test(pathname),
-		scopes: ['mail:send']
+		scopes: ['mail:read', 'mail:send'],
+		allScopes: true
 	},
 	{
 		method: 'POST',
 		match: (pathname) => /^\/api\/mail\/thread\/[^/]+\/forward$/.test(pathname),
-		scopes: ['mail:send']
+		scopes: ['mail:read', 'mail:send'],
+		allScopes: true
 	},
 	{
 		method: 'PATCH',
@@ -104,7 +107,8 @@ const BEARER_ROUTES: RouteRule[] = [
 	{
 		method: 'DELETE',
 		match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname),
-		scopes: ['mail:send']
+		scopes: ['mail:read', 'mail:send'],
+		allScopes: true
 	},
 	{
 		method: 'GET',
@@ -343,11 +347,11 @@ export function authorizeApiRequest(input: {
 		};
 	}
 
-	if (!hasScope(input.scopes, rule.scopes)) {
+	if (!(rule.allScopes ? hasAllScopes(input.scopes, rule.scopes) : hasScope(input.scopes, rule.scopes))) {
 		return {
 			ok: false,
 			status: 403,
-			error: `This API key needs ${rule.scopes.join(' or ')}.`
+			error: `This API key needs ${rule.scopes.join(rule.allScopes ? ' and ' : ' or ')}.`
 		};
 	}
 

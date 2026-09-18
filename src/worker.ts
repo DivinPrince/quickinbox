@@ -1,3 +1,4 @@
+import { deploymentPolicyResponse } from './lib/server/deployment-policy';
 import type { ExecutionContext } from '@cloudflare/workers-types';
 import {
 	handleCloudflareInbound,
@@ -5,7 +6,7 @@ import {
 	type CloudflareInboundMessage
 } from './lib/server/cloudflare-inbound';
 // Renamed from `_worker.js` by `scripts/wrap-cloudflare-worker.mjs` after `vite build`.
-// @ts-expect-error file is created at build time
+// @ts-ignore generated worker and declaration are created at build time
 import sveltekit from '../.svelte-kit/cloudflare/_sveltekit.js';
 
 type SvelteKitWorker = {
@@ -20,6 +21,9 @@ const svelteApp = sveltekit as SvelteKitWorker;
  */
 export default {
 	fetch(request: Request, env: Env, ctx: ExecutionContext) {
+		const pathname = new URL(request.url).pathname;
+		const blocked = deploymentPolicyResponse(pathname, env);
+		if (blocked) return blocked;
 		if (typeof svelteApp.fetch !== 'function') {
 			throw new Error('SvelteKit worker export is missing fetch');
 		}

@@ -121,7 +121,7 @@ test('Resend sends CID SVGs inline and leaves ordinary files without content_id'
 		| { html?: string; attachments?: Array<Record<string, unknown>> }
 		| undefined;
 	const originalFetch = globalThis.fetch;
-	globalThis.fetch = async (_input, init) => {
+	globalThis.fetch = (async (_input, init) => {
 		requestBody = JSON.parse(String(init?.body)) as {
 			html?: string;
 			attachments?: Array<Record<string, unknown>>;
@@ -130,7 +130,7 @@ test('Resend sends CID SVGs inline and leaves ordinary files without content_id'
 			status: 200,
 			headers: { 'content-type': 'application/json' }
 		});
-	};
+	}) as typeof fetch;
 
 	try {
 		const result = await createResendProvider('test-resend-key').send(providerAttachmentInput());

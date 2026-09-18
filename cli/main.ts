@@ -1,10 +1,10 @@
-import { writeFile } from 'node:fs/promises';
 import { stdin as stdinStream } from 'node:process';
 import {
 	listThreadsAcross,
 	QuickInboxClient,
 	QuickInboxError,
 	safeDownloadName,
+	saveAttachmentFile,
 	type AccountClient,
 	type MailboxView,
 	type ThreadSummary
@@ -458,7 +458,7 @@ async function run(argv: string[]): Promise<number> {
 			if (!emailId || !attachmentId) throw new Error('download requires <email-id> <attachment-id>');
 			const file = await (await clientFromConfig(flags)).downloadAttachment(emailId, attachmentId);
 			const out = flagString(flags, 'out') ?? safeDownloadName(file.filename);
-			await writeFile(out, file.bytes);
+			await saveAttachmentFile(out, file.bytes);
 			console.log(out);
 			return 0;
 		}

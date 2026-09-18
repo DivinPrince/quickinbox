@@ -8,6 +8,8 @@ declare global {
 		ASSETS: Fetcher;
 		EMAIL: CloudflareSendEmailBinding;
 		EMAIL_PROVIDER?: string;
+		DISABLE_PUBLIC_SETUP?: string;
+		DISABLE_EXTERNAL_AUTH?: string;
 		CLOUDFLARE_MAIL_DOMAINS?: string;
 		RESEND_API_KEY: string;
 		RESEND_WEBHOOK_SECRET: string;

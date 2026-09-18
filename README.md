@@ -182,6 +182,22 @@ Inbound mail only works on a **deployed** Worker (or `bun run preview`) —
 
 Send yourself a message from another account — it should land within seconds.
 
+### Private webmail deployments
+
+Two optional Worker variables restrict the exposed routes. Set their values to
+the string `"true"` in your deployment's `wrangler.jsonc`:
+
+- `DISABLE_PUBLIC_SETUP` blocks `/setup` and `/api/setup`. Enable it after
+  provisioning the administrator; it does not disable new-user onboarding.
+- `DISABLE_EXTERNAL_AUTH` blocks OAuth, MCP, API-key management, CLI pairing,
+  and the CLI installer. Browser login and mail delivery remain available.
+  Existing API keys are not revoked by this flag.
+
+Password changes revoke existing sessions, API keys, pairing codes, OAuth codes,
+and OAuth grants. Concurrent external credential issuance still needs further
+hardening, so keep `DISABLE_EXTERNAL_AUTH` enabled for a webmail-only installation.
+Keep personal deployment settings and secrets out of commits to a public fork.
+
 ### Several accounts in one browser
 
 If you have access to more than one mailbox on the same instance, use

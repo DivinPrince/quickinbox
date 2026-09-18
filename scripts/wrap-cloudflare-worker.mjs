@@ -18,6 +18,10 @@ if (!existsSync(generated)) {
 	throw new Error('Expected .svelte-kit/cloudflare/_worker.js after `vite build`.');
 }
 
+// Keep source checks independent of generated, bundled JavaScript internals.
+await writeFile(path.resolve('.svelte-kit/cloudflare/_sveltekit.d.ts'),
+ `declare const worker: { fetch(request: Request, env: Env, ctx: unknown): Response | Promise<Response> };\nexport default worker;\n`);
+
 const current = await readFile(generated, 'utf8');
 if (current.includes(MARKER) || current.includes(LEGACY_MARKER)) {
 	process.exit(0);
