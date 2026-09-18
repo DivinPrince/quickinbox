@@ -265,6 +265,11 @@
 		"pageTitle": "{folder} — {app}"
 	},
 	"compose": {
+		"newMessage": "新邮件",
+		"minimize": "最小化",
+		"restore": "恢复",
+		"fullScreen": "全屏",
+		"exitFullScreen": "退出全屏",
 		"title": "撰写 — {app}",
 		"draftTitle": "草稿 — {app}",
 		"draft": "草稿",

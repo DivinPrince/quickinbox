@@ -265,6 +265,11 @@
 		"pageTitle": "{folder} — {app}"
 	},
 	"compose": {
+		"newMessage": "Nuevo mensaje",
+		"minimize": "Minimizar",
+		"restore": "Restaurar",
+		"fullScreen": "Pantalla completa",
+		"exitFullScreen": "Salir de pantalla completa",
 		"title": "Redactar — {app}",
 		"draftTitle": "Borrador — {app}",
 		"draft": "Borrador",

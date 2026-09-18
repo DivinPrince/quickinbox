@@ -265,6 +265,11 @@
 		"pageTitle": "{folder} — {app}"
 	},
 	"compose": {
+		"newMessage": "New message",
+		"minimize": "Minimize",
+		"restore": "Restore",
+		"fullScreen": "Full screen",
+		"exitFullScreen": "Exit full screen",
 		"title": "Compose — {app}",
 		"draftTitle": "Draft — {app}",
 		"draft": "Draft",

@@ -106,7 +106,7 @@ test('Zero phone chrome clears the iOS status bar and keeps tap targets large', 
 	assert.match(phone, /\.z-mobile-nav a[\s\S]*min-width:\s*var\(--touch-target\)/);
 	assert.match(phone, /\.z-mobile-nav a[\s\S]*min-height:\s*var\(--touch-target\)/);
 	assert.match(phone, /\.z-list-tools \.z-icon-btn[\s\S]*--touch-target/);
-	assert.match(phone, /\.z-compose-stage/);
+	assert.match(phone, /\.z-compose-window[\s\S]*safe-area-inset-top/);
 	assert.match(phone, /\.z-palette-scrim/);
 });
 

@@ -265,6 +265,11 @@
 		"pageTitle": "{folder} — {app}"
 	},
 	"compose": {
+		"newMessage": "Nouveau message",
+		"minimize": "Réduire",
+		"restore": "Restaurer",
+		"fullScreen": "Plein écran",
+		"exitFullScreen": "Quitter le plein écran",
 		"title": "Composer — {app}",
 		"draftTitle": "Brouillon — {app}",
 		"draft": "Brouillon",
