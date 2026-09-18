@@ -16,7 +16,7 @@
 
 	let { data, children }: ThemeShellProps = $props();
 
-	const NARROW = ['/mail', '/settings'];
+	const NARROW = ['/settings'];
 	const narrow = $derived(NARROW.some((path) => $page.url.pathname.startsWith(path)));
 	const stacked = $derived(isStackedPath($page.url.pathname));
 	const mailbox = $derived(isMailboxPath($page.url.pathname));

@@ -158,10 +158,10 @@ test('stacked swipe wrapper does not become a phone column on desktop', () => {
 	assert.match(source, /@media \(min-width:\s*901px\)[\s\S]*display:\s*contents/);
 });
 
-test('compose is not a centred reading column on desktop', () => {
+test('mail and compose use the available Classic pane width on desktop', () => {
 	const source = readFileSync(join(root, 'src/themes/classic/Shell.svelte'), 'utf8');
-	assert.match(source, /const NARROW = \['\/mail', '\/settings'\]/);
-	assert.doesNotMatch(source, /NARROW = \[[^\]]*\/compose/);
+	assert.match(source, /const NARROW = \['\/settings'\]/);
+	assert.doesNotMatch(source, /NARROW = \[[^\]]*\/(mail|compose)/);
 });
 
 test('composer fill layout is phone-only', () => {

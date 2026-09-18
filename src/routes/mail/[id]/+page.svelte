@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import SnoozeControl from '$lib/components/SnoozeControl.svelte';
 	import { runMailAction } from '$lib/mail/client';
 	import { createMailSender } from '$lib/mail/send';
@@ -23,6 +24,8 @@
 	let replyHtml = $state('');
 	let replyAttachments = $state<OutboundAttachmentInput[]>([]);
 	let replyOpen = $state(false);
+	let replySection = $state<HTMLFormElement>();
+	let replyEditor = $state<RichTextEditor>();
 	let sending = $state(false);
 	let error = $state('');
 
@@ -233,6 +236,7 @@
 		forwardTarget = null;
 		replyOpen = !replyOpen;
 		error = '';
+		if (replyOpen) void revealComposer();
 	}
 
 	function openForward(target: ForwardTarget) {
@@ -244,6 +248,15 @@
 		forwardTarget = sameTarget ? null : target;
 		includeAttachments = true;
 		error = '';
+		if (forwardTarget) void revealComposer();
+	}
+
+	async function revealComposer() {
+		// The form and editor do not exist until the conditional block has rendered.
+		await tick();
+		if (!replyOpen && !forwardOpen) return;
+		replySection?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+		replyEditor?.focus({ preventScroll: true });
 	}
 
 	/** Forward the explicitly selected message, or the server-resolved whole thread. */
@@ -491,7 +504,7 @@
 	</article>
 
 	{#if forwardOpen}
-		<form class="reply-section" onsubmit={sendForward}>
+		<form class="reply-section" bind:this={replySection} onsubmit={sendForward}>
 			<p class="forward-context">
 				{forwardTarget?.kind === 'thread'
 					? t('thread.forwardingAll', { count: forwardedMessages.length })
@@ -519,6 +532,7 @@
 			{/if}
 
 			<RichTextEditor
+				bind:this={replyEditor}
 				bind:html={forwardHtml}
 				embedded
 				minHeight={140}
@@ -549,7 +563,7 @@
 			{/if}
 		</form>
 	{:else if replyOpen}
-		<form class="reply-section" onsubmit={sendReply}>
+		<form class="reply-section" bind:this={replySection} onsubmit={sendReply}>
 			<p class="reply-to">
 				{t('thread.replyingTo')}
 				<strong>
@@ -565,7 +579,7 @@
 				</p>
 			{/if}
 
-			<RichTextEditor bind:html={replyHtml} embedded minHeight={160} placeholder={t('thread.replyPlaceholder')} />
+			<RichTextEditor bind:this={replyEditor} bind:html={replyHtml} embedded minHeight={160} placeholder={t('thread.replyPlaceholder')} />
 
 			<div class="reply-footer">
 				<AttachmentPicker bind:attachments={replyAttachments} />
@@ -593,6 +607,12 @@
 </div>
 
 <style>
+	.mail-page {
+		container: classic-thread / inline-size;
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+
 	.mail-toolbar {
 		display: flex;
 		align-items: center;
@@ -602,6 +622,8 @@
 
 	.toolbar-actions {
 		display: flex;
+		flex-wrap: wrap;
+		justify-content: flex-end;
 		align-items: center;
 		gap: 0.375rem;
 		position: relative;
@@ -709,6 +731,7 @@
 
 	.subject-row {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: baseline;
 		justify-content: space-between;
 		gap: 0.75rem;
@@ -735,7 +758,9 @@
 	}
 
 	.reply-section {
+		min-width: 0;
 		margin-top: 1rem;
+		scroll-margin-block: 1rem;
 		padding: 1.75rem;
 		background: var(--color-surface);
 		border-radius: 1.25rem;
@@ -776,6 +801,10 @@
 
 	.forward-row .field-label {
 		width: 2.5rem;
+	}
+
+	.forward-row .field-input {
+		min-width: 0;
 	}
 
 	.forward-footer {
@@ -834,6 +863,17 @@
 
 	.reply-prompt:hover {
 		background: var(--color-surface-muted);
+	}
+
+	@container classic-thread (max-width: 40rem) {
+		.forward-all-launch span {
+			display: none;
+		}
+
+		.mail-card,
+		.reply-section {
+			padding: 1rem;
+		}
 	}
 
 	@media (max-width: 900px) {

@@ -313,12 +313,14 @@
 		margin-top: 0.125rem;
 		font-size: 0.75rem;
 		color: var(--color-muted);
-		white-space: nowrap;
+		overflow-wrap: anywhere;
 	}
 
 	.body {
 		margin-top: 1rem;
 		font-size: 0.9375rem;
+		min-width: 0;
+		overflow-wrap: anywhere;
 	}
 
 	.empty {

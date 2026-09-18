@@ -209,6 +209,10 @@ body {
 	line-height: 1.65;
 	overflow-wrap: anywhere;
 }
+/* Inline attachments and layout tables must fit the reading pane in both
+   ordinary correspondence and designed messages. */
+img, video, svg { max-width: 100% !important; height: auto !important; }
+table { max-width: 100% !important; }
 p { margin: 0 0 1em; }
 /* Tailwind's reset is not in here, but senders still rely on markers. */
 ul { list-style: disc outside; margin: 0.5em 0; padding-left: 1.5em; }
@@ -222,8 +226,6 @@ pre { white-space: pre-wrap; }
 const SIMPLE_CSS = `
 html:not([data-theme='dark']) { color-scheme: light; }
 body { color: #525252; background: transparent; }
-img, video, svg { max-width: 100%; height: auto; }
-table { max-width: 100%; }
 a { color: #4f6b58; }
 blockquote { border-color: rgba(0, 0, 0, 0.12) !important; }
 
