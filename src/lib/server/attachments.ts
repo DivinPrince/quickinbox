@@ -188,6 +188,35 @@ export async function listAttachments(
 	}));
 }
 
+/** One IN query per chunk — per-email lookups overflow Miniflare/D1. */
+export async function listAttachmentNamesByEmail(
+	db: D1Database,
+	emailIds: string[]
+): Promise<Map<string, string[]>> {
+	const names = new Map<string, string[]>();
+	if (emailIds.length === 0) return names;
+
+	const chunk = 80;
+	for (let i = 0; i < emailIds.length; i += chunk) {
+		const group = emailIds.slice(i, i + chunk);
+		const placeholders = group.map(() => '?').join(', ');
+		const { results } = await db
+			.prepare(
+				`SELECT email_id, filename FROM email_attachments
+				 WHERE email_id IN (${placeholders})
+				 ORDER BY created_at ASC`
+			)
+			.bind(...group)
+			.all<{ email_id: string; filename: string }>();
+		for (const row of results) {
+			const bucket = names.get(row.email_id) ?? [];
+			bucket.push(row.filename);
+			names.set(row.email_id, bucket);
+		}
+	}
+	return names;
+}
+
 export async function getAttachmentForUser(
 	db: D1Database,
 	userId: string,

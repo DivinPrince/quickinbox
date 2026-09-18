@@ -1,20 +1,30 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import type { EmailRow } from '$lib/types';
-import type { ClassifyCursor, ClassifyStep } from '$lib/mail/classify-progress';
+import type { EmailRow, InboxCategory } from '$lib/types';
+import { classifyExistingBatchSize, type ClassifyCursor, type ClassifyStep } from '$lib/mail/classify-progress';
 import {
 	bumpMailboxEpoch,
 	expandToThreads,
 	getEmailForUser,
 	getThreadKey,
 	getThreadUserCategory,
+	listThreadUserCategories,
 	setEmailFlags,
 	countUnclassifiedInbound,
 	listUnclassifiedInbound
 } from './mail-store';
-import { listAutoLabels, setEmailAutoLabels, getSenderPref } from './labels';
-import { listAttachments } from './attachments';
-import { decideClassification, persistClassification } from './classify-policy';
-import { configuredTypesafeKey, judgeInboundMail } from './typesafe-classify';
+import { listAutoLabels, setEmailAutoLabels, getSenderPref, listSenderPrefs } from './labels';
+import { listAttachments, listAttachmentNamesByEmail } from './attachments';
+import {
+	decideClassification,
+	persistClassification,
+	type ClassificationJudgments
+} from './classify-policy';
+import {
+	configuredTypesafeKey,
+	judgeInboundMail,
+	judgeInboundMailBatch,
+	type InboundJudgeInput
+} from './typesafe-classify';
 import { stripHtml } from './html';
 import { scheduleNewMailNotification, type PushNotificationEnv } from './push-notifications';
 import {
@@ -57,6 +67,7 @@ export type ClassifyApplyResult = {
 };
 
 export type MailJudge = typeof judgeInboundMail;
+export type MailBatchJudge = typeof judgeInboundMailBatch;
 
 /**
  * Classify after the message is stored, then notify unless it is spam or a
@@ -153,10 +164,20 @@ export async function classifyStoredEmail(
 		Boolean(judgments)
 	);
 
-	const ids = await expandToThreads(db, input.userId, [input.emailId]);
+	return persistMailDecision(db, input.userId, email, decision, judgments);
+}
+
+async function persistMailDecision(
+	db: D1Database,
+	userId: string,
+	email: EmailRow,
+	decision: ReturnType<typeof persistClassification>,
+	judgments: ClassificationJudgments | null
+): Promise<ClassifyApplyResult> {
+	const ids = await expandToThreads(db, userId, [email.id]);
 
 	if (decision.spam) {
-		await setEmailFlags(db, input.userId, ids, {
+		await setEmailFlags(db, userId, ids, {
 			spam: true,
 			spamSource: 'auto'
 		});
@@ -164,12 +185,12 @@ export async function classifyStoredEmail(
 	}
 
 	if (decision.categorySource === 'user') {
-		await setEmailFlags(db, input.userId, [input.emailId], {
+		await setEmailFlags(db, userId, [email.id], {
 			category: decision.category,
 			categorySource: 'user'
 		});
 	} else if (decision.categorySource === 'auto') {
-		await setEmailFlags(db, input.userId, ids, {
+		await setEmailFlags(db, userId, ids, {
 			category: decision.category,
 			categorySource: 'auto'
 		});
@@ -181,13 +202,13 @@ export async function classifyStoredEmail(
 		const scores = new Map(judgments.labels.map((label) => [label.id, label.noul]));
 		await setEmailAutoLabels(
 			db,
-			input.emailId,
+			email.id,
 			decision.labelIds.map((labelId) => ({
 				labelId,
 				score: scores.get(labelId) ?? 0
 			}))
 		);
-		await bumpMailboxEpoch(db, input.userId);
+		await bumpMailboxEpoch(db, userId);
 	}
 
 	return { applied: true, notify: decision.notify, subject: email.subject };
@@ -200,18 +221,28 @@ function bodyForJudge(email: EmailRow): string | null {
 	return null;
 }
 
-/**
- * Classify the next unclassified inbound message. One email per call so the
- * settings page can paint progress after every TypeSafe response.
- */
+/** Classify the next unclassified window in one TypeSafe batch. */
 export async function classifyNextExisting(
 	db: D1Database,
 	apiKey: string,
 	userId: string,
 	cursor: ClassifyCursor | null,
-	options?: { judge?: MailJudge }
+	options?: { judge?: MailJudge; batchJudge?: MailBatchJudge }
 ): Promise<ClassifyStep> {
-	const emails = await listUnclassifiedInbound(db, userId, { after: cursor, limit: 1 });
+	const remainingNow = await countUnclassifiedInbound(db, userId);
+	const limit = classifyExistingBatchSize(remainingNow);
+	if (limit === 0) {
+		return {
+			enabled: true,
+			applied: false,
+			subject: null,
+			remaining: remainingNow,
+			cursor,
+			complete: true
+		};
+	}
+
+	const emails = await listUnclassifiedInbound(db, userId, { limit });
 	if (emails.length === 0) {
 		return {
 			enabled: true,
@@ -223,30 +254,140 @@ export async function classifyNextExisting(
 		};
 	}
 
-	const email = emails[0];
-	const nextCursor: ClassifyCursor = { createdAt: email.created_at, id: email.id };
-	const result = await classifyStoredEmail(
-		db,
-		apiKey,
-		{
-			emailId: email.id,
-			userId,
+	const key = configuredTypesafeKey(apiKey);
+	const [autoLabels, senderPrefs, userCategories, attachmentNames] = await Promise.all([
+		key ? listAutoLabels(db, userId) : Promise.resolve([]),
+		listSenderPrefs(db, userId),
+		listThreadUserCategories(db, userId),
+		listAttachmentNamesByEmail(
+			db,
+			emails.map((email) => email.id)
+		)
+	]);
+	const contexts = emails.map((email) => {
+		const threadId = email.thread_id ?? email.id;
+		const senderDisposition = senderPrefs.get(email.from_addr.trim().toLowerCase()) ?? null;
+		const userLockedCategory = userCategories.get(threadId) ?? null;
+		const input: InboundJudgeInput = {
 			from: email.from_addr,
 			fromName: email.from_name,
 			to: email.to_addr,
 			subject: email.subject,
-			bodyText: bodyForJudge(email)
-		},
-		options
-	);
-	const remaining = await countUnclassifiedInbound(db, userId);
+			bodyText: bodyForJudge(email),
+			attachmentNames: attachmentNames.get(email.id) ?? [],
+			autoLabels
+		};
+		return { email, senderDisposition, userLockedCategory, input };
+	});
 
+	const needJudge = key
+		? contexts.filter((item) => item.senderDisposition !== 'spam')
+		: [];
+	const judged =
+		!key || needJudge.length === 0
+			? []
+			: options?.judge && !options.batchJudge
+				? await Promise.all(needJudge.map((item) => options.judge!(key, item.input)))
+				: await (options?.batchJudge ?? judgeInboundMailBatch)(
+						key,
+						needJudge.map((item) => item.input)
+					);
+
+	const byEmail = new Map<string, ClassificationJudgments | null>();
+	needJudge.forEach((item, index) => {
+		byEmail.set(item.email.id, judged[index] ?? null);
+	});
+
+	const spamIds: string[] = [];
+	const userLocked: { id: string; category: InboxCategory }[] = [];
+	const autoByCategory = new Map<InboxCategory, string[]>();
+	const labeled: {
+		emailId: string;
+		labelIds: string[];
+		judgments: ClassificationJudgments;
+	}[] = [];
+	let applied = false;
+	let subject: string | null = null;
+	const threadCategoryWinner = new Set<string>();
+
+	for (const item of contexts) {
+		const judgments =
+			item.senderDisposition === 'spam' ? null : (byEmail.get(item.email.id) ?? null);
+		const decision = persistClassification(
+			decideClassification({
+				senderDisposition: item.senderDisposition,
+				userLockedCategory: item.userLockedCategory,
+				judgments
+			}),
+			Boolean(judgments)
+		);
+		subject = item.email.subject;
+
+		if (decision.spam) {
+			spamIds.push(item.email.id);
+			applied = true;
+			continue;
+		}
+		if (decision.categorySource === 'user') {
+			userLocked.push({ id: item.email.id, category: decision.category });
+			applied = true;
+		} else if (decision.categorySource === 'auto') {
+			const threadId = item.email.thread_id ?? item.email.id;
+			if (!threadCategoryWinner.has(threadId)) {
+				threadCategoryWinner.add(threadId);
+				const bucket = autoByCategory.get(decision.category) ?? [];
+				bucket.push(item.email.id);
+				autoByCategory.set(decision.category, bucket);
+				applied = true;
+			}
+		}
+		if (decision.labelIds.length > 0 && judgments) {
+			labeled.push({ emailId: item.email.id, labelIds: decision.labelIds, judgments });
+		}
+	}
+
+	if (spamIds.length > 0) {
+		await setEmailFlags(db, userId, await expandToThreads(db, userId, spamIds), {
+			spam: true,
+			spamSource: 'auto'
+		});
+	}
+	for (const row of userLocked) {
+		await setEmailFlags(db, userId, [row.id], {
+			category: row.category,
+			categorySource: 'user'
+		});
+	}
+	for (const [category, ids] of autoByCategory) {
+		await setEmailFlags(db, userId, await expandToThreads(db, userId, ids), {
+			category,
+			categorySource: 'auto'
+		});
+	}
+	for (const row of labeled) {
+		const scores = new Map(row.judgments.labels.map((label) => [label.id, label.noul]));
+		await setEmailAutoLabels(
+			db,
+			row.emailId,
+			row.labelIds.map((labelId) => ({
+				labelId,
+				score: scores.get(labelId) ?? 0
+			}))
+		);
+	}
+	if (labeled.length > 0) await bumpMailboxEpoch(db, userId);
+
+	const last = emails[emails.length - 1];
+	const remaining = await countUnclassifiedInbound(db, userId);
+	if (!applied && remaining > 0) {
+		throw new Error('Classification produced no decisions');
+	}
 	return {
 		enabled: true,
-		applied: result.applied,
-		subject: result.subject,
+		applied,
+		subject,
 		remaining,
-		cursor: nextCursor,
+		cursor: { createdAt: last.created_at, id: last.id },
 		complete: remaining === 0
 	};
 }

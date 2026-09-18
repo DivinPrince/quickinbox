@@ -11,16 +11,10 @@
 
 	let classifyEnabled = $state(false);
 	let remaining = $state<number | null>(null);
-	let classifyTotal = $state(0);
-	let currentSubject = $state('');
 	let classifying = $state(false);
 	let classifyError = $state('');
 	let abortClassify: AbortController | null = null;
 
-	const classified = $derived(Math.max(0, classifyTotal - (remaining ?? classifyTotal)));
-	const classifyPercent = $derived(
-		classifyTotal > 0 ? Math.min(100, Math.round((classified / classifyTotal) * 100)) : 0
-	);
 	const showSortSection = $derived((classifyEnabled && remaining != null) || Boolean(classifyError));
 	const showSort = $derived(classifyEnabled && remaining != null && remaining > 0);
 
@@ -52,8 +46,6 @@
 		if (classifying) return;
 
 		classifyError = '';
-		currentSubject = '';
-		classifyTotal = remaining ?? 0;
 		classifying = true;
 		abortClassify?.abort();
 		const controller = new AbortController();
@@ -61,8 +53,7 @@
 
 		try {
 			await loadClassifyStatus();
-			if (remaining != null) classifyTotal = remaining;
-			if (!classifyEnabled || classifyTotal === 0) return;
+			if (!classifyEnabled || !remaining) return;
 
 			let cursor: ClassifyCursor | null = null;
 			while (!controller.signal.aborted) {
@@ -79,11 +70,9 @@
 				}
 
 				remaining = body.remaining;
-				if (body.subject) currentSubject = body.subject;
 				cursor = parseClassifyCursor(body.cursor);
 
 				if (body.complete) {
-					currentSubject = '';
 					await invalidateAll();
 					return;
 				}
@@ -100,10 +89,6 @@
 			classifying = false;
 			if (abortClassify === controller) abortClassify = null;
 		}
-	}
-
-	function stopClassify(): void {
-		abortClassify?.abort();
 	}
 
 	let name = $state('');
@@ -194,34 +179,17 @@
 	<section class="surface-lg card">
 		<h2><Icon name="inbox-unarchive-line" size={18} /> {t('settings.classifyExistingTitle')}</h2>
 
-		{#if classifying}
-			<div class="sort-live" role="status" aria-live="polite">
-				<div
-					class="bar-track"
-					role="progressbar"
-					aria-valuemin="0"
-					aria-valuemax="100"
-					aria-valuenow={classifyPercent}
+		{#if showSort || classifying}
+			<div class="sort-row" role="status" aria-live="polite">
+				<span class="stat-num" class:busy={classifying}>{remaining}</span>
+				<button
+					type="button"
+					class="btn-primary"
+					disabled={classifying}
+					aria-busy={classifying}
+					onclick={() => void classifyExisting()}
 				>
-					<div class="bar-fill active" style="width: {classifyPercent}%"></div>
-				</div>
-				<div class="sort-meta">
-					<span class="frac">
-						{t('settings.classifyExistingProgress', { done: classified, total: classifyTotal })}
-					</span>
-					{#if currentSubject}
-						<span class="subject">{currentSubject}</span>
-					{/if}
-					<button type="button" class="btn-ghost" onclick={stopClassify}>
-						{t('settings.classifyExistingStop')}
-					</button>
-				</div>
-			</div>
-		{:else if showSort}
-			<div class="sort-row">
-				<span class="stat-num">{remaining}</span>
-				<button type="button" class="btn-primary" onclick={() => void classifyExisting()}>
-					{t('settings.classifyExisting')}
+					{classifying ? t('settings.classifyExistingRunning') : t('settings.classifyExisting')}
 				</button>
 			</div>
 		{:else if remaining != null}
@@ -336,6 +304,16 @@
 		line-height: 1;
 	}
 
+	.stat-num.busy {
+		animation: classify-pulse 0.7s ease-in-out infinite;
+	}
+
+	@keyframes classify-pulse {
+		50% {
+			opacity: 0.4;
+		}
+	}
+
 	.caught-up {
 		display: flex;
 		align-items: center;
@@ -343,73 +321,6 @@
 		margin: 1rem 0 0;
 		font-size: 0.875rem;
 		color: var(--color-muted);
-	}
-
-	.sort-live {
-		margin-top: 1rem;
-	}
-
-	.sort-meta {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin-top: 0.5rem;
-		min-width: 0;
-		font-size: 0.75rem;
-		color: var(--color-muted);
-	}
-
-	.sort-meta .btn-ghost {
-		flex-shrink: 0;
-		margin-left: auto;
-	}
-
-	.frac {
-		flex-shrink: 0;
-		font-weight: 600;
-		font-variant-numeric: tabular-nums;
-		color: var(--color-text);
-	}
-
-	.subject {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.bar-track {
-		height: 0.35rem;
-		border-radius: 999px;
-		background: var(--color-line, rgb(0 0 0 / 0.08));
-		overflow: hidden;
-	}
-
-	.bar-fill {
-		height: 100%;
-		border-radius: inherit;
-		background: var(--color-accent, #2563eb);
-		transition: width 0.2s ease-out;
-	}
-
-	.bar-fill.active {
-		background-image: linear-gradient(
-			90deg,
-			transparent,
-			rgb(255 255 255 / 0.28),
-			transparent
-		);
-		background-size: 1.5rem 100%;
-		animation: classify-shimmer 0.9s linear infinite;
-	}
-
-	@keyframes classify-shimmer {
-		from {
-			background-position: 0 0;
-		}
-		to {
-			background-position: 1.5rem 0;
-		}
 	}
 
 	.label-list {
