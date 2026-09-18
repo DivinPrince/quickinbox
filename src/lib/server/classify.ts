@@ -13,7 +13,7 @@ import {
 	listUnclassifiedInbound
 } from './mail-store';
 import { listAutoLabels, setEmailAutoLabels, getSenderPref, listSenderPrefs } from './labels';
-import { listAttachments } from './attachments';
+import { listAttachments, listAttachmentNamesByEmail } from './attachments';
 import {
 	decideClassification,
 	persistClassification,
@@ -255,10 +255,14 @@ export async function classifyNextExisting(
 	}
 
 	const key = configuredTypesafeKey(apiKey);
-	const [autoLabels, senderPrefs, userCategories] = await Promise.all([
+	const [autoLabels, senderPrefs, userCategories, attachmentNames] = await Promise.all([
 		key ? listAutoLabels(db, userId) : Promise.resolve([]),
 		listSenderPrefs(db, userId),
-		listThreadUserCategories(db, userId)
+		listThreadUserCategories(db, userId),
+		listAttachmentNamesByEmail(
+			db,
+			emails.map((email) => email.id)
+		)
 	]);
 	const contexts = emails.map((email) => {
 		const threadId = email.thread_id ?? email.id;
@@ -270,7 +274,7 @@ export async function classifyNextExisting(
 			to: email.to_addr,
 			subject: email.subject,
 			bodyText: bodyForJudge(email),
-			attachmentNames: [],
+			attachmentNames: attachmentNames.get(email.id) ?? [],
 			autoLabels
 		};
 		return { email, senderDisposition, userLockedCategory, input };
@@ -304,6 +308,7 @@ export async function classifyNextExisting(
 	}[] = [];
 	let applied = false;
 	let subject: string | null = null;
+	const threadCategoryWinner = new Set<string>();
 
 	for (const item of contexts) {
 		const judgments =
@@ -327,10 +332,14 @@ export async function classifyNextExisting(
 			userLocked.push({ id: item.email.id, category: decision.category });
 			applied = true;
 		} else if (decision.categorySource === 'auto') {
-			const bucket = autoByCategory.get(decision.category) ?? [];
-			bucket.push(item.email.id);
-			autoByCategory.set(decision.category, bucket);
-			applied = true;
+			const threadId = item.email.thread_id ?? item.email.id;
+			if (!threadCategoryWinner.has(threadId)) {
+				threadCategoryWinner.add(threadId);
+				const bucket = autoByCategory.get(decision.category) ?? [];
+				bucket.push(item.email.id);
+				autoByCategory.set(decision.category, bucket);
+				applied = true;
+			}
 		}
 		if (decision.labelIds.length > 0 && judgments) {
 			labeled.push({ emailId: item.email.id, labelIds: decision.labelIds, judgments });
@@ -370,12 +379,15 @@ export async function classifyNextExisting(
 
 	const last = emails[emails.length - 1];
 	const remaining = await countUnclassifiedInbound(db, userId);
+	if (!applied && remaining > 0) {
+		throw new Error('Classification produced no decisions');
+	}
 	return {
 		enabled: true,
 		applied,
 		subject,
 		remaining,
 		cursor: { createdAt: last.created_at, id: last.id },
-		complete: remaining === 0 || !applied
+		complete: remaining === 0
 	};
 }
