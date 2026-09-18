@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
+	import { createMailSender } from '$lib/mail/send';
+	const sendMail = createMailSender();
+	import { goto, invalidateAll } from '$app/navigation';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
@@ -121,7 +123,7 @@
 		sending = true;
 		error = '';
 		try {
-			const response = await fetch('/api/mail', {
+			const response = await sendMail('/api/mail', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -136,13 +138,14 @@
 					attachments
 				})
 			});
-			const body = (await response.json()) as { error?: string };
+			const body = (await response.json()) as { id?: string; error?: string };
 			if (!response.ok) {
 				error = body.error ?? t('compose.failedToSend');
 				return;
 			}
 			await invalidateAll();
 			onClose();
+			if (body.id) await goto(`/sent?thread=${encodeURIComponent(body.id)}`);
 		} catch {
 			error = t('common.networkError');
 		} finally {

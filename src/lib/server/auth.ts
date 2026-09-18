@@ -616,9 +616,10 @@ export async function deleteUser(
 			.prepare(
 				`SELECT storage_key FROM email_attachments
 				 WHERE storage_key IS NOT NULL
-				   AND email_id IN (SELECT id FROM emails WHERE user_id = ?)`
+				   AND email_id IN (SELECT id FROM emails WHERE user_id = ?)
+				 UNION ALL SELECT payload_key AS storage_key FROM outbox_jobs WHERE user_id = ?`
 			)
-			.bind(targetId),
+			.bind(targetId, targetId),
 		db
 			.prepare(
 				`DELETE FROM users
@@ -632,6 +633,8 @@ export async function deleteUser(
 				 WHERE email_id IN (SELECT id FROM emails WHERE user_id = ?) AND ${gone}`
 			)
 			.bind(targetId, targetId),
+		db.prepare(`DELETE FROM outbox_jobs WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM trusted_image_senders WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM emails WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM addresses WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM sessions WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),

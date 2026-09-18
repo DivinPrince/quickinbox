@@ -1,10 +1,35 @@
 <script lang="ts">
+	import { page } from '$app/stores';
+	import { invalidateAll } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { EMAIL_STYLE_ID, buildEmailDocument, emailCss, isRichHtml } from '$lib/utils/email-html';
 	import { canFoldQuotes, foldQuotedHtml } from '$lib/utils/quotes';
 	import { t } from '$lib/i18n';
 
-	let { html }: { html: string } = $props();
+	let { html, messageId = '', sender = '', inbound = false }: {
+		html: string; messageId?: string; sender?: string; inbound?: boolean;
+	} = $props();
+	let loadedMessage = $state('');
+	let savingTrust = $state(false);
+	let privacyError = $state('');
+	const senderAddress = $derived((sender.match(/<([^>]+)>/)?.[1] ?? sender).trim().toLowerCase());
+	const trusted = $derived((($page.data.trustedImageSenders ?? []) as string[]).includes(senderAddress));
+	const allowRemoteImages = $derived((Boolean(messageId) && loadedMessage === messageId) || (inbound && trusted));
+	// Detection only controls the notice. CSP blocks all external image loads,
+	// even encoded URLs or unusual HTML that this conservative check misses.
+	const mayHaveImages = $derived(/<(?:img|source)\b|url\s*\(|\bbackground\s*=/i.test(html));
+	async function trustSender() {
+		savingTrust = true;
+		privacyError = '';
+		try {
+			const response = await fetch('/api/settings/remote-images', {
+				method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messageId })
+			});
+			if (!response.ok) throw new Error('Could not save');
+			await invalidateAll();
+		} catch { privacyError = t('privacy.saveError'); }
+		finally { savingTrust = false; }
+	}
 
 	const rich = $derived(isRichHtml(html));
 
@@ -21,7 +46,7 @@
 	 * cost a reload to correct, and nothing about a scriptless frame benefits
 	 * from it: the frame is invisible until measured from out here.
 	 */
-	const srcdoc = $derived(browser ? buildEmailDocument(html, { rich, theme }) : '');
+	const srcdoc = $derived(browser ? buildEmailDocument(html, { rich, theme, allowRemoteImages, messageId, origin: window.location.origin }) : '');
 
 	let mounted = $state(false);
 	let frame = $state<HTMLIFrameElement | null>(null);
@@ -252,6 +277,17 @@
 	});
 </script>
 
+{#if mayHaveImages && !allowRemoteImages}
+	<div class="image-notice">
+		<span>{t('privacy.blocked')}</span>
+		<button type="button" onclick={() => { loadedMessage = messageId; }}>{t('privacy.loadImages')}</button>
+		{#if inbound && messageId && senderAddress}
+			<button type="button" disabled={savingTrust} onclick={trustSender}>{t('privacy.alwaysAllow')}</button>
+		{/if}
+		{#if privacyError}<span role="alert">{privacyError}</span>{/if}
+	</div>
+{/if}
+
 {#if mounted && srcdoc}
 	<iframe
 		bind:this={frame}
@@ -280,6 +316,10 @@
 {/if}
 
 <style>
+	.image-notice { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; padding: .65rem .8rem; margin-bottom: .75rem; border-radius: .5rem; background: var(--color-surface-muted); color: var(--color-text-secondary); font-size: .75rem; }
+	.image-notice button { color: var(--color-text); text-decoration: underline; cursor: pointer; }
+	.image-notice button:disabled { opacity: .5; cursor: wait; }
+
 	.frame {
 		display: block;
 		width: 100%;

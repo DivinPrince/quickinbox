@@ -14,6 +14,7 @@
 	import { persistUiTheme } from '$lib/ui-theme/apply';
 	import { persistLocale } from '$lib/i18n';
 	import { getTheme } from '$lib/ui-theme/registry';
+	import OutboxNotice from '$lib/components/OutboxNotice.svelte';
 	import MailboxLiveSync from '$lib/components/MailboxLiveSync.svelte';
 	import type { ThemeShellData } from '$lib/ui-theme/types';
 	import type { LayoutData } from './$types';
@@ -95,6 +96,7 @@
 
 {#if showShell && shellData}
 	<MailboxLiveSync />
+	{#key data.user?.id}<OutboxNotice />{/key}
 	<ThemeShell data={shellData}>
 		{@render children()}
 	</ThemeShell>

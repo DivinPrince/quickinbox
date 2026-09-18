@@ -1,7 +1,7 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { MailAddress, OutboundAttachmentInput, User } from '$lib/types';
 import { appendEmailSignature, pickEmailSignature } from '$lib/email-signature';
-import { base64ByteLength, insertAttachments } from './attachments';
+import { base64ByteLength } from './attachments';
 import {
 	MAX_ATTACHMENT_BYTES,
 	MAX_ATTACHMENTS_PER_EMAIL,
@@ -16,11 +16,13 @@ import {
 import { parseEmailAddress } from './email-address';
 import { getEmailSignature } from './email-signature';
 import { stripHtml } from './html';
-import { insertEmail } from './mail-store';
-import { initialOutboundStatus, type EmailProvider } from './email-provider';
-import { escapeHtml, parseRecipients, sendOutboundEmail } from './send-mail';
+import { MAX_BODY_BYTES } from './constants';
+import { deliverOutboxJob, enqueueOutbound, getOutboxJob, type OutboxState } from './durable-outbox';
+import type { EmailProvider } from './email-provider';
+import { escapeHtml, parseRecipients, prepareOutboundEmail } from './send-mail';
 
 export type ComposeInput = {
+	idempotencyKey?: string;
 	fromAddressId?: string | null;
 	/** Pre-resolved identity — used by replies so we can send from the received mailbox. */
 	fromAddress?: MailAddress | null;
@@ -145,13 +147,13 @@ export async function resolveReplyFromAddress(
 	return getDefaultAddress(db, user.id);
 }
 
-/** Send through the configured provider, then record it in the Sent folder. */
+/** Persist the complete message before attempting provider delivery. */
 export async function sendAndStore(
 	env: { DB: D1Database; ATTACHMENTS: R2Bucket },
 	provider: EmailProvider,
 	user: User,
 	input: ComposeInput
-): Promise<{ emailId: string; providerId: string; from: MailAddress }> {
+): Promise<{ emailId: string; providerId: string | null; from: MailAddress; state: OutboxState }> {
 	// resolveFromAddress scopes the lookup to this user, so ownership is implied.
 	const from = input.fromAddress ?? (await resolveFromAddress(env.DB, user, input.fromAddressId));
 
@@ -172,7 +174,7 @@ export async function sendAndStore(
 	const attachments = input.attachments ?? [];
 	assertOutboundAttachments(attachments, input.allowCombinedAttachments);
 
-	const { providerId } = await sendOutboundEmail(provider, {
+	const outbound = prepareOutboundEmail({
 		from,
 		senderName: from.label?.trim() || user.name,
 		to: input.to,
@@ -186,7 +188,11 @@ export async function sendAndStore(
 		attachments
 	});
 
-	const emailId = await insertEmail(env.DB, {
+	const storedHtml = html ?? escapeHtml(text).replaceAll('\n', '<br>\n');
+	if ([text, storedHtml].some((body) => new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES)) {
+		throw new Error('Message body exceeds the storage limit');
+	}
+	const job = await enqueueOutbound(env, provider.kind, outbound, {
 		userId: user.id,
 		direction: 'outbound',
 		from: from.address,
@@ -196,23 +202,24 @@ export async function sendAndStore(
 		bcc: parseRecipients(input.bcc).join(', ') || null,
 		subject: input.subject.trim(),
 		bodyText: text,
-		bodyHtml: html ?? escapeHtml(text).replaceAll('\n', '<br>\n'),
+		bodyHtml: storedHtml,
 		inReplyTo: input.inReplyTo ?? null,
 		references: input.references ?? null,
 		replyToEmailId: input.replyToEmailId ?? null,
 		domainId: from.domain_id,
 		addressId: persistableAddressId(from.id),
-		providerId,
-		status: initialOutboundStatus(provider.kind),
 		isRead: true,
 		subjectMatch: input.subjectMatch
-	});
+	}, input.idempotencyKey);
 
-	if (attachments.length > 0) {
-		await insertAttachments(env.DB, env.ATTACHMENTS, emailId, attachments, {
-			enforceCountLimit: !input.allowCombinedAttachments
-		});
+	try {
+		await deliverOutboxJob(env, provider, job.id);
+	} catch {
+		// The durable job remains recoverable even when the request loses storage
+		// connectivity after the provider accepted the message.
+		console.error('Outbox delivery needs recovery', job.id);
 	}
-
-	return { emailId, providerId, from };
+	let current = job;
+	try { current = (await getOutboxJob(env.DB, job.id)) ?? job; } catch { /* scheduled recovery */ }
+	return { emailId: job.id, providerId: current.provider_id, from, state: current.state };
 }

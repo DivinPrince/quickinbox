@@ -72,7 +72,9 @@
 		"collapseSidebar": "收起侧边栏",
 		"toggleSidebar": "切换侧边栏",
 		"openSidebar": "打开侧边栏",
-		"closeSidebar": "关闭侧边栏"
+		"closeSidebar": "关闭侧边栏",
+		"outbox": "发件箱",
+		"maintenance": "维护"
 	},
 	"account": {
 		"menu": "账户菜单",
@@ -569,7 +571,11 @@
 		"delayed": "延迟",
 		"bounced": "退信",
 		"complained": "被标为垃圾邮件",
-		"failed": "失败"
+		"failed": "失败",
+		"pending": "等待发送",
+		"sending": "正在发送",
+		"accepted": "服务商已接收",
+		"uncertain": "投递状态不确定"
 	},
 	"date": {
 		"now": "现在"
@@ -635,5 +641,103 @@
 		"fr": "Français",
 		"zh-CN": "简体中文",
 		"es": "Español"
+	},
+	"privacy": {
+		"title": "远程图片",
+		"settingsHint": "远程图片默认被阻止，直到您在邮件中加载图片或允许该发件人。已存储的内嵌图片仍会显示。允许远程图片可能会透露您阅读邮件的时间。",
+		"noTrustedSenders": "尚未允许任何发件人自动加载远程图片。",
+		"blockSender": "阻止图片",
+		"blocked": "为保护隐私，已阻止远程图片。",
+		"loadImages": "加载图片",
+		"alwaysAllow": "始终允许此发件人",
+		"saveError": "无法保存图片偏好设置，请重试。"
+	},
+	"outbox": {
+		"hint": "邮件会在投递前保存。在可安全重试的情况下，系统会自动重试临时失败的投递。",
+		"empty": "暂无待发送邮件。",
+		"incomplete": "未完整保存的邮件",
+		"attempts": "尝试次数：{count}",
+		"refresh": "刷新",
+		"nextRetry": "下次自动尝试：{time}",
+		"retry": "立即重试",
+		"retrying": "正在重试…",
+		"retryError": "无法重试此邮件。",
+		"confirmDuplicate": "我已检查上次尝试，并理解再次发送可能产生重复邮件。",
+		"limit": "最多显示最近的 100 封外发邮件，未完成的邮件优先显示。",
+		"states": {
+			"preparing": "正在保存",
+			"pending": "等待发送",
+			"sending": "正在发送",
+			"retry": "已安排重试",
+			"accepted": "服务商已接收",
+			"failed": "失败",
+			"uncertain": "投递状态不确定"
+		},
+		"savedNotice": "邮件已保存到发件箱。"
+	},
+	"maintenance": {
+		"hint": "查看此实例的投递状况、域名检查、存储和导出。",
+		"checking": "正在检查…",
+		"refresh": "重新检查",
+		"messages": "已存储邮件",
+		"database": "数据库大小",
+		"attachments": "附件数据",
+		"files": "{count} 个文件",
+		"pending": "待发送邮件",
+		"myOutbox": "打开我的发件箱",
+		"services": "服务状态",
+		"provider": "邮件服务商",
+		"configured": "已配置",
+		"needsSetup": "需要配置",
+		"webhook": "Webhook 验证",
+		"storage": "附件存储",
+		"available": "可用",
+		"unavailable": "不可用",
+		"worker": "发件箱后台任务",
+		"running": "运行正常",
+		"workerMissing": "近期未运行，请检查定时任务",
+		"workerLastRun": "后台任务上次运行",
+		"never": "暂无记录",
+		"lastInbound": "最近存储的来信",
+		"lastOutbound": "最近被接收的外发邮件",
+		"unrouted": "未路由邮件",
+		"savedPayloads": "已保存的发送数据",
+		"storageHint": "附件用量基于已登记的文件，发送数据单独显示。不包含存储桶中的孤立对象和其他文件。",
+		"domains": "域名检查",
+		"dnsHint": "这些检查显示已发布的记录，并非投递测试。SPF 可能配置在发送子域名上。请在服务商控制台中验证 DKIM 和路由。",
+		"noDomains": "未连接任何域名。",
+		"domainConfig": "发送：{send} · 接收：{receive}（已保存的配置）",
+		"enabled": "已启用",
+		"disabled": "已禁用",
+		"dns": {
+			"published": "已发布",
+			"missing": "未找到",
+			"unknown": "查询不可用",
+			"multiple": "存在多条记录，请检查配置"
+		},
+		"verifyDkim": "在服务商控制台中验证",
+		"previous": "上一页",
+		"next": "下一页",
+		"failures": "最近的投递失败",
+		"noFailures": "未发现失败、退信或状态不确定的邮件。",
+		"processingEvents": "最近的处理错误",
+		"eventsHint": "最多显示最近 30 天的 25 条事件。安装本次更新后开始记录。",
+		"noEvents": "暂无处理错误记录。",
+		"kinds": {
+			"inbound": "来信处理",
+			"outbound": "外发投递",
+			"system": "后台处理"
+		},
+		"backups": "备份与导出",
+		"exportHint": "下载所有账户的邮件和附件内容，以及地址、域名、标签和图片偏好设置。",
+		"download": "下载邮件归档",
+		"exportLimit": "JSONL 归档不包含登录凭据，也不是完整的系统备份。导出期间邮件可能发生变化。完整下载的最后一条记录为“complete”，同时报告缺失的附件。",
+		"fullBackup": "完整实例备份",
+		"backupHint": "如需灾难恢复，请导出数据库并单独复制整个附件存储桶。请将两份备份一同存放在安全位置。",
+		"bucketBackup": "复制所有 R2 对象，包括 outbox/ 前缀。单独保存 Worker 配置和密钥。恢复备份前请暂停发送；定时任务运行前必须检查旧的待发送邮件。",
+		"databaseGuide": "数据库导出指南",
+		"storageGuide": "使用 rclone 备份 R2",
+		"checked": "检查时间：{time}",
+		"unknown": "不可用"
 	}
 }

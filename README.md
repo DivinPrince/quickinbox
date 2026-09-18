@@ -54,6 +54,51 @@ You need:
 
 If you already deployed from this repo, pulling updates only changes the product name in the UI and docs. It does **not** rename your Worker, D1 database, or R2 bucket — leave those as they are (often `quickmail` / `quickmail-attachments`). Existing `qm_live_` API keys keep working, and `quickmail` remains a CLI alias.
 
+### Durable sending, image privacy, and maintenance
+
+Apply migration `0026_outbox_and_maintenance.sql` before serving the updated
+Worker. The normal `bun run deploy` command applies migrations before deployment.
+Keep the `* * * * *` Cron Trigger in `wrangler.jsonc`; it recovers pending sends
+once a minute. No additional Cloudflare resources are required.
+
+- **Outbox** saves the full message and attachments before contacting the mail
+  provider. It shows waiting, sending, accepted, failed, and uncertain states.
+  “Accepted by provider” does not mean the recipient received it. Resend delivery
+  webhooks continue to update the message, including events arriving before the
+  original send response. Both themes show delivery status in the reader.
+- Temporary Resend failures reuse the exact saved payload and idempotency key,
+  with at most five automatic attempts and a 23-hour retry window (inside
+  Resend's 24-hour key retention). Explicit Cloudflare rate-limit rejections can
+  be retried. Cloudflare's sending binding does not expose an idempotency key,
+  so interrupted or ambiguous sends require review and a duplicate-risk
+  acknowledgement before a manual retry. Messages are never automatically
+  switched to another provider.
+- REST send, reply, and forward requests accept an `Idempotency-Key` header
+  (1–200 printable ASCII characters). Reuse it when retrying the same request;
+  different content under the same key is rejected. Browser composers generate
+  keys automatically, and sending a saved draft uses its draft ID. Hosted MCP
+  `send_message` and `reply` accept an optional `idempotencyKey`. A successful
+  API response includes `state`; HTTP 202 means the message is durably saved but
+  has not been confirmed accepted. Inspect Outbox before submitting it again.
+- **Remote images** are blocked by default, including CSS background images
+  and `srcset` sources. Stored inline attachments remain available. “Load images”
+  permits images for the current message view; “Always allow this sender” saves
+  an account-specific preference. Remove permissions in **Settings → General →
+  Remote images**. Sender addresses alone are not proof of authenticity.
+- **Admin → Maintenance** shows storage usage, recent processing and delivery
+  errors, the outbox worker's last run, and MX/SPF/DMARC record checks. DNS checks
+  establish record presence, not successful delivery; verify DKIM and routing
+  in the provider dashboard. Processing errors are retained for 30 days.
+
+The maintenance page can download a streaming JSONL archive of all accounts'
+mail and attachments, addresses, domains, labels, and image preferences. It
+excludes authentication credentials and is not a transactional system backup.
+The final `complete` record reports row counts and missing attachments; a file
+without that record is incomplete. For disaster recovery, export D1 and copy
+the **entire** R2 bucket, including `outbox/`, and preserve configuration and
+secrets separately. Pause sending and review pending jobs before enabling the
+scheduled worker on a restored database, to avoid replaying old sends.
+
 ## Choosing a mail provider
 
 One provider is active per deploy, selected by `EMAIL_PROVIDER` (`resend` is

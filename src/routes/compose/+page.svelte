@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { createMailSender } from '$lib/mail/send';
+	const sendMail = createMailSender();
 	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import Icon from '$lib/components/Icon.svelte';
@@ -106,7 +108,7 @@
 		error = '';
 
 		try {
-			const res = await fetch('/api/mail', {
+			const res = await sendMail('/api/mail', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({

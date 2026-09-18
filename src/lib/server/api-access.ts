@@ -17,6 +17,7 @@ function isPrefix(pathname: string, prefix: string): boolean {
 }
 
 const BEARER_ROUTES: RouteRule[] = [
+	{ method: 'POST', match: (pathname) => /^\/api\/outbox\/[^/]+$/.test(pathname), scopes: ['mail:send'] },
 	{
 		method: 'GET',
 		match: (pathname) => pathname === '/api/auth/me',

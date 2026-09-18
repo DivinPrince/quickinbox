@@ -14,6 +14,10 @@
 	// Resend reports these over the webhook; before that a message is just queued.
 	const meta = $derived(
 		({
+			pending: { label: t('delivery.pending'), icon: 'time-line', tone: 'neutral' },
+			sending: { label: t('delivery.sending'), icon: 'time-line', tone: 'neutral' },
+			accepted: { label: t('delivery.accepted'), icon: 'check-line', tone: 'neutral' },
+			uncertain: { label: t('delivery.uncertain'), icon: 'question-line', tone: 'warn' },
 			queued: { label: t('delivery.queued'), icon: 'time-line', tone: 'neutral' },
 			sent: { label: t('delivery.sent'), icon: 'check-line', tone: 'neutral' },
 			delivered: { label: t('delivery.delivered'), icon: 'check-double-line', tone: 'good' },

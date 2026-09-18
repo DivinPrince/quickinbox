@@ -42,6 +42,10 @@ export type ConnectedApp = {
 };
 
 export type DeliveryStatus =
+	| 'pending'
+	| 'sending'
+	| 'accepted'
+	| 'uncertain'
 	| 'queued'
 	| 'sent'
 	| 'delivered'

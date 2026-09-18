@@ -199,11 +199,13 @@
 					</a>
 				{/each}
 			{/if}
+			<a href="/outbox" class="sheet-link"><Icon name="time-line" size={20} /><span>{t('nav.outbox')}</span></a>
 			<a href="/settings" class="sheet-link" class:active={$page.url.pathname === '/settings'}>
 				<Icon name="user-settings-line" size={20} />
 				<span>{t('nav.settings')}</span>
 			</a>
 			{#if isAdmin}
+				<a href="/admin/maintenance" class="sheet-link"><Icon name="pulse-line" size={20} /><span>{t('nav.maintenance')}</span></a>
 				<a href="/admin" class="sheet-link" class:active={$page.url.pathname === '/admin'}>
 					<Icon name="settings-3-line" size={20} />
 					<span>{t('nav.admin')}</span>

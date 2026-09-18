@@ -82,10 +82,7 @@ ${bodyHtml}
 </html>`;
 }
 
-export async function sendOutboundEmail(
-	provider: EmailProvider,
-	input: OutboundMailInput
-): Promise<OutboundMailResult> {
+export function prepareOutboundEmail(input: OutboundMailInput): OutboundMailInput {
 	const subjectError = validateSubject(input.subject);
 	if (subjectError) {
 		throw new Error(subjectError);
@@ -111,7 +108,7 @@ export async function sendOutboundEmail(
 		if (references) headers['References'] = references;
 	}
 
-	return provider.send({
+	return {
 		from: input.from,
 		senderName: input.senderName,
 		to,
@@ -124,6 +121,10 @@ export async function sendOutboundEmail(
 		references,
 		...(Object.keys(headers).length ? { headers } : {}),
 		attachments: input.attachments,
-		idempotencyKey: input.idempotencyKey ?? crypto.randomUUID()
-	});
+		idempotencyKey: input.idempotencyKey
+	};
+}
+
+export async function sendOutboundEmail(provider: EmailProvider, input: OutboundMailInput): Promise<OutboundMailResult> {
+	return provider.send(prepareOutboundEmail({ ...input, idempotencyKey: input.idempotencyKey ?? crypto.randomUUID() }));
 }

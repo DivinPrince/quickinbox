@@ -75,7 +75,8 @@
 					badge: data.counts.drafts || undefined,
 					shortcut: 'g d'
 				},
-				{ href: '/sent', icon: 'Plane2', label: t('nav.sent'), shortcut: 'g t' }
+				{ href: '/sent', icon: 'Plane2', label: t('nav.sent'), shortcut: 'g t' },
+				{ href: '/outbox', icon: 'Plane2', label: t('nav.outbox') }
 			]
 		},
 		{
@@ -108,10 +109,11 @@
 		{ href: '/settings/notifications', icon: 'Bell', label: t('nav.notifications') },
 		{ href: '/settings/labels', icon: 'Tag', label: t('nav.labels') },
 		{ href: '/settings/shortcuts', icon: 'Tabs', label: t('nav.shortcuts'), shortcut: '?' },
-		...(data.user.is_admin ? [{ href: '/admin', icon: 'SettingsGear', label: t('nav.admin') }] : [])
+		...(data.user.is_admin ? [{ href: '/admin', icon: 'SettingsGear', label: t('nav.admin') }, { href: '/admin/maintenance', icon: 'SettingsGear', label: t('nav.maintenance') }] : [])
 	]);
 
 	function isActive(href: string): boolean {
+		if (href === '/admin') return pathname === '/admin';
 		if (href.startsWith('/inbox?label=')) {
 			return $page.url.searchParams.get('label') === new URLSearchParams(href.split('?')[1]).get('label');
 		}

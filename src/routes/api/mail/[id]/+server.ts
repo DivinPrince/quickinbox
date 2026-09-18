@@ -159,11 +159,12 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 
 	try {
 		const provider = getEmailProvider(platform);
-		const { emailId } = await sendAndStore(
+		const { emailId, state } = await sendAndStore(
 			{ DB: db, ATTACHMENTS: bucket },
 			provider,
 			locals.user,
 			{
+				idempotencyKey: request.headers.get('Idempotency-Key') ?? undefined,
 				fromAddressId: body.fromAddressId,
 				fromAddress,
 				to,
@@ -181,7 +182,7 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 			}
 		);
 
-		return json({ ok: true, id: emailId });
+		return json({ ok: true, id: emailId, state }, { status: state === 'accepted' ? 200 : 202 });
 	} catch (error) {
 		return json(
 			{ error: describeProviderError(error, 'Failed to send reply') },

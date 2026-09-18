@@ -1,3 +1,4 @@
+import { listTrustedImageSenders } from '$lib/server/image-privacy';
 import type { LayoutServerLoad } from './$types';
 import { emptyMailboxCounts } from '$lib/mail/categories';
 import { listLabels } from '$lib/server/labels';
@@ -15,7 +16,9 @@ export const load: LayoutServerLoad = async ({ locals, platform }) => {
 		: emptyMailboxCounts();
 	const labels = ready ? await listLabels(db!, locals.user!.id) : [];
 
+	const trustedImageSenders = ready ? await listTrustedImageSenders(db!, locals.user!.id) : [];
 	return {
+		trustedImageSenders,
 		user: locals.user,
 		domains: locals.domains,
 		addresses: locals.addresses,

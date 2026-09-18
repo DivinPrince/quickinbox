@@ -134,7 +134,7 @@
 
 		<div class="body mail-body">
 			{#if message.body_html}
-				<EmailBody html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
+				<EmailBody messageId={message.id} sender={message.from_addr} inbound={message.direction === 'inbound'} html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
 			{:else if text.body}
 				<p class="whitespace-pre-wrap">{text.body}</p>
 				{#if text.quoted}

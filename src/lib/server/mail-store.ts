@@ -36,6 +36,7 @@ export async function getUserIdByEmail(db: D1Database, email: string): Promise<s
 export async function insertEmail(
 	db: D1Database,
 	input: {
+		id?: string;
 		userId: string;
 		direction: 'inbound' | 'outbound';
 		from: string;
@@ -59,7 +60,7 @@ export async function insertEmail(
 		subjectMatch?: boolean;
 	}
 ): Promise<string> {
-	const id = crypto.randomUUID();
+	const id = input.id ?? crypto.randomUUID();
 	const bodyText = truncate(input.bodyText ?? null);
 	const bodyHtml = truncate(input.bodyHtml ?? null);
 
@@ -175,13 +176,14 @@ export async function updateEmailStatusByProviderId(
 	status: DeliveryStatus,
 	detail?: string | null
 ): Promise<void> {
-	await db
-		.prepare(
-			`UPDATE emails SET status = ?, status_at = datetime('now'), status_detail = ?
-			 WHERE provider_id = ?`
-		)
-		.bind(status, detail ?? null, providerId)
-		.run();
+	await db.batch([
+		db.prepare(`INSERT INTO outbound_delivery_events (provider_id, status, detail) VALUES (?, ?, ?)
+			ON CONFLICT(provider_id) DO UPDATE SET status = excluded.status, detail = excluded.detail, created_at = datetime('now')`)
+			.bind(providerId, status, detail ?? null),
+		db.prepare(`UPDATE emails SET status = ?, status_at = datetime('now'), status_detail = ?, updated_at = datetime('now') WHERE provider_id = ?`)
+			.bind(status, detail ?? null, providerId),
+		db.prepare('UPDATE users SET mailbox_epoch = mailbox_epoch + 1 WHERE id IN (SELECT user_id FROM emails WHERE provider_id = ?)').bind(providerId)
+	]);
 }
 
 /**
@@ -783,7 +785,10 @@ export async function deleteEmailsPermanently(
 				.bind(...ownedIds)
 				.all<{ storage_key: string }>();
 
-			await Promise.all(files.map((file) => bucket.delete(file.storage_key)));
+			const payloads = await db.prepare(`SELECT payload_key FROM outbox_jobs WHERE user_id = ? AND email_id IN (${ownedPlaceholders})`)
+				.bind(userId, ...ownedIds).all<{ payload_key: string }>();
+			await Promise.all([...files.map((file) => file.storage_key), ...payloads.results.map((job) => job.payload_key)]
+				.map((key) => bucket.delete(key)));
 		}
 
 		// Older D1 databases were created without ON DELETE CASCADE enforcement,

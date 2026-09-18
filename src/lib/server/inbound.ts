@@ -1,3 +1,4 @@
+import { recordOperationalFailure } from './operational-events';
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { DeliveryStatus } from '$lib/types';
 import { insertAttachmentBytes } from './attachments';
@@ -223,6 +224,7 @@ export async function storeInboundAttachments(
 		attachments = await client.listReceivedAttachments(providerId);
 	} catch (error) {
 		console.error('Failed to list inbound attachments', providerId, error);
+		await recordOperationalFailure(env.DB, 'inbound', 'Resend could not list attachments for an incoming message.');
 		return [];
 	}
 
@@ -258,6 +260,7 @@ export async function storeInboundAttachments(
 		} catch (error) {
 			// One bad attachment shouldn't cost us the message.
 			console.error('Failed to store inbound attachment', attachment.id, error);
+			await recordOperationalFailure(env.DB, 'inbound', 'An incoming attachment could not be stored. The message was kept.');
 		}
 	}
 

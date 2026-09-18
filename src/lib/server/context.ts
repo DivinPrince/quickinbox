@@ -123,6 +123,6 @@ export function describeProviderError(error: unknown, fallback = 'Failed to send
 
 export function statusForProviderError(error: unknown): number {
 	if (error instanceof ConfigError) return 503;
-	if (error instanceof ProviderError) return error.status >= 500 ? 502 : 400;
+	if (error instanceof ProviderError) return error.status >= 500 ? 502 : error.status;
 	return 400;
 }

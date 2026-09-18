@@ -1,4 +1,7 @@
 <script lang="ts">
+	import DeliveryStatus from '$lib/components/DeliveryStatus.svelte';
+	import { createMailSender } from '$lib/mail/send';
+	const sendMail = createMailSender();
 	import { untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { invalidateAll } from '$app/navigation';
@@ -372,7 +375,7 @@
 					replyMode === 'forwardAll' && thread
 						? `/api/mail/thread/${encodeURIComponent(thread.threadId)}/forward`
 						: `/api/mail/${encodeURIComponent(message.id)}/forward`;
-				const response = await fetch(endpoint, {
+				const response = await sendMail(endpoint, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
@@ -390,7 +393,7 @@
 					return;
 				}
 			} else {
-				const response = await fetch(`/api/mail/${message.id}`, {
+				const response = await sendMail(`/api/mail/${message.id}`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
@@ -665,6 +668,7 @@
 									{/if}
 								</div>
 							</div>
+							{#if message.direction === 'outbound'}<DeliveryStatus status={message.status} detail={message.status_detail} />{/if}
 							<p class="z-msg-to">{t('thread.toColon')} {toLine(message)}</p>
 						</div>
 					</div>
@@ -674,7 +678,7 @@
 						<div class="z-msg-body">
 							<div class="z-msg-html">
 								{#if message.body_html}
-									<EmailBody html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
+									<EmailBody messageId={message.id} sender={message.from_addr} inbound={message.direction === 'inbound'} html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
 								{:else}
 									<pre class="z-msg-text">{message.body_text}</pre>
 								{/if}

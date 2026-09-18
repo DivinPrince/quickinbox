@@ -94,11 +94,12 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 
 	try {
 		const provider = getEmailProvider(platform);
-		const { emailId } = await sendAndStore(
+		const { emailId, state } = await sendAndStore(
 			{ DB: db, ATTACHMENTS: bucket },
 			provider,
 			locals.user,
 			{
+				idempotencyKey: body.draftId ? `draft/${body.draftId}` : request.headers.get('Idempotency-Key') ?? undefined,
 				fromAddressId: body.fromAddressId,
 				to: body.to,
 				cc: body.cc,
@@ -111,10 +112,11 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		);
 
 		if (body.draftId) {
-			await deleteDraft(db, locals.user.id, body.draftId);
+			try { await deleteDraft(db, locals.user.id, body.draftId); }
+			catch { console.error('Could not remove draft after queuing', body.draftId); }
 		}
 
-		return json({ ok: true, id: emailId });
+		return json({ ok: true, id: emailId, state }, { status: state === 'accepted' ? 200 : 202 });
 	} catch (error) {
 		return json({ error: describeProviderError(error) }, { status: statusForProviderError(error) });
 	}

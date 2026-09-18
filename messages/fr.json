@@ -72,7 +72,9 @@
 		"collapseSidebar": "Réduire la barre latérale",
 		"toggleSidebar": "Afficher ou masquer la barre latérale",
 		"openSidebar": "Ouvrir la barre latérale",
-		"closeSidebar": "Fermer la barre latérale"
+		"closeSidebar": "Fermer la barre latérale",
+		"outbox": "Boîte d’envoi",
+		"maintenance": "Maintenance"
 	},
 	"account": {
 		"menu": "Menu du compte",
@@ -569,7 +571,11 @@
 		"delayed": "Retardé",
 		"bounced": "Rejeté",
 		"complained": "Marqué comme spam",
-		"failed": "Échec"
+		"failed": "Échec",
+		"pending": "En attente d’envoi",
+		"sending": "Envoi en cours",
+		"accepted": "Accepté par le fournisseur",
+		"uncertain": "Envoi incertain"
 	},
 	"date": {
 		"now": "Maintenant"
@@ -635,5 +641,103 @@
 		"fr": "Français",
 		"zh-CN": "简体中文",
 		"es": "Español"
+	},
+	"privacy": {
+		"title": "Images distantes",
+		"settingsHint": "Les images distantes sont bloquées jusqu’à ce que vous les chargiez dans un message ou autorisiez son expéditeur. Les images intégrées stockées restent visibles. Autoriser les images distantes peut révéler quand vous lisez un message.",
+		"noTrustedSenders": "Aucun expéditeur ne peut charger automatiquement des images distantes.",
+		"blockSender": "Bloquer les images",
+		"blocked": "Les images distantes sont bloquées pour protéger votre confidentialité.",
+		"loadImages": "Charger les images",
+		"alwaysAllow": "Toujours autoriser cet expéditeur",
+		"saveError": "Impossible d’enregistrer la préférence. Réessayez."
+	},
+	"outbox": {
+		"hint": "Les messages sont enregistrés avant leur envoi. Les échecs temporaires sont réessayés automatiquement lorsque cela ne risque pas de créer un doublon.",
+		"empty": "Aucun message sortant.",
+		"incomplete": "Message incomplet",
+		"attempts": "Tentatives : {count}",
+		"refresh": "Actualiser",
+		"nextRetry": "Prochaine tentative automatique : {time}",
+		"retry": "Réessayer",
+		"retrying": "Nouvelle tentative…",
+		"retryError": "Impossible de réessayer cet envoi.",
+		"confirmDuplicate": "J’ai vérifié la tentative précédente et je comprends qu’un nouvel envoi peut créer un doublon.",
+		"limit": "Jusqu’à 100 messages sortants récents, avec les messages en attente en premier.",
+		"states": {
+			"preparing": "Enregistrement",
+			"pending": "En attente d’envoi",
+			"sending": "Envoi en cours",
+			"retry": "Nouvelle tentative prévue",
+			"accepted": "Accepté par le fournisseur",
+			"failed": "Échec",
+			"uncertain": "Envoi incertain"
+		},
+		"savedNotice": "Message enregistré dans la boîte d’envoi."
+	},
+	"maintenance": {
+		"hint": "État des envois, vérifications des domaines, stockage et exports de cette installation.",
+		"checking": "Vérification…",
+		"refresh": "Actualiser les vérifications",
+		"messages": "Messages stockés",
+		"database": "Taille de la base",
+		"attachments": "Pièces jointes",
+		"files": "Fichiers : {count}",
+		"pending": "Messages en attente",
+		"myOutbox": "Ouvrir ma boîte d’envoi",
+		"services": "État des services",
+		"provider": "Fournisseur de messagerie",
+		"configured": "Configuré",
+		"needsSetup": "Configuration nécessaire",
+		"webhook": "Vérification du webhook",
+		"storage": "Stockage des pièces jointes",
+		"available": "Disponible",
+		"unavailable": "Indisponible",
+		"worker": "Traitement de la boîte d’envoi",
+		"running": "Actif",
+		"workerMissing": "Aucune exécution récente — vérifiez la tâche planifiée",
+		"workerLastRun": "Dernière exécution",
+		"never": "Non enregistré",
+		"lastInbound": "Dernier message reçu stocké",
+		"lastOutbound": "Dernier envoi accepté",
+		"unrouted": "Messages non acheminés",
+		"savedPayloads": "Données d’envoi enregistrées",
+		"storageHint": "L’utilisation des pièces jointes se base sur les fichiers référencés. Les données d’envoi sont indiquées séparément. Les objets orphelins et autres fichiers du compartiment sont exclus.",
+		"domains": "Vérification des domaines",
+		"dnsHint": "Ces vérifications indiquent les enregistrements publiés, pas un test de livraison. SPF peut être configuré sur un sous-domaine d’envoi. Vérifiez DKIM et le routage auprès du fournisseur.",
+		"noDomains": "Aucun domaine connecté.",
+		"domainConfig": "Envoi : {send} · Réception : {receive} (configuration enregistrée)",
+		"enabled": "activé",
+		"disabled": "désactivé",
+		"dns": {
+			"published": "Publié",
+			"missing": "Introuvable",
+			"unknown": "Vérification indisponible",
+			"multiple": "Plusieurs enregistrements — vérifiez la configuration"
+		},
+		"verifyDkim": "Vérifier chez le fournisseur",
+		"previous": "Précédent",
+		"next": "Suivant",
+		"failures": "Échecs d’envoi récents",
+		"noFailures": "Aucun envoi échoué, rejeté ou incertain.",
+		"processingEvents": "Erreurs de traitement récentes",
+		"eventsHint": "Jusqu’à 25 événements des 30 derniers jours. L’enregistrement commence après l’installation de cette mise à jour.",
+		"noEvents": "Aucune erreur de traitement enregistrée.",
+		"kinds": {
+			"inbound": "Traitement entrant",
+			"outbound": "Envoi sortant",
+			"system": "Traitement en arrière-plan"
+		},
+		"backups": "Sauvegardes et exports",
+		"exportHint": "Téléchargez les messages et les pièces jointes de tous les comptes, ainsi que les adresses, domaines, libellés et préférences d’images.",
+		"download": "Télécharger l’archive",
+		"exportLimit": "L’archive JSONL exclut les identifiants de connexion et ne constitue pas une sauvegarde complète du système. Le courrier peut évoluer pendant l’export. Un téléchargement complet se termine par un enregistrement « complete » indiquant aussi les pièces jointes manquantes.",
+		"fullBackup": "Sauvegarde complète de l’installation",
+		"backupHint": "Pour une restauration après sinistre, exportez la base de données et copiez séparément tout le compartiment de pièces jointes. Conservez les deux sauvegardes ensemble dans un endroit sécurisé.",
+		"bucketBackup": "Copiez tous les objets R2, y compris le préfixe outbox/. Conservez séparément la configuration et les secrets du Worker. Suspendez les envois avant une restauration ; vérifiez les anciens envois en attente avant de relancer la tâche planifiée.",
+		"databaseGuide": "Guide d’export de la base",
+		"storageGuide": "Sauvegarde R2 avec rclone",
+		"checked": "Vérifié le {time}",
+		"unknown": "Indisponible"
 	}
 }

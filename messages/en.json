@@ -72,7 +72,9 @@
 		"collapseSidebar": "Collapse sidebar",
 		"toggleSidebar": "Toggle sidebar",
 		"openSidebar": "Open sidebar",
-		"closeSidebar": "Close sidebar"
+		"closeSidebar": "Close sidebar",
+		"outbox": "Outbox",
+		"maintenance": "Maintenance"
 	},
 	"account": {
 		"menu": "Account menu",
@@ -569,7 +571,11 @@
 		"delayed": "Delayed",
 		"bounced": "Bounced",
 		"complained": "Marked as spam",
-		"failed": "Failed"
+		"failed": "Failed",
+		"pending": "Waiting to send",
+		"sending": "Sending",
+		"accepted": "Accepted by provider",
+		"uncertain": "Delivery uncertain"
 	},
 	"date": {
 		"now": "Now"
@@ -635,5 +641,103 @@
 		"fr": "Français",
 		"zh-CN": "简体中文",
 		"es": "Español"
+	},
+	"privacy": {
+		"title": "Remote images",
+		"settingsHint": "Remote images are blocked until you load them in a message or allow its sender. Stored inline images still display. Allowing remote images can reveal when you read a message.",
+		"noTrustedSenders": "No senders are allowed to load remote images automatically.",
+		"blockSender": "Block images",
+		"blocked": "Remote images are blocked to protect your privacy.",
+		"loadImages": "Load images",
+		"alwaysAllow": "Always allow this sender",
+		"saveError": "Could not save the image preference. Please try again."
+	},
+	"outbox": {
+		"hint": "Messages are saved before delivery. Temporary failures are retried automatically when it is safe to do so.",
+		"empty": "No outgoing messages yet.",
+		"incomplete": "Incomplete message",
+		"attempts": "Attempts: {count}",
+		"refresh": "Refresh",
+		"nextRetry": "Next automatic attempt: {time}",
+		"retry": "Retry now",
+		"retrying": "Retrying…",
+		"retryError": "Could not retry this message.",
+		"confirmDuplicate": "I checked the previous attempt and understand that sending again may create a duplicate.",
+		"limit": "Showing up to 100 recent outgoing messages, with unfinished messages first.",
+		"states": {
+			"preparing": "Saving",
+			"pending": "Waiting to send",
+			"sending": "Sending",
+			"retry": "Retry scheduled",
+			"accepted": "Accepted by provider",
+			"failed": "Failed",
+			"uncertain": "Delivery uncertain"
+		},
+		"savedNotice": "Message saved to Outbox."
+	},
+	"maintenance": {
+		"hint": "Delivery health, domain checks, storage, and exports for this installation.",
+		"checking": "Checking…",
+		"refresh": "Refresh checks",
+		"messages": "Stored messages",
+		"database": "Database size",
+		"attachments": "Attachment data",
+		"files": "Files: {count}",
+		"pending": "Pending messages",
+		"myOutbox": "Open my outbox",
+		"services": "Service health",
+		"provider": "Mail provider",
+		"configured": "Configured",
+		"needsSetup": "Needs configuration",
+		"webhook": "Webhook verification",
+		"storage": "Attachment storage",
+		"available": "Available",
+		"unavailable": "Unavailable",
+		"worker": "Outbox worker",
+		"running": "Running",
+		"workerMissing": "No recent run — check the scheduled worker",
+		"workerLastRun": "Last worker run",
+		"never": "Not recorded",
+		"lastInbound": "Last stored inbound",
+		"lastOutbound": "Last accepted outbound",
+		"unrouted": "Unrouted messages",
+		"savedPayloads": "Saved outgoing payloads",
+		"storageHint": "Attachment usage is based on recorded files, plus outgoing payloads shown separately. It excludes orphaned objects and other files in the bucket.",
+		"domains": "Domain checks",
+		"dnsHint": "These checks show published records, not a delivery test. SPF may be configured on a sending subdomain. Verify DKIM and routing in your provider dashboard.",
+		"noDomains": "No domains are connected.",
+		"domainConfig": "Sending: {send} · Receiving: {receive} (saved configuration)",
+		"enabled": "enabled",
+		"disabled": "disabled",
+		"dns": {
+			"published": "Published",
+			"missing": "Not found",
+			"unknown": "Lookup unavailable",
+			"multiple": "Multiple records — review configuration"
+		},
+		"verifyDkim": "Verify in provider dashboard",
+		"previous": "Previous",
+		"next": "Next",
+		"failures": "Recent delivery failures",
+		"noFailures": "No failed, bounced, or uncertain messages found.",
+		"processingEvents": "Recent processing errors",
+		"eventsHint": "Up to 25 events from the last 30 days. Recording starts after this update is installed.",
+		"noEvents": "No processing errors recorded.",
+		"kinds": {
+			"inbound": "Inbound processing",
+			"outbound": "Outbound delivery",
+			"system": "Background processing"
+		},
+		"backups": "Backups and exports",
+		"exportHint": "Download messages and attachment contents from all accounts, together with addresses, domains, labels, and image preferences.",
+		"download": "Download mail archive",
+		"exportLimit": "The JSONL archive excludes login credentials and is not a full system backup. Mail may change during export. A complete download ends with a “complete” record that also reports missing attachments.",
+		"fullBackup": "Full installation backup",
+		"backupHint": "For disaster recovery, export the database and separately copy the entire attachment bucket. Keep both backups together in a secure location.",
+		"bucketBackup": "Copy all R2 objects, including the outbox/ prefix. Preserve Worker configuration and secrets separately. Pause sending before restoring a backup; old pending jobs must be reviewed before the scheduled worker runs.",
+		"databaseGuide": "Database export guide",
+		"storageGuide": "R2 backup with rclone",
+		"checked": "Checked {time}",
+		"unknown": "Unavailable"
 	}
 }

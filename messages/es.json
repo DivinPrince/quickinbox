@@ -72,7 +72,9 @@
 		"collapseSidebar": "Contraer barra lateral",
 		"toggleSidebar": "Mostrar u ocultar barra lateral",
 		"openSidebar": "Abrir barra lateral",
-		"closeSidebar": "Cerrar barra lateral"
+		"closeSidebar": "Cerrar barra lateral",
+		"outbox": "Bandeja de salida",
+		"maintenance": "Mantenimiento"
 	},
 	"account": {
 		"menu": "Menú de la cuenta",
@@ -569,7 +571,11 @@
 		"delayed": "Retrasado",
 		"bounced": "Rechazado",
 		"complained": "Marcado como spam",
-		"failed": "Error"
+		"failed": "Error",
+		"pending": "Pendiente de envío",
+		"sending": "Enviando",
+		"accepted": "Aceptado por el proveedor",
+		"uncertain": "Entrega incierta"
 	},
 	"date": {
 		"now": "Ahora"
@@ -635,5 +641,103 @@
 		"fr": "Français",
 		"zh-CN": "简体中文",
 		"es": "Español"
+	},
+	"privacy": {
+		"title": "Imágenes remotas",
+		"settingsHint": "Las imágenes remotas se bloquean hasta que las cargues en un mensaje o autorices a su remitente. Las imágenes insertadas almacenadas siguen mostrándose. Permitir imágenes remotas puede revelar cuándo lees un mensaje.",
+		"noTrustedSenders": "Ningún remitente puede cargar imágenes remotas automáticamente.",
+		"blockSender": "Bloquear imágenes",
+		"blocked": "Las imágenes remotas están bloqueadas para proteger tu privacidad.",
+		"loadImages": "Cargar imágenes",
+		"alwaysAllow": "Permitir siempre a este remitente",
+		"saveError": "No se pudo guardar la preferencia. Inténtalo de nuevo."
+	},
+	"outbox": {
+		"hint": "Los mensajes se guardan antes del envío. Los fallos temporales se reintentan automáticamente cuando es seguro hacerlo.",
+		"empty": "Todavía no hay mensajes salientes.",
+		"incomplete": "Mensaje incompleto",
+		"attempts": "Intentos: {count}",
+		"refresh": "Actualizar",
+		"nextRetry": "Próximo intento automático: {time}",
+		"retry": "Reintentar ahora",
+		"retrying": "Reintentando…",
+		"retryError": "No se pudo reintentar este mensaje.",
+		"confirmDuplicate": "He comprobado el intento anterior y entiendo que volver a enviar puede crear un duplicado.",
+		"limit": "Se muestran hasta 100 mensajes salientes recientes, con los pendientes primero.",
+		"states": {
+			"preparing": "Guardando",
+			"pending": "Pendiente de envío",
+			"sending": "Enviando",
+			"retry": "Reintento programado",
+			"accepted": "Aceptado por el proveedor",
+			"failed": "Error",
+			"uncertain": "Entrega incierta"
+		},
+		"savedNotice": "Mensaje guardado en la bandeja de salida."
+	},
+	"maintenance": {
+		"hint": "Estado de entrega, comprobaciones de dominios, almacenamiento y exportaciones de esta instalación.",
+		"checking": "Comprobando…",
+		"refresh": "Actualizar comprobaciones",
+		"messages": "Mensajes almacenados",
+		"database": "Tamaño de la base de datos",
+		"attachments": "Datos de adjuntos",
+		"files": "Archivos: {count}",
+		"pending": "Mensajes pendientes",
+		"myOutbox": "Abrir mi bandeja de salida",
+		"services": "Estado de los servicios",
+		"provider": "Proveedor de correo",
+		"configured": "Configurado",
+		"needsSetup": "Requiere configuración",
+		"webhook": "Verificación del webhook",
+		"storage": "Almacenamiento de adjuntos",
+		"available": "Disponible",
+		"unavailable": "No disponible",
+		"worker": "Procesamiento de la bandeja de salida",
+		"running": "Activo",
+		"workerMissing": "Sin ejecuciones recientes: revisa la tarea programada",
+		"workerLastRun": "Última ejecución",
+		"never": "Sin registro",
+		"lastInbound": "Último correo recibido almacenado",
+		"lastOutbound": "Último envío aceptado",
+		"unrouted": "Mensajes sin destinatario asignado",
+		"savedPayloads": "Datos de envío guardados",
+		"storageHint": "El uso de adjuntos se basa en los archivos registrados; los datos de envío se muestran por separado. Se excluyen los objetos huérfanos y otros archivos del bucket.",
+		"domains": "Comprobaciones de dominios",
+		"dnsHint": "Estas comprobaciones muestran los registros publicados, no prueban la entrega. SPF puede estar configurado en un subdominio de envío. Verifica DKIM y el enrutamiento en el panel del proveedor.",
+		"noDomains": "No hay dominios conectados.",
+		"domainConfig": "Envío: {send} · Recepción: {receive} (configuración guardada)",
+		"enabled": "activado",
+		"disabled": "desactivado",
+		"dns": {
+			"published": "Publicado",
+			"missing": "No encontrado",
+			"unknown": "Consulta no disponible",
+			"multiple": "Varios registros: revisa la configuración"
+		},
+		"verifyDkim": "Verificar en el panel del proveedor",
+		"previous": "Anterior",
+		"next": "Siguiente",
+		"failures": "Fallos de entrega recientes",
+		"noFailures": "No se encontraron mensajes fallidos, rechazados o inciertos.",
+		"processingEvents": "Errores de procesamiento recientes",
+		"eventsHint": "Hasta 25 eventos de los últimos 30 días. El registro comienza después de instalar esta actualización.",
+		"noEvents": "No hay errores de procesamiento registrados.",
+		"kinds": {
+			"inbound": "Procesamiento entrante",
+			"outbound": "Entrega saliente",
+			"system": "Procesamiento en segundo plano"
+		},
+		"backups": "Copias de seguridad y exportaciones",
+		"exportHint": "Descarga los mensajes y adjuntos de todas las cuentas, junto con las direcciones, dominios, etiquetas y preferencias de imágenes.",
+		"download": "Descargar archivo de correo",
+		"exportLimit": "El archivo JSONL excluye las credenciales de acceso y no es una copia completa del sistema. El correo puede cambiar durante la exportación. Una descarga completa termina con un registro «complete» que también indica los adjuntos que faltan.",
+		"fullBackup": "Copia completa de la instalación",
+		"backupHint": "Para recuperarte de una pérdida de datos, exporta la base de datos y copia por separado todo el bucket de adjuntos. Guarda ambas copias juntas en un lugar seguro.",
+		"bucketBackup": "Copia todos los objetos R2, incluido el prefijo outbox/. Conserva por separado la configuración y los secretos del Worker. Pausa los envíos antes de restaurar una copia; revisa los mensajes pendientes antiguos antes de que se ejecute la tarea programada.",
+		"databaseGuide": "Guía de exportación de la base de datos",
+		"storageGuide": "Copia de R2 con rclone",
+		"checked": "Comprobado: {time}",
+		"unknown": "No disponible"
 	}
 }

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { createMailSender } from '$lib/mail/send';
+	const sendMail = createMailSender();
 	import { goto, invalidateAll } from '$app/navigation';
 	import Icon from '$lib/components/Icon.svelte';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
@@ -260,7 +262,7 @@
 				forwardTarget.kind === 'thread'
 					? `/api/mail/thread/${encodeURIComponent(data.threadId)}/forward`
 					: `/api/mail/${encodeURIComponent(forwardTarget.id)}/forward`;
-			const res = await fetch(endpoint, {
+			const res = await sendMail(endpoint, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -297,7 +299,7 @@
 		error = '';
 
 		try {
-			const res = await fetch(`/api/mail/${latest.id}`, {
+			const res = await sendMail(`/api/mail/${latest.id}`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({

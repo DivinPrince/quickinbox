@@ -195,6 +195,7 @@
 
 <div class="admin-page">
 	<StackHeader title={t('nav.admin')} back={false} />
+	<a class="btn-ghost" href="/admin/maintenance">{t('nav.maintenance')}</a>
 
 	{#if data.loadError}
 		<div class="surface-lg banner">
