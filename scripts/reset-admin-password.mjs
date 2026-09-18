@@ -64,7 +64,7 @@ const escape = (value) => value.replace(/'/g, "''");
 const emailSql = `'${escape(email.trim().toLowerCase())}'`;
 const sql = [
  `UPDATE users SET password_hash = '${escape(passwordHash)}' WHERE email = ${emailSql};`,
- ...['sessions', 'api_tokens', 'pairing_codes', 'oauth_codes', 'oauth_grants'].map(
+ ...['sessions', 'api_tokens', 'pairing_codes', 'oauth_codes', 'oauth_grants', 'mfa_enrollments'].map(
   (table) => `DELETE FROM ${table} WHERE user_id IN (SELECT id FROM users WHERE email = ${emailSql});`
 )].join('\n');
 const temporaryDirectory = mkdtempSync(join(tmpdir(), 'quickinbox-reset-'));

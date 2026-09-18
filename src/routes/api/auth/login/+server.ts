@@ -1,20 +1,24 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { checkRateLimit, login, logout, readSessionToken, sessionCookieOptions, SESSION_COOKIE } from '$lib/server/auth';
+import { MfaError, MfaRequired } from '$lib/server/mfa';
+import { readAuthBody } from '$lib/server/auth-body';
 import { hashToken } from '$lib/server/crypto';
 import { readLinkedTokens, resolveLinkedSessions, writeLinkedTokens } from '$lib/server/accounts';
 import { LINKED_SESSIONS_COOKIE, MAX_LINKED_ACCOUNTS, SESSION_DAYS } from '$lib/server/constants';
 
 export const POST: RequestHandler = async ({ request, cookies, platform, url }) => {
+	if (request.headers.get('origin') && request.headers.get('origin') !== url.origin) return json({ error: 'Invalid request origin' }, { status: 403 });
 	const db = platform?.env.DB;
 	if (!db) return json({ error: 'Database unavailable' }, { status: 503 });
 	const limited = () => json({ error: 'Too many sign-in attempts. Try again in 10 minutes.' }, { status: 429, headers: { 'Retry-After': '600' } });
 	const ip = request.headers.get('cf-connecting-ip') ?? 'local';
 	if (!(await checkRateLimit(db, `login:ip:${ip}`, 30, 600))) return limited();
 
-	const body = await request.json().catch(() => null) as { email?: string; password?: string; add?: boolean } | null;
+	const body = await readAuthBody(request) as { email?: string; password?: string; add?: boolean; code?: unknown } | null;
 	if (!body || typeof body.email !== 'string' || typeof body.password !== 'string' || !body.email || !body.password || body.email.length > 254 || body.password.length > 1024) {
 		return json({ error: 'Email and password are required' }, { status: 400 });
 	}
+	if (body.code !== undefined && (typeof body.code !== 'string' || body.code.length > 64)) return json({ error: 'Invalid verification code' }, { status: 400 });
 	body.email = body.email.trim().toLowerCase();
 	if (!(await checkRateLimit(db, `login:account:${await hashToken(body.email)}`, 10, 600))) return limited();
 
@@ -36,7 +40,14 @@ export const POST: RequestHandler = async ({ request, cookies, platform, url }) 
 		}
 	}
 
-	const result = await login(db, body.email, body.password);
+	let result;
+	try {
+		result = await login(db, body.email, body.password, { code: body.code as string | undefined, encryptionKey: platform?.env.MFA_ENCRYPTION_KEY });
+	} catch (error) {
+		if (error instanceof MfaRequired) return json({ requiresTwoFactor: true }, { headers: { 'Cache-Control': 'no-store' } });
+		if (error instanceof MfaError) return json({ error: error.message }, { status: error.status, headers: { 'Cache-Control': 'no-store' } });
+		return json({ error: 'Sign-in is temporarily unavailable. If your authenticator is unavailable, try a recovery code.' }, { status: 503 });
+	}
 	if (!result) {
 		return json({ error: 'Invalid email or password' }, { status: 401 });
 	}
@@ -52,7 +63,7 @@ export const POST: RequestHandler = async ({ request, cookies, platform, url }) 
 		writeLinkedTokens(cookies, parked.map((session) => session.token), url);
 	}
 
-	return json({ user: result.user, accounts: parked.length + 1 });
+	return json({ user: result.user, accounts: parked.length + 1 }, { headers: { 'Cache-Control': 'no-store' } });
 };
 
 /**

@@ -198,6 +198,36 @@ and OAuth grants. Concurrent external credential issuance still needs further
 hardening, so keep `DISABLE_EXTERNAL_AUTH` enabled for a webmail-only installation.
 Keep personal deployment settings and secrets out of commits to a public fork.
 
+### Two-factor authentication
+
+Authenticator-app 2FA is available in **Settings → General**. The administrator
+must first apply migrations and configure `MFA_ENCRYPTION_KEY` as a Worker secret:
+a base64-encoded, cryptographically random 32-byte key. Keep a secure backup of
+this key with your database backups. Never commit it or put it in public Worker
+variables. Local development can supply it in the ignored `.dev.vars` file.
+Changing or deleting the key makes existing authenticator secrets unreadable;
+key rotation requires re-encrypting them. Recovery codes still work without it.
+
+Users confirm their password, scan the QR code, verify one code, and save ten
+single-use recovery codes outside their mailbox. Enrollment expires after ten
+minutes. Enabling 2FA, turning it off, or generating replacement recovery codes
+signs out existing sessions and revokes client credentials. New sign-ins require
+the password plus an authenticator or recovery code. Authenticator codes cannot
+be reused; wait for the next code after confirming enrollment.
+
+Password resets, including the administrator recovery script, **preserve 2FA**.
+Disabling 2FA or replacing recovery codes requires the password and a valid
+second factor. If both the authenticator and all recovery codes are lost, the
+Cloudflare account owner must perform an explicit administrative recovery; a
+password reset alone will not bypass 2FA. This version supports browser 2FA only:
+API keys, OAuth/MCP and mobile sessions cannot authenticate enrolled accounts.
+Passkeys and remembered-device exemptions are not implemented.
+
+The migration is additive, but an older Worker does not know how to complete
+2FA. Do not roll back to an older application version after users enroll without
+planning account recovery. Run `bun run check`, `bun run test`, and `bun run build`
+before deploying changes to authentication.
+
 ### Several accounts in one browser
 
 If you have access to more than one mailbox on the same instance, use

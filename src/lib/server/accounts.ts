@@ -106,6 +106,7 @@ export async function resolveLinkedSessions(
 			 JOIN users u ON u.id = s.user_id
 			 WHERE s.token_hash IN (${placeholders})
 			   AND s.device_platform IS NULL
+			   AND (s.mfa_verified = 1 OR NOT EXISTS (SELECT 1 FROM user_mfa WHERE user_id = u.id))
 			   AND datetime(s.expires_at) > datetime('now')`
 		)
 		.bind(...hashes)

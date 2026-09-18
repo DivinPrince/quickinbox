@@ -44,3 +44,9 @@ RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Forums, and spam. Keep the placeholder to skip — everything stays in Primary.
 # Production: wrangler secret put TYPESAFE_API_KEY
 TYPESAFE_API_KEY=REPLACE_WITH_YOUR_TYPESAFE_API_KEY
+
+# --- Two-factor authentication (optional) ---
+# Base64 encoding of 32 cryptographically random bytes. Keep a secure backup.
+# Production: wrangler secret put MFA_ENCRYPTION_KEY
+# Do not rotate this key without re-encrypting existing user_mfa secrets.
+# MFA_ENCRYPTION_KEY=REPLACE_WITH_YOUR_BASE64_ENCRYPTION_KEY

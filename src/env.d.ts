@@ -21,6 +21,8 @@ declare global {
 		TELEGRAM_THREAD_ID?: string;
 		APP_URL?: string;
 		TYPESAFE_API_KEY?: string;
+				/** AES-256-GCM key for authenticator secrets, stored as a Worker secret. */
+				MFA_ENCRYPTION_KEY?: string;
 	}
 }
 

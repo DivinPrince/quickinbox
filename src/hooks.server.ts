@@ -1,3 +1,4 @@
+import { getMfa } from '$lib/server/mfa';
 import { redirect, type Handle } from '@sveltejs/kit';
 import { authorizeApiRequest, canAccessDuringFirstLogin } from '$lib/server/api-access';
 import { getUserByApiToken, readBearerToken } from '$lib/server/api-tokens';
@@ -208,6 +209,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 				}
 			}
 		}
+	}
+
+	// External credentials cannot bypass browser-only two-factor authentication.
+	if (db && event.locals.user && (
+		pathname.startsWith('/oauth/authorize') || pathname.startsWith('/api/apikeys') || pathname.startsWith('/api/auth/pair-codes')
+	) && await getMfa(db, event.locals.user.id)) {
+		return jsonError('External clients are unavailable while two-factor authentication is enabled.', 403);
 	}
 
 	// Webhooks authenticate with a signature, not a session.
