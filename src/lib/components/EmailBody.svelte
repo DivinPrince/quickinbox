@@ -3,6 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { EMAIL_STYLE_ID, buildEmailDocument, emailCss, isRichHtml } from '$lib/utils/email-html';
+	import { hasExternalImages } from '$lib/utils/email-images';
 	import { canFoldQuotes, foldQuotedHtml } from '$lib/utils/quotes';
 	import { t } from '$lib/i18n';
 
@@ -15,9 +16,7 @@
 	const senderAddress = $derived((sender.match(/<([^>]+)>/)?.[1] ?? sender).trim().toLowerCase());
 	const trusted = $derived((($page.data.trustedImageSenders ?? []) as string[]).includes(senderAddress));
 	const allowRemoteImages = $derived((Boolean(messageId) && loadedMessage === messageId) || (inbound && trusted));
-	// Detection only controls the notice. CSP blocks all external image loads,
-	// even encoded URLs or unusual HTML that this conservative check misses.
-	const mayHaveImages = $derived(/<(?:img|source)\b|url\s*\(|\bbackground\s*=/i.test(html));
+	let blockedImages = $state(false);
 	async function trustSender() {
 		savingTrust = true;
 		privacyError = '';
@@ -201,6 +200,7 @@
 		if (!doc?.body?.hasChildNodes()) return;
 		if (doc === prepared) return;
 		prepared = doc;
+		blockedImages = hasExternalImages(doc, { messageId, origin: window.location.origin });
 
 		applyStyles(doc);
 		quoted = canFoldQuotes(html) ? foldQuotedHtml(doc.body) : [];
@@ -231,6 +231,7 @@
 		// documentElement.scrollHeight during the first measurement.
 		height = 0;
 		painted = false;
+		blockedImages = false;
 		cancelReveal();
 		prepared = null;
 		content?.disconnect();
@@ -277,7 +278,7 @@
 	});
 </script>
 
-{#if mayHaveImages && !allowRemoteImages}
+{#if blockedImages && !allowRemoteImages}
 	<div class="image-notice">
 		<span>{t('privacy.blocked')}</span>
 		<button type="button" onclick={() => { loadedMessage = messageId; }}>{t('privacy.loadImages')}</button>

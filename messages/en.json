@@ -647,8 +647,8 @@
 		"settingsHint": "Remote images are blocked until you load them in a message or allow its sender. Stored inline images still display. Allowing remote images can reveal when you read a message.",
 		"noTrustedSenders": "No senders are allowed to load remote images automatically.",
 		"blockSender": "Block images",
-		"blocked": "Remote images are blocked to protect your privacy.",
-		"loadImages": "Load images",
+		"blocked": "External images are blocked to protect your privacy. Images attached to this email can still appear.",
+		"loadImages": "Load external images",
 		"alwaysAllow": "Always allow this sender",
 		"saveError": "Could not save the image preference. Please try again."
 	},

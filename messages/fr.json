@@ -647,8 +647,8 @@
 		"settingsHint": "Les images distantes sont bloquées jusqu’à ce que vous les chargiez dans un message ou autorisiez son expéditeur. Les images intégrées stockées restent visibles. Autoriser les images distantes peut révéler quand vous lisez un message.",
 		"noTrustedSenders": "Aucun expéditeur ne peut charger automatiquement des images distantes.",
 		"blockSender": "Bloquer les images",
-		"blocked": "Les images distantes sont bloquées pour protéger votre confidentialité.",
-		"loadImages": "Charger les images",
+		"blocked": "Les images externes sont bloquées pour protéger votre vie privée. Les images jointes à cet e-mail peuvent tout de même s’afficher.",
+		"loadImages": "Charger les images externes",
 		"alwaysAllow": "Toujours autoriser cet expéditeur",
 		"saveError": "Impossible d’enregistrer la préférence. Réessayez."
 	},

@@ -647,8 +647,8 @@
 		"settingsHint": "Las imágenes remotas se bloquean hasta que las cargues en un mensaje o autorices a su remitente. Las imágenes insertadas almacenadas siguen mostrándose. Permitir imágenes remotas puede revelar cuándo lees un mensaje.",
 		"noTrustedSenders": "Ningún remitente puede cargar imágenes remotas automáticamente.",
 		"blockSender": "Bloquear imágenes",
-		"blocked": "Las imágenes remotas están bloqueadas para proteger tu privacidad.",
-		"loadImages": "Cargar imágenes",
+		"blocked": "Las imágenes externas están bloqueadas para proteger tu privacidad. Las imágenes adjuntas a este correo pueden seguir mostrándose.",
+		"loadImages": "Cargar imágenes externas",
 		"alwaysAllow": "Permitir siempre a este remitente",
 		"saveError": "No se pudo guardar la preferencia. Inténtalo de nuevo."
 	},
