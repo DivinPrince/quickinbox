@@ -7,6 +7,7 @@ import { resolveReplyFromAddress, sendAndStore } from './outbox';
 import { parseRecipients } from './send-mail';
 
 export type ForwardRequest = {
+	idempotencyKey?: string;
 	fromAddressId?: string;
 	to?: string;
 	cc?: string;
@@ -39,7 +40,7 @@ export async function sendForwardedMessages(
 	user: User,
 	originals: EmailRow[],
 	input: ForwardRequest
-): Promise<{ emailId: string }> {
+): Promise<{ emailId: string; state: import('./durable-outbox').OutboxState }> {
 	if (originals.length === 0) throw new Error('No messages to forward');
 	if (parseRecipients(input.to).length === 0) throw new Error('A recipient is required');
 	const ordered = orderForwardedMessages(originals);
@@ -60,7 +61,8 @@ export async function sendForwardedMessages(
 
 	// Omitting reply headers and replyToEmailId is deliberate: a forward starts
 	// a new conversation. Providers set Reply-To to the selected From identity.
-	const { emailId } = await sendAndStore(env, provider, user, {
+	const { emailId, state } = await sendAndStore(env, provider, user, {
+		idempotencyKey: input.idempotencyKey,
 		fromAddressId: input.fromAddressId,
 		fromAddress,
 		to: input.to!,
@@ -74,5 +76,5 @@ export async function sendForwardedMessages(
 		subjectMatch: false
 	});
 
-	return { emailId };
+	return { emailId, state };
 }

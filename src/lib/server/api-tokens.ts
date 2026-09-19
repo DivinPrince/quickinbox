@@ -191,7 +191,7 @@ export async function getUserByApiToken(db: D1Database, token: string): Promise<
 			        t.id AS token_id, t.scopes, t.last_used_at
 			 FROM api_tokens t
 			 JOIN users u ON u.id = t.user_id
-			 WHERE t.token_hash = ?`
+			 WHERE t.token_hash = ? AND NOT EXISTS (SELECT 1 FROM user_mfa WHERE user_id = u.id)`
 		)
 		.bind(hash)
 		.first<TokenUserRow>();

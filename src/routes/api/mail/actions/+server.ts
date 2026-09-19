@@ -1,3 +1,5 @@
+import { cleanupMail } from '$lib/server/mail-cleanup';
+import { statusForProviderError, describeProviderError } from '$lib/server/context';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { authorizeMailAction, isMailAction, type MailAction } from '$lib/server/api-access';
 import { isInboxCategory } from '$lib/mail/categories';
@@ -20,6 +22,8 @@ type ActionBody = {
 	ids?: string[];
 	category?: string;
 	labelId?: string;
+	requestId?: string;
+	until?: string;
 };
 
 export const POST: RequestHandler = async ({ request, locals, platform }) => {
@@ -28,7 +32,8 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const body = (await request.json()) as ActionBody;
+	const body = (await request.json().catch(() => null)) as ActionBody | null;
+	if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'Invalid action request' }, { status: 400 });
 	const action = body.action;
 
 	if (!isMailAction(action)) {
@@ -46,6 +51,7 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		}
 	}
 
+	if (body.ids !== undefined && (!Array.isArray(body.ids) || body.ids.length > 1000)) return json({ error: 'Invalid message selection' }, { status: 400 });
 	const selected = (body.ids ?? []).filter((id) => typeof id === 'string' && id.length > 0);
 	if (selected.length === 0 && !WHOLE_MAILBOX.includes(action)) {
 		return json({ error: 'No messages selected' }, { status: 400 });
@@ -55,6 +61,12 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 	// message in it — trashing a thread takes its replies along.
 	const ids = await expandToThreads(db, locals.user.id, selected);
 
+	if (['archive', 'trash', 'snooze', 'unsnooze'].includes(action)) {
+		try {
+			const result = await cleanupMail(db, locals.user.id, action as 'archive' | 'trash' | 'snooze' | 'unsnooze', ids, body.requestId ?? crypto.randomUUID(), body.until);
+			return json({ ok: true, ...result });
+		} catch (error) { return json({ error: describeProviderError(error) }, { status: statusForProviderError(error) }); }
+	}
 	let affected = 0;
 
 	switch (action) {
@@ -70,15 +82,11 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		case 'unstar':
 			affected = await setEmailFlags(db, locals.user.id, ids, { isStarred: false });
 			break;
-		case 'archive':
-			affected = await setEmailFlags(db, locals.user.id, ids, { archived: true });
-			break;
+
 		case 'unarchive':
 			affected = await setEmailFlags(db, locals.user.id, ids, { archived: false });
 			break;
-		case 'trash':
-			affected = await setEmailFlags(db, locals.user.id, ids, { trashed: true });
-			break;
+
 		case 'restore':
 			affected = await setEmailFlags(db, locals.user.id, ids, { trashed: false });
 			break;
@@ -123,6 +131,10 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		case 'empty-spam':
 			affected = await emptySpam(db, platform?.env.ATTACHMENTS, locals.user.id);
 			break;
+		case 'archive':
+		case 'trash':
+		case 'snooze':
+		case 'unsnooze': break;
 		default: {
 			const _never: never = action;
 			return _never;

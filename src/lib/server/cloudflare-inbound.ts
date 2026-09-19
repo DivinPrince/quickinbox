@@ -1,3 +1,4 @@
+import { recordOperationalFailure } from './operational-events';
 import type { R2Bucket } from '@cloudflare/workers-types';
 import PostalMime, { type Address, type Attachment } from 'postal-mime';
 import { insertAttachmentBytes } from './attachments';
@@ -162,6 +163,7 @@ export async function storeInboundAttachments(
 			});
 		} catch (error) {
 			console.error('Failed to store inbound Cloudflare attachment', attachment.filename, error);
+			await recordOperationalFailure(env.DB, 'inbound', 'An incoming attachment could not be stored. The message was kept.');
 		}
 	}
 

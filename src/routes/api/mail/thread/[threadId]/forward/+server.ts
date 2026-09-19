@@ -28,15 +28,15 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 
 	try {
 		const provider = getEmailProvider(platform);
-		const { emailId } = await sendForwardedMessages(
+		const { emailId, state } = await sendForwardedMessages(
 			{ DB: db, ATTACHMENTS: bucket },
 			provider,
 			locals.user,
 			messages,
-			body
+			{ ...body, idempotencyKey: request.headers.get('Idempotency-Key') ?? body.idempotencyKey }
 		);
 
-		return json({ ok: true, id: emailId });
+		return json({ ok: true, id: emailId, state }, { status: state === 'accepted' ? 200 : 202 });
 	} catch (error) {
 		return json(
 			{ error: describeProviderError(error, 'Failed to forward conversation') },

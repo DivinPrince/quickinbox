@@ -177,7 +177,7 @@ export const load: PageServerLoad = async ({ url, locals, platform, fetch, setHe
 export const actions: Actions = {
 	default: async ({ request, url, locals, platform, cookies, fetch }) => {
 		const db = platform?.env.DB;
-		if (!locals.user || !db) {
+		if (!locals.user || locals.user.must_change_password || !db) {
 			throw redirect(303, loginHref(`${url.pathname}${url.search}`));
 		}
 
@@ -213,7 +213,7 @@ export const actions: Actions = {
 		const chosen = param(form, 'user_id', 128);
 		if (chosen && chosen !== locals.user.id) {
 			const linked = await resolveLinkedSessions(db, readLinkedTokens(cookies));
-			if (!linked.some((session) => session.user.id === chosen)) {
+			if (!linked.some((session) => session.user.id === chosen && !session.user.must_change_password)) {
 				return fail(400, {
 					invalid: { code: 'invalid_request', message: 'That account is not signed in on this browser' }
 				});

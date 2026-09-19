@@ -14,6 +14,7 @@ declare global {
 				EMAIL: CloudflareSendEmailBinding;
 				/** `resend` (default) or `cloudflare`. */
 				EMAIL_PROVIDER?: string;
+				DISABLE_EXTERNAL_AUTH?: string;
 				/** Comma-separated domains when EMAIL_PROVIDER=cloudflare. */
 				CLOUDFLARE_MAIL_DOMAINS?: string;
 				/** Resend API key — `wrangler secret put RESEND_API_KEY`. */
@@ -36,6 +37,8 @@ declare global {
 				APP_URL?: string;
 				/** Optional TypeSafe key for inbound category/spam classification. */
 				TYPESAFE_API_KEY?: string;
+				/** AES-256-GCM key for authenticator secrets, stored as a Worker secret. */
+				MFA_ENCRYPTION_KEY?: string;
 			};
 		}
 		interface Locals {

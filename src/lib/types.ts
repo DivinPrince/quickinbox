@@ -42,6 +42,10 @@ export type ConnectedApp = {
 };
 
 export type DeliveryStatus =
+	| 'pending'
+	| 'sending'
+	| 'accepted'
+	| 'uncertain'
 	| 'queued'
 	| 'sent'
 	| 'delivered'
@@ -94,7 +98,7 @@ export type MailAddress = {
 };
 
 /** The mailboxes the sidebar can show. Drafts/Trash/Spam are flags, not folders. */
-export type MailboxView = 'inbox' | 'archive' | 'starred' | 'drafts' | 'sent' | 'trash' | 'spam';
+export type MailboxView = 'snoozed' | 'inbox' | 'archive' | 'starred' | 'drafts' | 'sent' | 'trash' | 'spam';
 
 /** Exclusive Gmail-style inbox tabs. A message lives in exactly one. */
 export type InboxCategory = 'primary' | 'social' | 'promotions' | 'updates' | 'forums';
@@ -142,6 +146,7 @@ export type ThreadLabel = {
 };
 
 export type EmailRow = {
+	snoozed_until?: string | null;
 	id: string;
 	user_id: string;
 	direction: 'inbound' | 'outbound';

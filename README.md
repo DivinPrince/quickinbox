@@ -54,6 +54,77 @@ You need:
 
 If you already deployed from this repo, pulling updates only changes the product name in the UI and docs. It does **not** rename your Worker, D1 database, or R2 bucket — leave those as they are (often `quickmail` / `quickmail-attachments`). Existing `qm_live_` API keys keep working, and `quickmail` remains a CLI alias.
 
+### Durable sending, image privacy, and maintenance
+
+Apply migration `0026_outbox_and_maintenance.sql` before serving the updated
+Worker. The normal `bun run deploy` command applies migrations before deployment.
+Keep the `* * * * *` Cron Trigger in `wrangler.jsonc`; it recovers pending sends
+once a minute. No additional Cloudflare resources are required.
+
+- **Outbox** saves the full message and attachments before contacting the mail
+  provider. It shows waiting, sending, accepted, failed, and uncertain states.
+  “Accepted by provider” does not mean the recipient received it. Resend delivery
+  webhooks continue to update the message, including events arriving before the
+  original send response. Both themes show delivery status in the reader.
+- Temporary Resend failures reuse the exact saved payload and idempotency key,
+  with at most five automatic attempts and a 23-hour retry window (inside
+  Resend's 24-hour key retention). Explicit Cloudflare rate-limit rejections can
+  be retried. Cloudflare's sending binding does not expose an idempotency key,
+  so interrupted or ambiguous sends require review and a duplicate-risk
+  acknowledgement before a manual retry. Messages are never automatically
+  switched to another provider.
+- REST send, reply, and forward requests accept an `Idempotency-Key` header
+  (1–200 printable ASCII characters). Reuse it when retrying the same request;
+  different content under the same key is rejected. Browser composers generate
+  keys automatically, and sending a saved draft uses its draft ID. Hosted MCP
+  `send_message` and `reply` accept an optional `idempotencyKey`. A successful
+  API response includes `state`; HTTP 202 means the message is durably saved but
+  has not been confirmed accepted. Inspect Outbox before submitting it again.
+- **Remote images** are blocked by default, including CSS background images
+  and `srcset` sources. Stored inline attachments remain available. “Load images”
+  permits images for the current message view; “Always allow this sender” saves
+  an account-specific preference. Remove permissions in **Settings → General →
+  Remote images**. Sender addresses alone are not proof of authenticity.
+- **Admin → Maintenance** shows storage usage, recent processing and delivery
+  errors, the outbox worker's last run, and MX/SPF/DMARC record checks. DNS checks
+  establish record presence, not successful delivery; verify DKIM and routing
+  in the provider dashboard. Processing errors are retained for 30 days.
+
+The maintenance page can download a streaming JSONL archive of all accounts'
+mail and attachments, addresses, domains, labels, and image preferences. It
+excludes authentication credentials and is not a transactional system backup.
+The final `complete` record reports row counts and missing attachments; a file
+without that record is incomplete. For disaster recovery, export D1 and copy
+the **entire** R2 bucket, including `outbox/`, and preserve configuration and
+secrets separately. Pause sending and review pending jobs before enabling the
+scheduled worker on a restored database, to avoid replaying old sends.
+
+### Drafts, search, and inbox cleanup
+
+Migration `0027_mail_workflows.sql` adds the search index, draft versions, sender
+rules, and cleanup history. Apply it before deploying this version; it indexes
+existing messages and maintains the index as mail changes.
+
+- Both composers autosave after a short pause, including attachments. The URL
+  points to the saved draft for refresh recovery. A failed save keeps the composer
+  open and offers retry; another tab cannot silently overwrite a newer version.
+  Refreshing with unsaved changes prompts before leaving. Saved snapshots are in
+  R2 under `drafts/` and are included in mail archives.
+- **Search** covers mail across folders with sender, recipient (including Cc/Bcc),
+  date, and attachment filters, highlighted matches, and paginated results. Spam
+  and Trash are optional. Search matches word prefixes using D1 FTS5; multiple
+  words must all occur. The command palette links to the full results page.
+- Archive and Trash show **Undo** for ten minutes. Undo restores prior state only
+  for messages that have not received a newer cleanup action. Failed actions
+  offer retry, reusing the original request identifier.
+- **Snooze** offers presets and a local date/time picker. Snoozed conversations
+  leave the inbox and unread count until their wake time; a new inbound reply
+  wakes them sooner. **Snoozed** lets you bring them back immediately. The existing
+  minute-by-minute scheduled worker processes due conversations.
+- **Settings → General → Sender rules** can label and archive new incoming mail
+  from an exact address, optionally matching text in the subject. Rules are
+  account-specific, run atomically with ingestion, and can be disabled or removed.
+
 ## Choosing a mail provider
 
 One provider is active per deploy, selected by `EMAIL_PROVIDER` (`resend` is
@@ -181,6 +252,52 @@ Inbound mail only works on a **deployed** Worker (or `bun run preview`) —
 3. Later users claim addresses through `/onboarding`.
 
 Send yourself a message from another account — it should land within seconds.
+
+### Private webmail deployments
+
+Two optional Worker variables restrict the exposed routes. Set their values to
+the string `"true"` in your deployment's `wrangler.jsonc`:
+
+- `DISABLE_PUBLIC_SETUP` blocks `/setup` and `/api/setup`. Enable it after
+  provisioning the administrator; it does not disable new-user onboarding.
+- `DISABLE_EXTERNAL_AUTH` blocks OAuth, MCP, API-key management, CLI pairing,
+  and the CLI installer. Browser login and mail delivery remain available.
+  Existing API keys are not revoked by this flag.
+
+Password changes revoke existing sessions, API keys, pairing codes, OAuth codes,
+and OAuth grants. Concurrent external credential issuance still needs further
+hardening, so keep `DISABLE_EXTERNAL_AUTH` enabled for a webmail-only installation.
+Keep personal deployment settings and secrets out of commits to a public fork.
+
+### Two-factor authentication
+
+Authenticator-app 2FA is available in **Settings → General**. The administrator
+must first apply migrations and configure `MFA_ENCRYPTION_KEY` as a Worker secret:
+a base64-encoded, cryptographically random 32-byte key. Keep a secure backup of
+this key with your database backups. Never commit it or put it in public Worker
+variables. Local development can supply it in the ignored `.dev.vars` file.
+Changing or deleting the key makes existing authenticator secrets unreadable;
+key rotation requires re-encrypting them. Recovery codes still work without it.
+
+Users confirm their password, scan the QR code, verify one code, and save ten
+single-use recovery codes outside their mailbox. Enrollment expires after ten
+minutes. Enabling 2FA, turning it off, or generating replacement recovery codes
+signs out existing sessions and revokes client credentials. New sign-ins require
+the password plus an authenticator or recovery code. Authenticator codes cannot
+be reused; wait for the next code after confirming enrollment.
+
+Password resets, including the administrator recovery script, **preserve 2FA**.
+Disabling 2FA or replacing recovery codes requires the password and a valid
+second factor. If both the authenticator and all recovery codes are lost, the
+Cloudflare account owner must perform an explicit administrative recovery; a
+password reset alone will not bypass 2FA. This version supports browser 2FA only:
+API keys, OAuth/MCP and mobile sessions cannot authenticate enrolled accounts.
+Passkeys and remembered-device exemptions are not implemented.
+
+The migration is additive, but an older Worker does not know how to complete
+2FA. Do not roll back to an older application version after users enroll without
+planning account recovery. Run `bun run check`, `bun run test`, and `bun run build`
+before deploying changes to authentication.
 
 ### Several accounts in one browser
 

@@ -23,6 +23,9 @@
 	import UiThemePicker from './UiThemePicker.svelte';
 	import LocalePicker from './LocalePicker.svelte';
 	import LabelsSettings from './LabelsSettings.svelte';
+	import SenderRulesSettings from './SenderRulesSettings.svelte';
+	import ImagePrivacySettings from './ImagePrivacySettings.svelte';
+	import TwoFactorSettings from './TwoFactorSettings.svelte';
 
 	type DeviceSession = {
 		id: string;
@@ -43,6 +46,8 @@
 		isAdmin: boolean;
 		devices: DeviceSession[];
 		connectedApps: ConnectedApp[];
+		mfa: { enabled: boolean; recoveryCodesRemaining: number; configured: boolean };
+		externalAuthEnabled: boolean;
 	};
 
 	let {
@@ -688,6 +693,9 @@
 	{/if}
 
 	{#if show('general')}
+	<ImagePrivacySettings />
+	<SenderRulesSettings labels={($page.data.labels ?? []) as MailLabel[]} />
+	{#key $page.data.user?.id}<TwoFactorSettings status={data.mfa} />{/key}
 	<section class="surface-lg card">
 		<h2><Icon name="pencil-line" size={18} /> {t('settings.signature')}</h2>
 		<p class="card-hint">{t('settings.signatureHint')}</p>
@@ -822,6 +830,7 @@
 		</ul>
 	</section>
 
+	{#if data.externalAuthEnabled}
 	<section class="surface-lg card">
 		<div class="card-head">
 			<h2><Icon name="key-2-line" size={18} /> {t('settings.apiKeys')}</h2>
@@ -926,6 +935,7 @@
 		{#if appError}<p class="error" role="alert">{appError}</p>{/if}
 	</section>
 
+	{/if}
 	<section class="surface-lg card">
 		<h2><Icon name="smartphone-line" size={18} /> {t('settings.devices')}</h2>
 		<p class="card-hint">
@@ -963,7 +973,7 @@
 			<p class="hint">{t('settings.noSessions')}</p>
 		{/if}
 
-		{#if pairingPanelOpen}
+		{#if data.externalAuthEnabled && pairingPanelOpen}
 			<div class="pair-panel" aria-busy={pairingBusy}>
 				<div class="pair-heading">
 					<p class="pair-title">{t('settings.scanWithApp', { app: APP_NAME })}</p>
@@ -997,7 +1007,7 @@
 					</button>
 				{/if}
 			</div>
-		{:else}
+		{:else if data.externalAuthEnabled}
 			<button type="button" class="btn-primary pair-btn" onclick={openPairingPanel}>
 				{t('settings.connectMobile')}
 			</button>

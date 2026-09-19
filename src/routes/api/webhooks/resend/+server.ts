@@ -1,3 +1,4 @@
+import { recordOperationalFailure } from '$lib/server/operational-events';
 import { json, text, type RequestHandler } from '@sveltejs/kit';
 import { getResendClient, getWebhookSecret } from '$lib/server/context';
 import { claimWebhookEvent, handleResendWebhook, type ResendWebhookEvent } from '$lib/server/inbound';
@@ -71,6 +72,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		);
 		return json({ ok: true, ...outcome });
 	} catch (error) {
+		await recordOperationalFailure(db, 'inbound', 'Resend webhook processing failed. The provider can retry this event.');
 		// Release the claim so Resend's retry can succeed.
 		await db.prepare('DELETE FROM webhook_events WHERE id = ?').bind(eventId).run();
 		console.error('Webhook handling failed', event.type, error);

@@ -9,6 +9,7 @@ type RouteRule = {
 	method: string;
 	match: (pathname: string) => boolean;
 	scopes: readonly ApiScope[];
+	allScopes?: boolean;
 };
 
 function isPrefix(pathname: string, prefix: string): boolean {
@@ -16,6 +17,9 @@ function isPrefix(pathname: string, prefix: string): boolean {
 }
 
 const BEARER_ROUTES: RouteRule[] = [
+	{ method: 'GET', match: (pathname) => pathname === '/api/search', scopes: ['mail:read'] },
+	{ method: 'POST', match: (pathname) => pathname === '/api/mail/undo', scopes: ['mail:read', 'mail:send'], allScopes: true },
+	{ method: 'POST', match: (pathname) => /^\/api\/outbox\/[^/]+$/.test(pathname), scopes: ['mail:send'] },
 	{
 		method: 'GET',
 		match: (pathname) => pathname === '/api/auth/me',
@@ -64,12 +68,14 @@ const BEARER_ROUTES: RouteRule[] = [
 	{
 		method: 'POST',
 		match: (pathname) => /^\/api\/mail\/[^/]+\/forward$/.test(pathname),
-		scopes: ['mail:send']
+		scopes: ['mail:read', 'mail:send'],
+		allScopes: true
 	},
 	{
 		method: 'POST',
 		match: (pathname) => /^\/api\/mail\/thread\/[^/]+\/forward$/.test(pathname),
-		scopes: ['mail:send']
+		scopes: ['mail:read', 'mail:send'],
+		allScopes: true
 	},
 	{
 		method: 'PATCH',
@@ -104,7 +110,8 @@ const BEARER_ROUTES: RouteRule[] = [
 	{
 		method: 'DELETE',
 		match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname),
-		scopes: ['mail:send']
+		scopes: ['mail:read', 'mail:send'],
+		allScopes: true
 	},
 	{
 		method: 'GET',
@@ -207,6 +214,8 @@ export function canAccessDuringFirstLogin(pathname: string, method: string): boo
 
 /** Bulk mailbox actions. Per-action scopes are enforced in `authorizeMailAction`. */
 export const MAIL_ACTIONS = [
+	'snooze',
+	'unsnooze',
 	'read',
 	'unread',
 	'star',
@@ -259,6 +268,8 @@ export function authorizeMailAction(input: {
 		case 'unstar':
 		case 'archive':
 		case 'unarchive':
+		case 'snooze':
+		case 'unsnooze':
 		case 'spam':
 		case 'unspam':
 		case 'categorize':
@@ -343,11 +354,11 @@ export function authorizeApiRequest(input: {
 		};
 	}
 
-	if (!hasScope(input.scopes, rule.scopes)) {
+	if (!(rule.allScopes ? hasAllScopes(input.scopes, rule.scopes) : hasScope(input.scopes, rule.scopes))) {
 		return {
 			ok: false,
 			status: 403,
-			error: `This API key needs ${rule.scopes.join(' or ')}.`
+			error: `This API key needs ${rule.scopes.join(rule.allScopes ? ' and ' : ' or ')}.`
 		};
 	}
 

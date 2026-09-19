@@ -767,7 +767,7 @@ export async function getUserByOAuthToken(db: D1Database, token: string): Promis
 			`SELECT g.id AS grant_id, g.client_id, g.scope, g.access_expires_at, g.revoked_at, g.last_used_at,
 			        u.id, u.email, u.name, u.is_admin, u.must_change_password, u.created_at
 			 FROM oauth_grants g JOIN users u ON u.id = g.user_id
-			 WHERE g.access_hash = ?`
+			 WHERE g.access_hash = ? AND NOT EXISTS (SELECT 1 FROM user_mfa WHERE user_id = u.id)`
 		)
 		.bind(hash)
 		.first<TokenUserRow>();

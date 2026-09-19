@@ -7,6 +7,7 @@ import {
 } from './constants';
 import { createSessionToken, hashPassword, hashToken, verifyPassword } from './crypto';
 import type { User } from '$lib/types';
+import { getMfa, mfaProof, MfaError, MfaRequired } from './mfa';
 
 type UserRow = {
 	id: string;
@@ -135,7 +136,8 @@ export async function bootstrapAdmin(
 export async function login(
 	db: D1Database,
 	email: string,
-	password: string
+	password: string,
+	secondFactor?: { code?: string; encryptionKey?: string }
 ): Promise<{ user: User; token: string } | null> {
 	const user = await getUserByEmail(db, email);
 	if (!user) return null;
@@ -148,10 +150,27 @@ export async function login(
 	const sessionId = crypto.randomUUID();
 	const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-	await db
-		.prepare('INSERT INTO sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)')
-		.bind(sessionId, user.id, token_hash, expiresAt)
-		.run();
+	const mfa = await getMfa(db, user.id);
+	if (mfa) {
+		if (!secondFactor?.code) throw new MfaRequired();
+		const proof = await mfaProof(db, mfa, secondFactor.code, secondFactor.encryptionKey, user.password_hash);
+		const results = await db.batch([
+			...proof.statements,
+			db.prepare(`INSERT INTO sessions (id, user_id, token_hash, expires_at, mfa_verified)
+			 SELECT ?, id, ?, ?, 1 FROM users WHERE id = ? AND password_hash = ?
+			 AND EXISTS (SELECT 1 FROM user_mfa WHERE user_id = users.id AND last_verification = ?)`)
+			 .bind(sessionId, token_hash, expiresAt, user.id, user.password_hash, proof.marker)
+		]);
+		if (!results[results.length - 1].meta.changes) throw new MfaError('Invalid or already used code. Sign in again.', 401);
+	} else {
+		const issued = await db
+			.prepare(`INSERT INTO sessions (id, user_id, token_hash, expires_at)
+			 SELECT ?, id, ?, ? FROM users WHERE id = ? AND password_hash = ?
+			 AND NOT EXISTS (SELECT 1 FROM user_mfa WHERE user_id = users.id)`)
+			.bind(sessionId, token_hash, expiresAt, user.id, user.password_hash)
+			.run();
+		if (!issued.meta.changes) return null;
+	}
 
 	const { password_hash: _, ...safeUser } = user;
 	return { user: safeUser, token };
@@ -325,6 +344,7 @@ export async function redeemPairingCode(
 				 FROM pairing_codes
 				 WHERE code_hash = ?
 				   AND used_at IS NULL
+				   AND NOT EXISTS (SELECT 1 FROM user_mfa WHERE user_id = pairing_codes.user_id)
 				   AND datetime(expires_at) > datetime('now')`
 			)
 			.bind(sessionId, token_hash, expiresAt, deviceName, devicePlatform, code_hash),
@@ -412,22 +432,14 @@ export async function setUserPassword(
 	}
 
 	const password_hash = await hashPassword(password);
-	const result = await db
-		.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
-		.bind(password_hash, userId)
-		.run();
-
-	if ((result.meta.changes ?? 0) === 0) {
-		throw new Error('User not found');
-	}
-
-	// Password rotation must cut off every login path, including long-lived keys.
-	await db.batch([
-		db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
-		db.prepare('DELETE FROM api_tokens WHERE user_id = ?').bind(userId),
-		db.prepare('DELETE FROM oauth_grants WHERE user_id = ?').bind(userId),
-		db.prepare('DELETE FROM oauth_codes WHERE user_id = ?').bind(userId)
+	// Commit the new password and all credential revocations atomically.
+	const [result] = await db.batch([
+		db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(password_hash, userId),
+		...['sessions', 'api_tokens', 'pairing_codes', 'oauth_grants', 'oauth_codes', 'mfa_enrollments'].map((table) =>
+			db.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(userId)
+		)
 	]);
+	if ((result.meta.changes ?? 0) === 0) throw new Error('User not found');
 }
 
 export async function completeFirstLogin(
@@ -489,6 +501,27 @@ export async function completeFirstLogin(
 					SELECT 1 FROM users
 					WHERE id = ? AND password_hash = ? AND must_change_password = 0
 				   )`
+			)
+			.bind(userId, userId, password_hash),
+		db
+			.prepare(
+				`DELETE FROM pairing_codes
+				 WHERE user_id = ?
+				   AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ? AND must_change_password = 0)`
+			)
+			.bind(userId, userId, password_hash),
+		db
+			.prepare(
+				`DELETE FROM oauth_codes
+				 WHERE user_id = ?
+				   AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ? AND must_change_password = 0)`
+			)
+			.bind(userId, userId, password_hash),
+		db
+			.prepare(
+				`DELETE FROM oauth_grants
+				 WHERE user_id = ?
+				   AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ? AND must_change_password = 0)`
 			)
 			.bind(userId, userId, password_hash)
 	]);
@@ -583,9 +616,11 @@ export async function deleteUser(
 			.prepare(
 				`SELECT storage_key FROM email_attachments
 				 WHERE storage_key IS NOT NULL
-				   AND email_id IN (SELECT id FROM emails WHERE user_id = ?)`
+				   AND email_id IN (SELECT id FROM emails WHERE user_id = ?)
+				 UNION ALL SELECT payload_key AS storage_key FROM outbox_jobs WHERE user_id = ?
+				 UNION ALL SELECT draft_payload_key AS storage_key FROM emails WHERE user_id = ? AND draft_payload_key IS NOT NULL`
 			)
-			.bind(targetId),
+			.bind(targetId, targetId, targetId),
 		db
 			.prepare(
 				`DELETE FROM users
@@ -599,6 +634,8 @@ export async function deleteUser(
 				 WHERE email_id IN (SELECT id FROM emails WHERE user_id = ?) AND ${gone}`
 			)
 			.bind(targetId, targetId),
+		db.prepare(`DELETE FROM outbox_jobs WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM trusted_image_senders WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM emails WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM addresses WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM sessions WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
@@ -606,6 +643,9 @@ export async function deleteUser(
 		db.prepare(`DELETE FROM oauth_grants WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM oauth_codes WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db.prepare(`DELETE FROM pairing_codes WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM mfa_enrollments WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM mfa_recovery_codes WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
+		db.prepare(`DELETE FROM user_mfa WHERE user_id = ? AND ${gone}`).bind(targetId, targetId),
 		db
 			.prepare(`DELETE FROM push_subscriptions WHERE user_id = ? AND ${gone}`)
 			.bind(targetId, targetId),
@@ -661,7 +701,8 @@ export async function getAuthenticatedSession(
 			        u.id, u.email, u.name, u.is_admin, u.must_change_password, u.created_at
 			 FROM sessions s
 			 JOIN users u ON u.id = s.user_id
-			 WHERE s.token_hash = ? AND datetime(s.expires_at) > datetime('now')`
+			 WHERE s.token_hash = ? AND datetime(s.expires_at) > datetime('now')
+			 AND (NOT EXISTS (SELECT 1 FROM user_mfa WHERE user_id = u.id) OR (s.mfa_verified = 1 AND s.device_platform IS NULL))`
 		)
 		.bind(token_hash)
 		.first<

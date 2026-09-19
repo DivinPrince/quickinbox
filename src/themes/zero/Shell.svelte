@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { afterNavigate, goto, replaceState } from '$app/navigation';
+	import { untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { logoutAccount } from '$lib/account-switch';
 	import { t } from '$lib/i18n';
@@ -23,10 +24,35 @@
 
 	const pathname = $derived($page.url.pathname);
 	const settings = $derived(pathname.startsWith('/settings') || pathname.startsWith('/admin'));
-	const composeOpen = $derived(
-		$page.url.searchParams.get('compose') === '1' || pathname === '/compose'
-	);
-	const draftId = $derived($page.url.searchParams.get('draft'));
+	let composeOpen = $state(false);
+	let draftId = $state<string | null>(null);
+	let composer: ComposeDialog | undefined = $state();
+	let composeOwner = untrack(() => data.user.id);
+
+	$effect(() => {
+		if (data.user.id !== composeOwner) {
+			composeOwner = data.user.id;
+			composeOpen = false;
+			draftId = null;
+		}
+	});
+
+	afterNavigate((navigation) => {
+		const url = new URL($page.url);
+		if (url.searchParams.get('compose') === '1' || url.pathname === '/compose') {
+			draftId = url.searchParams.get('draft');
+			composeOpen = true;
+		} else if (navigation.type === 'popstate') {
+			composeOpen = false;
+			draftId = null;
+		} else if (composeOpen) {
+			// Keep the same editor alive while browsing folders or opening a message.
+			url.searchParams.set('compose', '1');
+			const savedDraft = navigation.from?.url.searchParams.get('draft');
+			if (savedDraft) url.searchParams.set('draft', savedDraft);
+			replaceState(url, $page.state);
+		}
+	});
 
 	$effect(() => {
 		collapsed = localStorage.getItem('quickinbox:zero-sidebar') === '1';
@@ -75,7 +101,10 @@
 					badge: data.counts.drafts || undefined,
 					shortcut: 'g d'
 				},
-				{ href: '/sent', icon: 'Plane2', label: t('nav.sent'), shortcut: 'g t' }
+				{ href: '/sent', icon: 'Plane2', label: t('nav.sent'), shortcut: 'g t' },
+				{ href: '/outbox', icon: 'Plane2', label: t('nav.outbox') },
+				{ href: '/snoozed', icon: 'Clock', label: t('cleanup.snoozed') },
+				{ href: '/search', icon: 'Search', label: t('common.search') }
 			]
 		},
 		{
@@ -108,10 +137,11 @@
 		{ href: '/settings/notifications', icon: 'Bell', label: t('nav.notifications') },
 		{ href: '/settings/labels', icon: 'Tag', label: t('nav.labels') },
 		{ href: '/settings/shortcuts', icon: 'Tabs', label: t('nav.shortcuts'), shortcut: '?' },
-		...(data.user.is_admin ? [{ href: '/admin', icon: 'SettingsGear', label: t('nav.admin') }] : [])
+		...(data.user.is_admin ? [{ href: '/admin', icon: 'SettingsGear', label: t('nav.admin') }, { href: '/admin/maintenance', icon: 'SettingsGear', label: t('nav.maintenance') }] : [])
 	]);
 
 	function isActive(href: string): boolean {
+		if (href === '/admin') return pathname === '/admin';
 		if (href.startsWith('/inbox?label=')) {
 			return $page.url.searchParams.get('label') === new URLSearchParams(href.split('?')[1]).get('label');
 		}
@@ -126,6 +156,11 @@
 	}
 
 	function openCompose() {
+		mobileOpen = false;
+		if (composeOpen) {
+			void composer?.restore();
+			return;
+		}
 		const url = new URL($page.url);
 		if (pathname === '/compose') return;
 		url.searchParams.set('compose', '1');
@@ -138,6 +173,8 @@
 	}
 
 	function closeCompose() {
+		composeOpen = false;
+		draftId = null;
 		if (pathname === '/compose') {
 			void goto('/inbox');
 			return;
@@ -172,6 +209,7 @@
 	});
 
 	function onKey(event: KeyboardEvent) {
+		if (event.defaultPrevented) return;
 		const target = event.target as HTMLElement | null;
 		const typing =
 			target &&
@@ -186,18 +224,11 @@
 			return;
 		}
 
-		if (typing) {
-			if (event.key === 'Escape' && composeOpen) {
-				event.preventDefault();
-				closeCompose();
-			}
-			return;
-		}
+		if (typing) return;
 
 		if (event.key === 'Escape') {
 			if (paletteOpen) paletteOpen = false;
 			else if (shortcutsOpen) shortcutsOpen = false;
-			else if (composeOpen) closeCompose();
 			else if (mobileOpen) mobileOpen = false;
 			return;
 		}
@@ -393,7 +424,7 @@
 </div>
 
 {#if composeOpen}
-	<ComposeDialog addresses={data.addresses} draftId={draftId} onClose={closeCompose} />
+	<ComposeDialog bind:this={composer} addresses={data.addresses} draftId={draftId} onClose={closeCompose} />
 {/if}
 
 {#if paletteOpen}

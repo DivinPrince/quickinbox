@@ -228,7 +228,7 @@ test('mailbox counts keep Primary unread separate from Social and exclude spam f
 	assert.match(sql, /category = 'social'/);
 	assert.match(
 		sql,
-		/spam_at IS NULL AND direction = 'inbound' AND category = 'primary'/
+		/spam_at IS NULL AND direction = 'inbound'.*AND category = 'primary'/
 	);
 	assert.match(sql, /deleted_at IS NULL AND spam_at IS NOT NULL THEN/);
 });

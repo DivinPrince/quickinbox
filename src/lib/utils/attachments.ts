@@ -1,12 +1,12 @@
 export function isImageType(contentType: string): boolean {
-	return contentType.startsWith('image/');
+	return ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'image/bmp', 'image/x-icon'].includes(contentType.toLowerCase().split(';', 1)[0].trim());
 }
 
 export function isPreviewableInline(contentType: string): boolean {
 	return (
 		isImageType(contentType) ||
 		contentType === 'application/pdf' ||
-		contentType.startsWith('text/') ||
+		contentType === 'text/plain' ||
 		contentType === 'application/json'
 	);
 }

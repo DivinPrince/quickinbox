@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import SnoozeControl from '$lib/components/SnoozeControl.svelte';
+	import DeliveryStatus from '$lib/components/DeliveryStatus.svelte';
+	import { createMailSender } from '$lib/mail/send';
+	const sendMail = createMailSender();
+	import { tick, untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { invalidateAll } from '$app/navigation';
 	import EmailBody from '$lib/components/EmailBody.svelte';
@@ -47,6 +51,8 @@
 	let error = $state('');
 	let opened = $state<Set<string>>(new Set());
 	let replyOpen = $state(false);
+	let threadBody: HTMLDivElement | undefined = $state();
+	let replyEditor: RichTextEditor | undefined = $state();
 	let replyMode = $state<ReplyMode>('reply');
 	let replyTarget = $state<ThreadMessage | null>(null);
 	let replyHtml = $state('');
@@ -257,9 +263,8 @@
 	async function act(action: string, extra: Record<string, unknown> = {}) {
 		if (!latest) return;
 		menuFor = null;
-		await runMailAction(action, [latest.id], extra);
-		onClose();
-		await invalidateAll();
+		try { await runMailAction(action, [latest.id], extra); onClose(); await invalidateAll(); }
+		catch { /* The shared notice offers retry. */ }
 	}
 
 	async function toggleLabel(labelId: string) {
@@ -290,7 +295,7 @@
 
 	async function toggleStar() {
 		if (!latest) return;
-		await runMailAction(starred ? 'unstar' : 'star', [latest.id]);
+		try { await runMailAction(starred ? 'unstar' : 'star', [latest.id]); } catch { return; }
 		await invalidateAll();
 		if (thread) {
 			thread = {
@@ -300,7 +305,7 @@
 		}
 	}
 
-	function startReply(mode: ReplyMode, message: ThreadMessage) {
+	async function startReply(mode: ReplyMode, message: ThreadMessage) {
 		replyMode = mode;
 		replyTarget = message;
 		replyOpen = true;
@@ -317,6 +322,12 @@
 		const nextOpened = new Set(opened);
 		nextOpened.add(message.id);
 		opened = nextOpened;
+		closeMenus();
+		await tick();
+		if (!replyOpen || replyTarget?.id !== message.id || replyMode !== mode) return;
+		// The composer is sticky, so scroll its pane to its actual position in the thread.
+		threadBody?.scrollTo({ top: threadBody.scrollHeight, behavior: 'instant' });
+		replyEditor?.focus({ preventScroll: true });
 	}
 
 	function startForwardAll() {
@@ -337,8 +348,10 @@
 	}
 
 	function onThreadKey(event: KeyboardEvent) {
-		if (!id || !thread || !latest) return;
+		if (event.defaultPrevented || !id || !thread || !latest) return;
 		const target = event.target as HTMLElement | null;
+		// The docked composer has its own send shortcut.
+		if (target?.closest('.z-compose-window')) return;
 		if (
 			target &&
 			(target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
@@ -349,9 +362,13 @@
 			}
 			return;
 		}
-		if (event.key === 'r') startReply('reply', latest);
-		if (event.key === 'a') startReply('replyAll', latest);
-		if (event.key === 'f') startReply('forward', latest);
+		if (event.metaKey || event.ctrlKey || event.altKey) return;
+		const modes: Record<string, ReplyMode> = { r: 'reply', a: 'replyAll', f: 'forward' };
+		const mode = modes[event.key];
+		if (mode) {
+			event.preventDefault();
+			void startReply(mode, latest);
+		}
 		if (event.key === 'Escape' && replyOpen) {
 			replyOpen = false;
 		}
@@ -372,7 +389,7 @@
 					replyMode === 'forwardAll' && thread
 						? `/api/mail/thread/${encodeURIComponent(thread.threadId)}/forward`
 						: `/api/mail/${encodeURIComponent(message.id)}/forward`;
-				const response = await fetch(endpoint, {
+				const response = await sendMail(endpoint, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
@@ -390,7 +407,7 @@
 					return;
 				}
 			} else {
-				const response = await fetch(`/api/mail/${message.id}`, {
+				const response = await sendMail(`/api/mail/${message.id}`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
@@ -455,13 +472,16 @@
 				</button>
 			</Tooltip>
 			<div class="z-thread-bar-right">
-				<button type="button" class="z-thread-replyall" onclick={startForwardAll}>
+				{#if view !== 'spam' && view !== 'trash'}<SnoozeControl ids={[latest.id]} snoozed={view === 'snoozed'} onDone={onClose} />{/if}
+				<button type="button" class="z-thread-replyall" aria-label={t('thread.forwardAll')} title={t('thread.forwardAll')} onclick={startForwardAll}>
 					<Icon name="Forward" size={14} />
 					<span>{t('thread.forwardAll')}</span>
 				</button>
 				<button
 					type="button"
 					class="z-thread-replyall"
+					aria-label={t('thread.replyAll')}
+					title={t('thread.replyAll')}
 					onclick={() => startReply('replyAll', latest)}
 				>
 					<Icon name="Reply" size={14} />
@@ -558,7 +578,7 @@
 			</div>
 		</div>
 
-		<div class="z-thread-body">
+		<div class="z-thread-body" bind:this={threadBody}>
 			<div class="z-thread-hero">
 				<h1 class="z-thread-subject">
 					{thread.subject || t('mailbox.noSubject')}
@@ -665,6 +685,7 @@
 									{/if}
 								</div>
 							</div>
+							{#if message.direction === 'outbound'}<DeliveryStatus status={message.status} detail={message.status_detail} />{/if}
 							<p class="z-msg-to">{t('thread.toColon')} {toLine(message)}</p>
 						</div>
 					</div>
@@ -674,7 +695,7 @@
 						<div class="z-msg-body">
 							<div class="z-msg-html">
 								{#if message.body_html}
-									<EmailBody html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
+									<EmailBody messageId={message.id} sender={message.from_addr} inbound={message.direction === 'inbound'} html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
 								{:else}
 									<pre class="z-msg-text">{message.body_text}</pre>
 								{/if}
@@ -734,7 +755,7 @@
 					<div class="z-composer-fields">
 						<div class="z-composer-row">
 							<span class="z-composer-label">{t('compose.toColon')}</span>
-							<input class="z-composer-input" bind:value={replyTo} placeholder={t('compose.emailPlaceholder')} />
+							<input class="z-composer-input" bind:value={replyTo} aria-label={t('compose.to')} placeholder={t('compose.emailPlaceholder')} />
 							<div class="z-composer-row-actions">
 								<button type="button" class="z-composer-link" onclick={() => (showCc = !showCc)}>{t('compose.cc')}</button>
 								<button type="button" class="z-composer-link" onclick={() => (showBcc = !showBcc)}>{t('compose.bcc')}</button>
@@ -753,18 +774,19 @@
 						{#if showCc}
 							<div class="z-composer-row">
 								<span class="z-composer-label">{t('compose.ccColon')}</span>
-								<input class="z-composer-input" bind:value={replyCc} placeholder={t('compose.ccPlaceholder')} />
+								<input class="z-composer-input" bind:value={replyCc} aria-label={t('compose.cc')} placeholder={t('compose.ccPlaceholder')} />
 							</div>
 						{/if}
 						{#if showBcc}
 							<div class="z-composer-row">
 								<span class="z-composer-label">{t('compose.bccColon')}</span>
-								<input class="z-composer-input" bind:value={replyBcc} placeholder={t('compose.bccPlaceholder')} />
+								<input class="z-composer-input" bind:value={replyBcc} aria-label={t('compose.bcc')} placeholder={t('compose.bccPlaceholder')} />
 							</div>
 						{/if}
 					</div>
 					<div class="z-composer-body">
 						<RichTextEditor
+							bind:this={replyEditor}
 							bind:html={replyHtml}
 							embedded
 							minHeight={80}

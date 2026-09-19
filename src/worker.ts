@@ -1,11 +1,16 @@
-import type { ExecutionContext } from '@cloudflare/workers-types';
+import { deploymentPolicyResponse } from './lib/server/deployment-policy';
+import { getEmailProvider } from './lib/server/context';
+import { wakeSnoozedMail } from './lib/server/mail-cleanup';
+import { flushOutbox } from './lib/server/durable-outbox';
+import { recordOperationalFailure } from './lib/server/operational-events';
+import type { ScheduledController, ExecutionContext } from '@cloudflare/workers-types';
 import {
 	handleCloudflareInbound,
 	type CloudflareInboundEnv,
 	type CloudflareInboundMessage
 } from './lib/server/cloudflare-inbound';
 // Renamed from `_worker.js` by `scripts/wrap-cloudflare-worker.mjs` after `vite build`.
-// @ts-expect-error file is created at build time
+// @ts-ignore generated worker and declaration are created at build time
 import sveltekit from '../.svelte-kit/cloudflare/_sveltekit.js';
 
 type SvelteKitWorker = {
@@ -20,10 +25,17 @@ const svelteApp = sveltekit as SvelteKitWorker;
  */
 export default {
 	fetch(request: Request, env: Env, ctx: ExecutionContext) {
+		const pathname = new URL(request.url).pathname;
+		const blocked = deploymentPolicyResponse(pathname, env);
+		if (blocked) return blocked;
 		if (typeof svelteApp.fetch !== 'function') {
 			throw new Error('SvelteKit worker export is missing fetch');
 		}
 		return svelteApp.fetch(request, env, ctx);
+	},
+
+	async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+		await Promise.all([wakeSnoozedMail(env.DB), flushOutbox(env, getEmailProvider({ env, ctx }))]);
 	},
 
 	async email(message: CloudflareInboundMessage, env: Env, ctx: ExecutionContext) {
@@ -46,6 +58,11 @@ export default {
 			waitUntil: (promise) => ctx.waitUntil(promise)
 		};
 
-		await handleCloudflareInbound(message, inboundEnv);
+		try {
+			await handleCloudflareInbound(message, inboundEnv);
+		} catch (error) {
+			await recordOperationalFailure(env.DB, 'inbound', 'Cloudflare inbound processing failed. Check Worker logs for details.');
+			throw error;
+		}
 	}
 };

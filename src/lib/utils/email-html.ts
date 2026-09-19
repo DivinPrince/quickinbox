@@ -209,6 +209,10 @@ body {
 	line-height: 1.65;
 	overflow-wrap: anywhere;
 }
+/* Inline attachments and layout tables must fit the reading pane in both
+   ordinary correspondence and designed messages. */
+img, video, svg { max-width: 100% !important; height: auto !important; }
+table { max-width: 100% !important; }
 p { margin: 0 0 1em; }
 /* Tailwind's reset is not in here, but senders still rely on markers. */
 ul { list-style: disc outside; margin: 0.5em 0; padding-left: 1.5em; }
@@ -222,8 +226,6 @@ pre { white-space: pre-wrap; }
 const SIMPLE_CSS = `
 html:not([data-theme='dark']) { color-scheme: light; }
 body { color: #525252; background: transparent; }
-img, video, svg { max-width: 100%; height: auto; }
-table { max-width: 100%; }
 a { color: #4f6b58; }
 blockquote { border-color: rgba(0, 0, 0, 0.12) !important; }
 
@@ -290,13 +292,29 @@ function isFullDocument(html: string): boolean {
  * webface falls back to the stack below rather than announcing the open to
  * whoever hosts it.
  */
-const CSP =
-	"default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'; " +
-	"font-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; " +
-	"form-action 'none'; base-uri 'none'";
+export type EmailDocumentOptions = {
+	rich: boolean;
+	theme?: string;
+	allowRemoteImages?: boolean;
+	messageId?: string;
+	origin?: string;
+};
 
-function headStart(): string {
-	return `<meta http-equiv="Content-Security-Policy" content="${CSP}">
+function headStart(options: EmailDocumentOptions): string {
+	let images = 'data:';
+	if (options.allowRemoteImages) images += ' https: http:';
+	else if (options.origin && options.messageId && /^[a-zA-Z0-9_-]+$/.test(options.messageId)) {
+		const origin = new URL(options.origin);
+		if (origin.protocol === 'https:' || origin.protocol === 'http:') {
+			// Permit only this message's own attachments; remote CSS images and
+			// srcset sources are governed by the same policy as <img src>.
+			images += ` ${origin.origin}/api/mail/${options.messageId}/attachments/`;
+		}
+	}
+	const csp = `default-src 'none'; img-src ${images}; style-src 'unsafe-inline'; ` +
+		"font-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; " +
+		"form-action 'none'; base-uri 'none'";
+	return `<meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="referrer" content="no-referrer">`;
 }
 
@@ -347,10 +365,10 @@ function withTheme(html: string, theme: string): string {
 
 export function buildEmailDocument(
 	html: string,
-	options: { rich: boolean; theme?: string }
+	options: EmailDocumentOptions
 ): string {
 	const theme = options.theme ?? 'light';
-	const before = headStart();
+	const before = headStart(options);
 	const after = headEnd(options.rich);
 
 	// A designed message written only for a white page is recoloured to suit a
@@ -367,7 +385,11 @@ export function buildEmailDocument(
 	// after load matters in dark mode: the colour scheme and the transparency
 	// opt-out have to be in the very first paint, or the message flashes up as a
 	// white sheet while it waits for script.
-	if (isFullDocument(source)) return withTheme(spliceHead(source, before, after), theme);
+	if (isFullDocument(source)) {
+		// Put the policy before ALL untrusted markup, including malformed resources
+		// before <head>. Keep the in-head copy for complete documents as well.
+		return '<!doctype html>' + before + withTheme(spliceHead(source, before, after), theme);
+	}
 
 	return `<!doctype html><html data-theme="${theme}"><head><meta charset="utf-8">
 ${before}

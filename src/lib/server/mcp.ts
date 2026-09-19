@@ -43,7 +43,7 @@ export type McpContext = {
 	origin: string;
 };
 
-const views = ['inbox', 'archive', 'starred', 'drafts', 'sent', 'trash', 'spam'] as const;
+const views = ['inbox', 'snoozed', 'archive', 'starred', 'drafts', 'sent', 'trash', 'spam'] as const;
 const categories = INBOX_CATEGORIES;
 const MAX_BODY_CHARS = 20_000;
 
@@ -279,6 +279,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
 				description: 'Send a new email from the connected mailbox.',
 				inputSchema: {
 					to: z.string().describe('Comma-separated recipients.'),
+					idempotencyKey: z.string().max(200).optional().describe('Reuse this key when retrying the same send after a lost response.'),
 					subject: z.string(),
 					text: z.string().optional().describe('Plain-text body. Required unless html is given.'),
 					html: z.string().optional(),
@@ -291,13 +292,13 @@ export function createMcpServer(ctx: McpContext): McpServer {
 				if (!input.text?.trim() && !input.html?.trim()) return textResult('text or html is required', true);
 				if (!ctx.bucket) return textResult('Sending is not configured on this server', true);
 				try {
-					const { emailId, from } = await sendAndStore(
+					const { emailId, from, state } = await sendAndStore(
 						{ DB: ctx.db, ATTACHMENTS: ctx.bucket },
 						ctx.provider(),
 						ctx.user,
 						input
 					);
-					return textResult({ ok: true, id: emailId, from: from.address });
+					return textResult({ ok: true, id: emailId, state, from: from.address });
 				} catch (error) {
 					return fail(error);
 				}
@@ -311,6 +312,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
 					'Reply to a message. Recipients, subject and threading headers come from the original; pass `to` to override recipients.',
 				inputSchema: {
 					id: z.string().describe('Message id to reply to.'),
+					idempotencyKey: z.string().max(200).optional(),
 					text: z.string().optional(),
 					html: z.string().optional(),
 					to: z.string().optional(),
@@ -318,7 +320,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
 					fromAddressId: z.string().optional()
 				}
 			},
-			async ({ id, text, html, to, cc, fromAddressId }) => {
+			async ({ id, text, html, to, cc, fromAddressId, idempotencyKey }) => {
 				if (!text?.trim() && !html?.trim()) return textResult('text or html is required', true);
 				if (!ctx.bucket) return textResult('Sending is not configured on this server', true);
 				try {
@@ -330,11 +332,12 @@ export function createMcpServer(ctx: McpContext): McpServer {
 					const fromAddress = fromAddressId
 						? undefined
 						: await resolveReplyFromAddress(ctx.db, ctx.user, original);
-					const { emailId, from } = await sendAndStore(
+					const { emailId, from, state } = await sendAndStore(
 						{ DB: ctx.db, ATTACHMENTS: ctx.bucket },
 						ctx.provider(),
 						ctx.user,
 						{
+							idempotencyKey,
 							fromAddressId,
 							fromAddress,
 							to: recipient,
@@ -347,7 +350,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
 							replyToEmailId: original.id
 						}
 					);
-					return textResult({ ok: true, id: emailId, from: from.address, to: recipient, subject });
+					return textResult({ ok: true, id: emailId, state, from: from.address, to: recipient, subject });
 				} catch (error) {
 					return fail(error);
 				}
@@ -369,6 +372,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
 				}
 			},
 			async ({ id, isRead, isStarred, archived, trashed, spam, category }) => {
+				if (!canRead) return textResult('This operation needs mail:read and mail:send.', true);
 				if (
 					[isRead, isStarred, archived, trashed, spam, category].every((value) => value === undefined)
 				) {
@@ -409,6 +413,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
 				}
 			},
 			async ({ id, labelIds }) => {
+				if (!canRead) return textResult('This operation needs mail:read and mail:send.', true);
 				try {
 					const ids = await expandToThreads(ctx.db, ctx.user.id, [id]);
 					if (ids.length === 0) return textResult(`No message or thread with id ${id}`, true);

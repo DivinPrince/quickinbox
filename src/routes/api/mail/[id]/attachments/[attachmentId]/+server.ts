@@ -34,7 +34,10 @@ export const GET: RequestHandler = async ({ params, locals, platform, url }) => 
 			'Content-Type': attachment.content_type,
 			'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(attachment.filename)}"`,
 			'Content-Length': String(bytes.length),
-			'Cache-Control': 'private, max-age=3600'
+			'Cache-Control': 'private, no-store',
+			'X-Content-Type-Options': 'nosniff',
+			'Content-Security-Policy': "sandbox; default-src 'none'; base-uri 'none'; form-action 'none'",
+			'Referrer-Policy': 'no-referrer'
 		}
 	});
 };

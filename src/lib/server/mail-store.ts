@@ -1,3 +1,5 @@
+import { ftsQuery } from './search';
+import { parseEmailAddress } from './email-address';
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import { MAILBOX_PAGE_SIZE } from '$lib/constants';
 import { MAX_BODY_BYTES } from './constants';
@@ -22,16 +24,7 @@ import type {
 	ThreadSummary
 } from '$lib/types';
 
-/** D1 caps bound parameters at 100; leave room for user_id and SET values. */
-const D1_IN_CHUNK = 80;
-
-function chunkIds(ids: string[], size = D1_IN_CHUNK): string[][] {
-	const groups: string[][] = [];
-	for (let i = 0; i < ids.length; i += size) {
-		groups.push(ids.slice(i, i + size));
-	}
-	return groups;
-}
+import { chunkIds } from './d1';
 
 export async function getUserIdByEmail(db: D1Database, email: string): Promise<string | null> {
 	const row = await db
@@ -45,6 +38,7 @@ export async function getUserIdByEmail(db: D1Database, email: string): Promise<s
 export async function insertEmail(
 	db: D1Database,
 	input: {
+		id?: string;
 		userId: string;
 		direction: 'inbound' | 'outbound';
 		from: string;
@@ -68,7 +62,7 @@ export async function insertEmail(
 		subjectMatch?: boolean;
 	}
 ): Promise<string> {
-	const id = crypto.randomUUID();
+	const id = input.id ?? crypto.randomUUID();
 	const bodyText = truncate(input.bodyText ?? null);
 	const bodyHtml = truncate(input.bodyHtml ?? null);
 
@@ -128,10 +122,11 @@ export async function insertEmail(
 	if (input.direction === 'inbound') {
 		await db
 			.prepare(
-				`UPDATE emails SET archived_at = NULL, updated_at = datetime('now')
-				 WHERE user_id = ? AND COALESCE(thread_id, id) = ?`
+				`UPDATE emails SET archived_at = NULL, snoozed_until = NULL, cleanup_revision = cleanup_revision + 1, updated_at = datetime('now')
+				 WHERE user_id = ? AND COALESCE(thread_id, id) = ?
+				 AND NOT EXISTS (SELECT 1 FROM sender_rules WHERE user_id = ? AND sender = ? AND enabled = 1 AND archive = 1 AND (subject_contains = '' OR instr(lower(?), lower(subject_contains)) > 0))`
 			)
-			.bind(input.userId, threadId)
+			.bind(input.userId, threadId, input.userId, parseEmailAddress(input.from), input.subject)
 			.run();
 	} else if (input.replyToEmailId) {
 		// Sending a reply from an archived conversation should not silently move
@@ -184,13 +179,14 @@ export async function updateEmailStatusByProviderId(
 	status: DeliveryStatus,
 	detail?: string | null
 ): Promise<void> {
-	await db
-		.prepare(
-			`UPDATE emails SET status = ?, status_at = datetime('now'), status_detail = ?
-			 WHERE provider_id = ?`
-		)
-		.bind(status, detail ?? null, providerId)
-		.run();
+	await db.batch([
+		db.prepare(`INSERT INTO outbound_delivery_events (provider_id, status, detail) VALUES (?, ?, ?)
+			ON CONFLICT(provider_id) DO UPDATE SET status = excluded.status, detail = excluded.detail, created_at = datetime('now')`)
+			.bind(providerId, status, detail ?? null),
+		db.prepare(`UPDATE emails SET status = ?, status_at = datetime('now'), status_detail = ?, updated_at = datetime('now') WHERE provider_id = ?`)
+			.bind(status, detail ?? null, providerId),
+		db.prepare('UPDATE users SET mailbox_epoch = mailbox_epoch + 1 WHERE id IN (SELECT user_id FROM emails WHERE provider_id = ?)').bind(providerId)
+	]);
 }
 
 /**
@@ -201,7 +197,9 @@ export async function updateEmailStatusByProviderId(
 function viewFilter(view: MailboxView): string {
 	switch (view) {
 		case 'inbox':
-			return "e.deleted_at IS NULL AND e.archived_at IS NULL AND e.spam_at IS NULL AND e.direction = 'inbound'";
+			return "e.deleted_at IS NULL AND e.archived_at IS NULL AND e.spam_at IS NULL AND e.direction = 'inbound' AND (e.snoozed_until IS NULL OR e.snoozed_until <= datetime('now'))";
+		case 'snoozed':
+			return "e.deleted_at IS NULL AND e.spam_at IS NULL AND e.snoozed_until > datetime('now')";
 		case 'archive':
 			return "e.deleted_at IS NULL AND e.spam_at IS NULL AND e.archived_at IS NOT NULL AND (e.status IS NULL OR e.status <> 'draft')";
 		case 'sent':
@@ -308,18 +306,15 @@ function buildScope(userId: string, query: MailboxQuery): { where: string; bindi
 
 	const term = query.q?.trim();
 	if (term) {
-		filters.push(
-			`(e.subject LIKE ? ESCAPE '\\' OR e.from_addr LIKE ? ESCAPE '\\'
-			  OR e.to_addr LIKE ? ESCAPE '\\' OR e.body_text LIKE ? ESCAPE '\\')`
-		);
-		const like = `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
-		bindings.push(like, like, like, like);
+		const match = ftsQuery(term);
+		filters.push(match ? 'e.rowid IN (SELECT rowid FROM email_search WHERE email_search MATCH ?)' : '0 = 1');
+		if (match) bindings.push(match);
 	}
 
 	if (query.unreadOnly) filters.push('e.is_read = 0');
 	if (query.starredOnly) filters.push('e.is_starred = 1');
 	if (query.attachmentsOnly) {
-		filters.push('EXISTS(SELECT 1 FROM email_attachments a WHERE a.email_id = e.id)');
+		filters.push('(e.draft_attachment_count > 0 OR EXISTS(SELECT 1 FROM email_attachments a WHERE a.email_id = e.id))');
 	}
 
 	return { where: filters.join(' AND '), bindings };
@@ -381,7 +376,7 @@ export async function listMailbox(
 			`SELECT m.id, COALESCE(m.thread_id, m.id) AS thread_id, m.direction, m.from_addr, m.from_name, m.to_addr,
 			        m.subject, m.is_read, m.is_starred, m.archived_at, m.spam_at, m.category, m.created_at, m.domain_id, m.address_id, m.status,
 			        substr(COALESCE(m.body_text, ''), 1, 4000) AS body_head,
-			        EXISTS(SELECT 1 FROM email_attachments a WHERE a.email_id = m.id) AS has_attachments
+			        (m.draft_attachment_count > 0 OR EXISTS(SELECT 1 FROM email_attachments a WHERE a.email_id = m.id)) AS has_attachments
 			 FROM emails m
 			 WHERE m.user_id = ? AND COALESCE(m.thread_id, m.id) IN (${placeholders}) AND ${display}
 			 ORDER BY datetime(m.created_at) ASC`
@@ -574,7 +569,7 @@ export async function getMailboxCounts(
 	const thread = 'COALESCE(thread_id, id)';
 
 	const inboxOpen =
-		"deleted_at IS NULL AND archived_at IS NULL AND spam_at IS NULL AND direction = 'inbound'";
+		"deleted_at IS NULL AND archived_at IS NULL AND spam_at IS NULL AND direction = 'inbound' AND (snoozed_until IS NULL OR snoozed_until <= datetime('now'))";
 	const byCategory = (category: InboxCategory, unread = false) =>
 		`COUNT(DISTINCT CASE WHEN ${inboxOpen} AND category = '${category}'${unread ? ' AND is_read = 0' : ''} THEN ${thread} END)`;
 
@@ -739,6 +734,7 @@ export async function setEmailFlags(
 		bumpEpoch = true;
 	}
 
+	if (update.archived !== undefined || update.trashed !== undefined || update.spam !== undefined) { assignments.push('cleanup_revision = cleanup_revision + 1'); bumpEpoch = true; }
 	if (assignments.length === 0) return 0;
 	if (bumpEpoch) assignments.push("updated_at = datetime('now')");
 
@@ -769,47 +765,55 @@ export async function deleteEmailsPermanently(
 ): Promise<number> {
 	if (ids.length === 0) return 0;
 
-	const placeholders = ids.map(() => '?').join(', ');
-	const owned = await db
-		.prepare(`SELECT id FROM emails WHERE user_id = ? AND id IN (${placeholders})`)
-		.bind(userId, ...ids)
-		.all<{ id: string }>();
+	let deletedCount = 0;
+	for (const group of chunkIds([...new Set(ids)])) {
+		const placeholders = group.map(() => '?').join(', ');
+		const owned = await db
+			.prepare(`SELECT id FROM emails WHERE user_id = ? AND id IN (${placeholders})`)
+			.bind(userId, ...group)
+			.all<{ id: string }>();
 
-	const ownedIds = owned.results.map((row) => row.id);
-	if (ownedIds.length === 0) return 0;
+		const ownedIds = owned.results.map((row) => row.id);
+		if (ownedIds.length === 0) continue;
 
-	const ownedPlaceholders = ownedIds.map(() => '?').join(', ');
+		deletedCount += ownedIds.length;
+		const ownedPlaceholders = ownedIds.map(() => '?').join(', ');
 
-	if (bucket) {
-		const { results: files } = await db
-			.prepare(
-				`SELECT storage_key FROM email_attachments
-				 WHERE email_id IN (${ownedPlaceholders}) AND storage_key IS NOT NULL`
-			)
+		if (bucket) {
+			const { results: files } = await db
+				.prepare(
+					`SELECT storage_key FROM email_attachments
+					 WHERE email_id IN (${ownedPlaceholders}) AND storage_key IS NOT NULL`
+				)
+				.bind(...ownedIds)
+				.all<{ storage_key: string }>();
+
+			const payloads = await db.prepare(`SELECT payload_key FROM outbox_jobs WHERE user_id = ? AND email_id IN (${ownedPlaceholders})`)
+				.bind(userId, ...ownedIds).all<{ payload_key: string }>();
+			const draftPayloads = await db.prepare(`SELECT draft_payload_key FROM emails WHERE user_id = ? AND id IN (${ownedPlaceholders}) AND draft_payload_key IS NOT NULL`).bind(userId, ...ownedIds).all<{ draft_payload_key: string }>();
+			await Promise.all([...files.map((file) => file.storage_key), ...payloads.results.map((job) => job.payload_key), ...draftPayloads.results.map((draft) => draft.draft_payload_key)]
+				.map((key) => bucket.delete(key)));
+		}
+
+		// Older D1 databases were created without ON DELETE CASCADE enforcement,
+		// so clear the children explicitly.
+		await db
+			.prepare(`DELETE FROM email_attachments WHERE email_id IN (${ownedPlaceholders})`)
 			.bind(...ownedIds)
-			.all<{ storage_key: string }>();
+			.run();
 
-		await Promise.all(files.map((file) => bucket.delete(file.storage_key)));
+		await db
+			.prepare(`DELETE FROM email_labels WHERE email_id IN (${ownedPlaceholders})`)
+			.bind(...ownedIds)
+			.run();
+
+		await db
+			.prepare(`DELETE FROM emails WHERE user_id = ? AND id IN (${ownedPlaceholders})`)
+			.bind(userId, ...ownedIds)
+			.run();
 	}
 
-	// Older D1 databases were created without ON DELETE CASCADE enforcement,
-	// so clear the children explicitly.
-	await db
-		.prepare(`DELETE FROM email_attachments WHERE email_id IN (${ownedPlaceholders})`)
-		.bind(...ownedIds)
-		.run();
-
-	await db
-		.prepare(`DELETE FROM email_labels WHERE email_id IN (${ownedPlaceholders})`)
-		.bind(...ownedIds)
-		.run();
-
-	await db
-		.prepare(`DELETE FROM emails WHERE user_id = ? AND id IN (${ownedPlaceholders})`)
-		.bind(userId, ...ownedIds)
-		.run();
-
-	return ownedIds.length;
+	return deletedCount;
 }
 
 /** "Mark all as read" from the list menu — scoped to the active domain filter. */
@@ -1003,11 +1007,13 @@ export async function getDraft(
 	return row ?? null;
 }
 
-export async function deleteDraft(db: D1Database, userId: string, draftId: string): Promise<void> {
+export async function deleteDraft(db: D1Database, userId: string, draftId: string, bucket?: R2Bucket): Promise<void> {
+	const draft = await db.prepare("SELECT draft_payload_key FROM emails WHERE id = ? AND user_id = ? AND status = 'draft'").bind(draftId, userId).first<{ draft_payload_key: string | null }>();
 	await db
 		.prepare("DELETE FROM emails WHERE id = ? AND user_id = ? AND status = 'draft'")
 		.bind(draftId, userId)
 		.run();
+	if (bucket && draft?.draft_payload_key) await bucket.delete(draft.draft_payload_key);
 }
 
 export async function getEmailForUser(
@@ -1092,18 +1098,22 @@ export async function listThreadMessages(
 		results.map((message) => message.id)
 	);
 
-	// Every message in the thread can carry attachments — one round trip for all.
-	const placeholders = results.map(() => '?').join(', ');
-	const { results: files } = await db
-		.prepare(
-			`SELECT id, email_id, filename, content_type, size_bytes,
-			        content_disposition, content_id, created_at
-			 FROM email_attachments
-			 WHERE email_id IN (${placeholders})
-			 ORDER BY created_at ASC`
-		)
-		.bind(...results.map((message) => message.id))
-		.all<EmailAttachmentMeta>();
+	// Fetch attachments in batches that stay within D1's bound-parameter limit.
+	const files: EmailAttachmentMeta[] = [];
+	for (const group of chunkIds(results.map((message) => message.id))) {
+		const placeholders = group.map(() => '?').join(', ');
+		const { results: groupFiles } = await db
+			.prepare(
+				`SELECT id, email_id, filename, content_type, size_bytes,
+				        content_disposition, content_id, created_at
+				 FROM email_attachments
+				 WHERE email_id IN (${placeholders})
+				 ORDER BY created_at ASC`
+			)
+			.bind(...group)
+			.all<EmailAttachmentMeta>();
+		files.push(...groupFiles);
+	}
 
 	// The query already filters drafts out, so `status` is a delivery state or null
 	// and needs no further narrowing here.

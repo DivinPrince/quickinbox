@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
-	import { participantName, viewFromLocation } from '$lib/mail/folders';
 	import { t } from '$lib/i18n';
-	import type { MailboxPage, ThreadSummary } from '$lib/types';
+	import type { SearchResult } from '$lib/server/search';
+	import SearchHighlight from '$lib/components/SearchHighlight.svelte';
 	import Icon from '../icons/Icon.svelte';
 
 	let { onClose }: { onClose: () => void } = $props();
 
 	type NavItem = { kind: 'nav'; href: string; icon: string; label: string };
-	type ResultItem = { kind: 'thread'; thread: ThreadSummary; label: string };
+	type ResultItem = { kind: 'thread'; thread: SearchResult; label: string };
 
 	const nav = $derived<NavItem[]>([
 		{ kind: 'nav', href: '/inbox?compose=1', icon: 'PencilCompose', label: t('nav.compose') },
@@ -26,7 +25,9 @@
 
 	let query = $state('');
 	let active = $state(0);
-	let results = $state<ThreadSummary[]>([]);
+	let searchError = $state(false);
+	let retryCount = $state(0);
+	let results = $state<SearchResult[]>([]);
 	let inputEl: HTMLInputElement | undefined = $state();
 
 	$effect(() => {
@@ -35,19 +36,22 @@
 
 	$effect(() => {
 		const q = query.trim();
+		void retryCount;
+		searchError = false;
 		if (q.length < 2) {
 			results = [];
 			return;
 		}
 		let cancelled = false;
 		const handle = window.setTimeout(() => {
-			void fetch(`/api/mail?q=${encodeURIComponent(q)}`)
+			void fetch(`/api/search?q=${encodeURIComponent(q)}`)
 				.then(async (response) => {
-					const body = (await response.json()) as MailboxPage;
-					if (!cancelled && body.threads) results = body.threads.slice(0, 8);
+					if (!response.ok) throw new Error('Search failed');
+					const body = (await response.json()) as { results: SearchResult[] };
+					if (!cancelled && body.results) results = body.results.slice(0, 8);
 				})
 				.catch(() => {
-					if (!cancelled) results = [];
+					if (!cancelled) { results = []; searchError = true; }
 				});
 		}, 180);
 		return () => {
@@ -56,15 +60,13 @@
 		};
 	});
 
-	const view = $derived(viewFromLocation($page.url.pathname, $page.url.searchParams));
-
 	const items = $derived.by((): (NavItem | ResultItem)[] => {
 		const q = query.trim().toLowerCase();
 		const filtered = q ? nav.filter((item) => item.label.toLowerCase().includes(q)) : nav;
 		const hits: ResultItem[] = results.map((thread) => ({
 			kind: 'thread',
 			thread,
-			label: `${participantName(thread.participants, view, $page.data.locale)} — ${thread.subject || t('mailbox.noSubject')}`
+			label: `${thread.from_addr} — ${thread.subject || t('mailbox.noSubject')}`
 		}));
 		return [...filtered, ...hits];
 	});
@@ -77,7 +79,7 @@
 		if (item.kind === 'nav') {
 			void goto(item.href);
 		} else {
-			void goto(`/inbox?thread=${encodeURIComponent(item.thread.latest_id)}`);
+			void goto(item.thread.status === 'draft' ? `/compose?draft=${encodeURIComponent(item.thread.id)}` : `/mail/${encodeURIComponent(item.thread.id)}`);
 		}
 		onClose();
 	}
@@ -90,7 +92,7 @@
 		}
 		const q = query.trim();
 		if (q) {
-			void goto(`/inbox?q=${encodeURIComponent(q)}`);
+			void goto(`/search?q=${encodeURIComponent(q)}`);
 			onClose();
 		}
 	}
@@ -126,14 +128,16 @@
 	}}
 >
 	<div class="z-palette" role="dialog" aria-modal="true" aria-label={t('search.title')} tabindex="-1" onkeydown={onKey}>
-		<input bind:this={inputEl} bind:value={query} placeholder={t('search.placeholder')} />
+		<input aria-label={t('search.title')} bind:this={inputEl} bind:value={query} placeholder={t('search.placeholder')} />
 		<div class="z-palette-list">
+			{#if query.trim()}<button type="button" class="z-palette-item" onclick={() => { void goto(`/search?q=${encodeURIComponent(query.trim())}`); onClose(); }}><Icon name="Search" /><strong>{t('searchFlow.viewAll')}</strong></button>{/if}
+			{#if searchError}<button type="button" class="z-palette-item" onclick={() => retryCount++}>{t('searchFlow.failed')} · {t('cleanup.retry')}</button>{/if}
 			{#if items.length === 0}
 				<div class="z-palette-item" style="cursor: default; opacity: 0.7;">
 					{query.trim().length < 2 ? t('search.typeToSearch') : t('search.noMatches')}
 				</div>
 			{:else}
-				{#each items as item, index (item.kind === 'nav' ? item.href : item.thread.thread_id)}
+				{#each items as item, index (item.kind === 'nav' ? item.href : item.thread.id)}
 					<button
 						type="button"
 						class="z-palette-item"
@@ -143,10 +147,10 @@
 					>
 						{#if item.kind === 'nav'}
 							<Icon name={item.icon} />
-							<span>{item.label}</span>
+							<span><SearchHighlight text={item.label} query={query} /></span>
 						{:else}
 							<Icon name="Mail" />
-							<span>{item.label}</span>
+							<span><SearchHighlight text={item.label} query={query} /></span>
 						{/if}
 					</button>
 				{/each}

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import SnoozeControl from './SnoozeControl.svelte';
+	import { runMailAction } from '$lib/mail/client';
 	import { untrack } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page as currentPage } from '$app/stores';
@@ -34,6 +36,7 @@
 	} = $props();
 
 	const META = $derived<Record<MailboxView, { title: string; icon: string; empty: string }>>({
+		snoozed: { title: t('cleanup.snoozed'), icon: 'time-line', empty: t('cleanup.empty') },
 		inbox: { title: t('nav.inbox'), icon: 'inbox-line', empty: t('mailbox.empty.inbox') },
 		archive: { title: t('nav.archive'), icon: 'archive-line', empty: t('mailbox.empty.archive') },
 		starred: { title: t('nav.starred'), icon: 'star-line', empty: t('mailbox.empty.starred') },
@@ -156,15 +159,7 @@
 		actionError = '';
 		busy = true;
 		try {
-			const response = await fetch('/api/mail/actions', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ action, ids, ...extra })
-			});
-			if (!response.ok) {
-				actionError = t('mailbox.updateFailed');
-				return;
-			}
+			await runMailAction(action, ids, extra);
 			selected = [];
 			await invalidateAll();
 		} catch {
@@ -268,6 +263,7 @@
 <section class="mailbox" data-view={view} class:selecting class:primary-tab={hideMailboxTitle}>
 	<header class="toolbar">
 		<div class="toolbar-left">
+			{#if selected.length && !['drafts', 'spam', 'trash'].includes(view)}<SnoozeControl ids={selected} snoozed={view === 'snoozed'} />{/if}
 			<div class="select-all">
 				<Check
 					label={t('mailbox.selectAll')}
@@ -974,7 +970,8 @@
 		background: var(--color-surface);
 		border-radius: 1rem;
 		box-shadow: var(--shadow-sm);
-		overflow: hidden;
+		/* Toolbar menus can extend below a short mailbox. */
+		overflow: visible;
 	}
 
 	.filter-chips {

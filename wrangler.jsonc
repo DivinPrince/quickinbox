@@ -5,6 +5,7 @@
 	"compatibility_date": "2025-06-01",
 	"compatibility_flags": ["nodejs_compat", "enable_nodejs_http_modules"],
 	"workers_dev": true,
+	"triggers": { "crons": ["* * * * *"] },
 
 	// Your Cloudflare account is picked up from `wrangler login`. If you belong
 	// to more than one account, set CLOUDFLARE_ACCOUNT_ID in your environment

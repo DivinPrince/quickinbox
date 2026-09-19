@@ -16,21 +16,21 @@ export async function insertAttachments(
 	bucket: R2Bucket,
 	emailId: string,
 	attachments: OutboundAttachmentInput[],
-	options: { enforceCountLimit?: boolean } = {}
+	options: { enforceCountLimit?: boolean; stableIds?: boolean } = {}
 ): Promise<void> {
 	if (attachments.length === 0) return;
 	if (options.enforceCountLimit !== false && attachments.length > MAX_ATTACHMENTS_PER_EMAIL) {
 		throw new Error(`Maximum ${MAX_ATTACHMENTS_PER_EMAIL} attachments allowed`);
 	}
 
-	for (const attachment of attachments) {
+	for (const [index, attachment] of attachments.entries()) {
 		const bytes = base64ToBytes(attachment.content);
 		if (bytes.byteLength > MAX_ATTACHMENT_BYTES) {
 			const limitMb = MAX_ATTACHMENT_BYTES / (1024 * 1024);
 			throw new Error(`"${attachment.filename}" exceeds ${limitMb}MB limit`);
 		}
 
-		const id = crypto.randomUUID();
+		const id = options.stableIds ? `${emailId}-${index}` : crypto.randomUUID();
 		const storageKey = buildStorageKey(emailId, id, attachment.filename);
 
 		await bucket.put(storageKey, bytes, {
@@ -43,7 +43,7 @@ export async function insertAttachments(
 				`INSERT INTO email_attachments (
 					id, email_id, filename, content_type, size_bytes, content_base64, storage_key,
 					content_disposition, content_id
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`
 			)
 			.bind(
 				id,
@@ -246,7 +246,7 @@ export async function getAttachmentForUser(
 
 export async function readAttachmentBytes(
 	bucket: R2Bucket,
-	attachment: StoredAttachmentRow
+	attachment: Pick<StoredAttachmentRow, 'storage_key' | 'content_base64'>
 ): Promise<Uint8Array | null> {
 	if (attachment.storage_key) {
 		const object = await bucket.get(attachment.storage_key);

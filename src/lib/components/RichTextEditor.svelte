@@ -22,6 +22,10 @@
 
 	let editor: HTMLDivElement | null = null;
 
+	export function focus(options?: FocusOptions) {
+		editor?.focus(options);
+	}
+
 	/** Copy `html` into the live editor without resetting the caret on each keystroke. */
 	function hydrateEditor(node: HTMLDivElement, next: string) {
 		const apply = (value: string) => {

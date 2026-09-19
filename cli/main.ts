@@ -1,10 +1,10 @@
-import { writeFile } from 'node:fs/promises';
 import { stdin as stdinStream } from 'node:process';
 import {
 	listThreadsAcross,
 	QuickInboxClient,
 	QuickInboxError,
 	safeDownloadName,
+	saveAttachmentFile,
 	type AccountClient,
 	type MailboxView,
 	type ThreadSummary
@@ -34,7 +34,7 @@ Accounts:
 
 Mail:
   quickinbox inbox [--page N] [--unread] [--category primary|social|promotions|updates|forums] [--all-accounts]
-  quickinbox search <query> [--view inbox|sent|drafts|starred|trash|spam|archive] [--category …] [--all-accounts]
+  quickinbox search <query> [--view inbox|snoozed|sent|drafts|starred|trash|spam|archive] [--category …] [--all-accounts]
   quickinbox read <thread-or-message-id>
   quickinbox send --to <addr> --subject <text> [--body <text>] [--from <address-id>]
   quickinbox reply <id> [--body <text>]
@@ -223,6 +223,7 @@ async function resolveUserId(client: QuickInboxClient, idOrEmail: string): Promi
 function mailboxView(value: string | undefined): MailboxView {
 	switch (value) {
 		case 'inbox':
+		case 'snoozed':
 		case 'archive':
 		case 'starred':
 		case 'drafts':
@@ -233,7 +234,7 @@ function mailboxView(value: string | undefined): MailboxView {
 		case undefined:
 			return 'inbox';
 		default:
-			throw new Error('view must be inbox, archive, sent, drafts, starred, trash, or spam');
+			throw new Error('view must be inbox, snoozed, archive, sent, drafts, starred, trash, or spam');
 	}
 }
 
@@ -458,7 +459,7 @@ async function run(argv: string[]): Promise<number> {
 			if (!emailId || !attachmentId) throw new Error('download requires <email-id> <attachment-id>');
 			const file = await (await clientFromConfig(flags)).downloadAttachment(emailId, attachmentId);
 			const out = flagString(flags, 'out') ?? safeDownloadName(file.filename);
-			await writeFile(out, file.bytes);
+			await saveAttachmentFile(out, file.bytes);
 			console.log(out);
 			return 0;
 		}

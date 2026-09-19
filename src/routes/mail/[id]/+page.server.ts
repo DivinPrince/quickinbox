@@ -32,6 +32,7 @@ export const load: PageServerLoad = async ({ params, locals, platform }) => {
 	const replyIdentity = await resolveReplyFromAddress(platform.env.DB, locals.user, latest);
 
 	return {
+		snoozedUntil: email.snoozed_until ?? null,
 		threadId: email.thread_id ?? email.id,
 		/** The message that was linked to — expanded first when the page opens. */
 		focusId: email.id,

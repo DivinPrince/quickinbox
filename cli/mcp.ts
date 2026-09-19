@@ -11,7 +11,7 @@ import {
 } from './client.ts';
 import { loadAccounts } from './config.ts';
 
-const views = ['inbox', 'archive', 'starred', 'drafts', 'sent', 'trash', 'spam'] as const;
+const views = ['inbox', 'snoozed', 'archive', 'starred', 'drafts', 'sent', 'trash', 'spam'] as const;
 const categories = ['primary', 'social', 'promotions', 'updates', 'forums'] as const;
 
 function textResult(value: unknown, isError = false) {

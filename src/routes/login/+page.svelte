@@ -10,6 +10,10 @@
 	let password = $state('');
 	let error = $state('');
 	let loading = $state(false);
+	let requiresTwoFactor = $state(false);
+	let code = $state('');
+	let recovery = $state(false);
+	function restart() { requiresTwoFactor = false; code = ''; password = ''; error = ''; recovery = false; }
 
 	// Reached from the account menu while signed in: the existing account stays
 	// signed in and the new one becomes active.
@@ -29,13 +33,15 @@
 			const res = await fetch('/api/auth/login', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ email, password, add: keepOthers })
+				body: JSON.stringify({ email, password, add: keepOthers, ...(requiresTwoFactor ? { code } : {}) })
 			});
 			const data = await res.json();
 			if (!res.ok) {
 				error = data.error ?? t('auth.loginFailed');
 				return;
 			}
+			if (data.requiresTwoFactor) { requiresTwoFactor = true; return; }
+			password = ''; code = '';
 			// When adding an account the previous owner of the push subscription is
 			// still signed in on this browser, so leave it alone.
 			if (!keepOthers) {
@@ -72,6 +78,7 @@
 			{#if $page.url.searchParams.get('setup') === 'complete'}
 				<p class="setup-complete">{t('accountSetup.complete')}</p>
 			{/if}
+			{#if !requiresTwoFactor}
 			<div>
 				<label for="email" class="text-sm text-[var(--color-text-secondary)]">{t('auth.email')}</label>
 				<input id="email" type="email" bind:value={email} required autocomplete="username" class="auth-input" />
@@ -88,8 +95,23 @@
 				/>
 			</div>
 
+			{:else}
+			<p class="auth-hint">Verify your sign-in for {email}.</p>
+			<div>
+				<label for="verification-code">{recovery ? 'Recovery code' : 'Authenticator code'}</label>
+				<input id="verification-code" type="text" bind:value={code} required autocomplete="one-time-code"
+				 inputmode={recovery ? 'text' : 'numeric'} maxlength={recovery ? 19 : 6}
+				 pattern={recovery ? '[A-Za-z2-7\\- ]{16,19}' : '[0-9]{6}'} class="auth-input"
+				 placeholder={recovery ? 'XXXX-XXXX-XXXX-XXXX' : '000000'} />
+			</div>
+			<button type="button" class="auth-back" disabled={loading} onclick={() => { recovery = !recovery; code = ''; error = ''; }}>
+				{recovery ? 'Use my authenticator app' : 'Use a recovery code'}
+			</button>
+			<button type="button" class="auth-back" disabled={loading} onclick={restart}>Back to password</button>
+			{/if}
+
 			{#if error}
-				<p class="text-sm text-[var(--color-text-secondary)]">{error}</p>
+				<p role="alert" class="text-sm text-[var(--color-text-secondary)]">{error}</p>
 			{/if}
 
 			<button type="submit" disabled={loading} class="btn-primary mt-2 w-full py-2.5">

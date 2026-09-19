@@ -1,3 +1,4 @@
+import { chunkIds } from './d1';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { MailLabel, ThreadLabel } from '$lib/types';
 import {
@@ -260,30 +261,32 @@ export async function labelsForEmails(
 	const byEmail = new Map<string, ThreadLabel[]>();
 	if (emailIds.length === 0) return byEmail;
 
-	const placeholders = emailIds.map(() => '?').join(', ');
-	const { results } = await db
-		.prepare(
-			`SELECT el.email_id, l.id, l.name, l.color, l.slug
-			 FROM email_labels el
-			 JOIN labels l ON l.id = el.label_id
-			 WHERE el.email_id IN (${placeholders})
-			 ORDER BY l.sort_order ASC, l.name ASC`
-		)
-		.bind(...emailIds)
-		.all<{ email_id: string; id: string; name: string; color: string; slug: string }>();
+	for (const group of chunkIds(emailIds)) {
+		const placeholders = group.map(() => '?').join(', ');
+		const { results } = await db
+			.prepare(
+				`SELECT el.email_id, l.id, l.name, l.color, l.slug
+				 FROM email_labels el
+				 JOIN labels l ON l.id = el.label_id
+				 WHERE el.email_id IN (${placeholders})
+				 ORDER BY l.sort_order ASC, l.name ASC`
+			)
+			.bind(...group)
+			.all<{ email_id: string; id: string; name: string; color: string; slug: string }>();
 
-	for (const row of results) {
-		const label: ThreadLabel = {
-			id: row.id,
-			name: row.name,
-			color: row.color,
-			slug: row.slug
-		};
-		const bucket = byEmail.get(row.email_id);
-		if (bucket) {
-			if (!bucket.some((entry) => entry.id === label.id)) bucket.push(label);
-		} else {
-			byEmail.set(row.email_id, [label]);
+		for (const row of results) {
+			const label: ThreadLabel = {
+				id: row.id,
+				name: row.name,
+				color: row.color,
+				slug: row.slug
+			};
+			const bucket = byEmail.get(row.email_id);
+			if (bucket) {
+				if (!bucket.some((entry) => entry.id === label.id)) bucket.push(label);
+			} else {
+				byEmail.set(row.email_id, [label]);
+			}
 		}
 	}
 
@@ -332,11 +335,13 @@ export async function setThreadLabels(
 		}
 	}
 
-	const emailPlaceholders = emailIds.map(() => '?').join(', ');
-	await db
-		.prepare(`DELETE FROM email_labels WHERE email_id IN (${emailPlaceholders})`)
-		.bind(...emailIds)
-		.run();
+	for (const group of chunkIds(emailIds)) {
+		const emailPlaceholders = group.map(() => '?').join(', ');
+		await db
+			.prepare(`DELETE FROM email_labels WHERE email_id IN (${emailPlaceholders})`)
+			.bind(...group)
+			.run();
+	}
 
 	for (const emailId of emailIds) {
 		for (const labelId of unique) {
@@ -409,16 +414,18 @@ export async function rememberSenders(
 	disposition: SenderDisposition
 ): Promise<void> {
 	if (emailIds.length === 0) return;
-	const placeholders = emailIds.map(() => '?').join(', ');
-	const { results } = await db
-		.prepare(
-			`SELECT DISTINCT from_addr FROM emails
-			 WHERE user_id = ? AND direction = 'inbound' AND id IN (${placeholders})`
-		)
-		.bind(userId, ...emailIds)
-		.all<{ from_addr: string }>();
+	for (const group of chunkIds(emailIds)) {
+		const placeholders = group.map(() => '?').join(', ');
+		const { results } = await db
+			.prepare(
+				`SELECT DISTINCT from_addr FROM emails
+				 WHERE user_id = ? AND direction = 'inbound' AND id IN (${placeholders})`
+			)
+			.bind(userId, ...group)
+			.all<{ from_addr: string }>();
 
-	for (const row of results) {
-		await setSenderPref(db, userId, row.from_addr, disposition);
+		for (const row of results) {
+			await setSenderPref(db, userId, row.from_addr, disposition);
+		}
 	}
 }
