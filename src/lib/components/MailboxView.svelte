@@ -970,7 +970,8 @@
 		background: var(--color-surface);
 		border-radius: 1rem;
 		box-shadow: var(--shadow-sm);
-		overflow: hidden;
+		/* Toolbar menus can extend below a short mailbox. */
+		overflow: visible;
 	}
 
 	.filter-chips {

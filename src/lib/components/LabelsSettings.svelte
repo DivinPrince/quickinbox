@@ -279,6 +279,11 @@
 </section>
 
 <style>
+	.card {
+		margin-top: 1.5rem;
+		padding: 1.5rem;
+	}
+
 	h2 {
 		display: flex;
 		align-items: center;
@@ -458,5 +463,13 @@
 		clip: rect(0, 0, 0, 0);
 		white-space: nowrap;
 		border: 0;
+	}
+
+	@media (max-width: 900px) {
+		.card {
+			margin-top: 1rem;
+			padding: 1.25rem 1rem;
+			box-shadow: none;
+		}
 	}
 </style>
