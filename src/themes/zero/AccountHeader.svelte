@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import LocaleSwitcher from '$lib/components/LocaleSwitcher.svelte';
 	import { initials } from '$lib/mail/folders';
-	import { setThemePreference } from '$lib/theme';
 	import { t } from '$lib/i18n';
 	import Logo from '$lib/components/Logo.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
@@ -26,10 +24,8 @@
 
 	let menuOpen = $state(false);
 	let extraOpen = $state(false);
-	let localeOpen = $state(false);
 	let switching = $state(false);
 	let switchError = $state('');
-	let darkMode = $state(false);
 
 	const otherAccounts = $derived(data.accounts.filter((account) => !account.current));
 
@@ -44,10 +40,6 @@
 			switching = false;
 		}
 	}
-
-	$effect(() => {
-		darkMode = document.documentElement.dataset.theme === 'dark';
-	});
 
 	const filteredId = $derived($page.url.searchParams.get('address'));
 	const active = $derived(
@@ -81,7 +73,6 @@
 	function closeMenus() {
 		menuOpen = false;
 		extraOpen = false;
-		localeOpen = false;
 	}
 
 	async function selectAddress(address: MailAddress) {
@@ -111,13 +102,6 @@
 		}
 	}
 
-	function toggleMode() {
-		const next = darkMode ? 'light' : 'dark';
-		setThemePreference(next);
-		darkMode = next === 'dark';
-		closeMenus();
-	}
-
 	function onDocPointer(event: PointerEvent) {
 		const target = event.target as HTMLElement | null;
 		if (!target?.closest('.z-account')) closeMenus();
@@ -137,7 +121,6 @@
 				aria-expanded={menuOpen}
 				onclick={() => {
 					extraOpen = false;
-					localeOpen = false;
 					menuOpen = !menuOpen;
 				}}
 			>
@@ -180,7 +163,6 @@
 								aria-expanded={extraOpen}
 								onclick={() => {
 									menuOpen = false;
-									localeOpen = false;
 									extraOpen = !extraOpen;
 								}}
 							>
@@ -215,13 +197,6 @@
 				</Tooltip>
 			</div>
 			<div class="z-account-actions">
-				<LocaleSwitcher
-					bind:open={localeOpen}
-					onOpen={() => {
-						menuOpen = false;
-						extraOpen = false;
-					}}
-				/>
 				<Tooltip text={t('account.menu')} enabled={!menuOpen}>
 					<button
 						type="button"
@@ -231,7 +206,6 @@
 						aria-expanded={menuOpen}
 						onclick={() => {
 							extraOpen = false;
-							localeOpen = false;
 							menuOpen = !menuOpen;
 						}}
 					>
@@ -267,9 +241,6 @@
 					{t('account.addAddress')}
 				</a>
 			{/if}
-			{#if collapsed}
-				<LocaleSwitcher embedded />
-			{/if}
 			{#if otherAccounts.length > 0}
 				<p class="z-menu-label">{t('account.accounts')}</p>
 				{#each otherAccounts as account (account.id)}
@@ -294,19 +265,6 @@
 				<Icon name="Plus" size={16} />
 				{t('account.addAccount')}
 			</a>
-			<a href="/settings/general" onclick={closeMenus}>
-				<Icon name="SettingsGear" size={16} />
-				{t('nav.settings')}
-			</a>
-			<button type="button" onclick={toggleMode}>
-				{#if darkMode}
-					<Icon name="Sun" size={16} />
-					{t('account.lightMode')}
-				{:else}
-					<Icon name="Moon" size={16} />
-					{t('account.darkMode')}
-				{/if}
-			</button>
 			<button type="button" class="logout" onclick={() => onLogout()}>
 				<Icon name="ArrowLeft" size={16} />
 				{t('nav.logOut')}

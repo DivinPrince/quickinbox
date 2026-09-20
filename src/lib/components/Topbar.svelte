@@ -4,7 +4,6 @@
 	import { haptic } from '$lib/app-chrome';
 	import { t } from '$lib/i18n';
 	import Icon from './Icon.svelte';
-	import LocaleSwitcher from './LocaleSwitcher.svelte';
 	import { ADD_ACCOUNT_HREF, switchAccount } from '$lib/account-switch';
 	import type { LinkedAccount, MailAddress } from '$lib/types';
 
@@ -100,18 +99,6 @@
 	</form>
 
 	<div class="topbar-actions">
-		<div class="locale-chip">
-			<LocaleSwitcher />
-		</div>
-		<a
-			href="/settings"
-			class="icon-btn"
-			aria-label={t('nav.settings')}
-			class:active={$page.url.pathname === '/settings'}
-		>
-			<Icon name="settings-3-line" size={17} />
-		</a>
-
 		<div class="account">
 			<button
 				type="button"
@@ -170,9 +157,6 @@
 					</a>
 
 					<div class="menu-divider"></div>
-					<a href="/settings" class="menu-item" role="menuitem" onclick={() => (menuOpen = false)}>
-						<Icon name="user-settings-line" size={15} /> {t('nav.settings')}
-					</a>
 					<button type="button" class="menu-item" role="menuitem" onclick={onLogout}>
 						<Icon name="logout-box-r-line" size={15} /> {t('nav.logOut')}
 					</button>
@@ -253,24 +237,6 @@
 		align-items: center;
 		gap: 0.5rem;
 		margin-left: auto;
-	}
-
-	.locale-chip {
-		display: flex;
-		align-items: center;
-	}
-
-	.locale-chip :global(.locale-trigger) {
-		width: 2rem;
-		height: 2rem;
-		min-width: 2rem;
-		border-radius: 0.5rem;
-		font-size: 0.6875rem;
-	}
-
-	:global(.topbar .icon-btn.active) {
-		color: var(--color-text);
-		background: var(--color-surface-hover);
 	}
 
 	.account {

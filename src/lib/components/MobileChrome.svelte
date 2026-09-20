@@ -2,7 +2,6 @@
 	import { page } from '$app/stores';
 	import Icon from './Icon.svelte';
 	import DomainSwitcher from './DomainSwitcher.svelte';
-	import LocaleSwitcher from './LocaleSwitcher.svelte';
 	import { haptic, isMailboxPath, isMorePath } from '$lib/app-chrome';
 	import { ADD_ACCOUNT_HREF, switchAccount } from '$lib/account-switch';
 	import { t } from '$lib/i18n';
@@ -227,12 +226,6 @@
 			phones for stacked and utility pages — so on Settings and Admin, where
 			people go looking for it, there was no way to sign out at all.
 		-->
-		<div class="sheet-section">
-			<p class="sheet-title">{t('settings.language')}</p>
-			<div class="sheet-locales">
-				<LocaleSwitcher embedded />
-			</div>
-		</div>
 
 		<div class="sheet-section">
 			<p class="sheet-title">{t('account.accounts')}</p>
@@ -497,32 +490,6 @@
 			letter-spacing: 0.06em;
 			text-transform: uppercase;
 			color: var(--color-muted);
-		}
-
-		.sheet-locales :global(.locale-label) {
-			display: none;
-		}
-
-		.sheet-locales :global(button) {
-			display: flex;
-			align-items: center;
-			gap: 0.75rem;
-			width: 100%;
-			min-height: 2.75rem;
-			padding: 0 0.75rem;
-			border: none;
-			border-radius: 0.75rem;
-			background: transparent;
-			font-size: 0.9375rem;
-			color: var(--color-text-secondary);
-			text-align: left;
-			cursor: pointer;
-		}
-
-		.sheet-locales :global(button[aria-selected='true']) {
-			background: var(--color-surface-hover);
-			color: var(--color-text);
-			font-weight: 500;
 		}
 
 		@keyframes sheet-up {

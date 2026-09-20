@@ -196,17 +196,6 @@
 		</div>
 
 		<div class="field-row">
-			<span class="field-label">{t('compose.to')}</span>
-			<input
-				id="to"
-				type="text"
-				inputmode="email"
-				autocomplete="email"
-				bind:value={to}
-				required
-				placeholder={t('compose.recipientPlaceholder')}
-				class="field-input"
-			/>
 			<button
 				type="button"
 				class="copies-toggle"
@@ -215,16 +204,28 @@
 			>
 				{t('compose.ccBcc')}
 			</button>
+			<span class="field-label">{t('compose.to')}</span>
+			<input
+				id="to"
+				aria-label={t('compose.to')}
+				type="text"
+				inputmode="email"
+				autocomplete="email"
+				bind:value={to}
+				required
+				placeholder={t('compose.recipientPlaceholder')}
+				class="field-input"
+			/>
 		</div>
 
 		{#if showCopies}
 			<div class="field-row">
 				<span class="field-label">{t('compose.cc')}</span>
-				<input type="text" bind:value={cc} placeholder={t('compose.commaSeparated')} class="field-input" />
+				<input type="text" aria-label={t('compose.cc')} bind:value={cc} placeholder={t('compose.commaSeparated')} class="field-input" />
 			</div>
 			<div class="field-row">
 				<span class="field-label">{t('compose.bcc')}</span>
-				<input type="text" bind:value={bcc} placeholder={t('compose.commaSeparated')} class="field-input" />
+				<input type="text" aria-label={t('compose.bcc')} bind:value={bcc} placeholder={t('compose.commaSeparated')} class="field-input" />
 			</div>
 		{/if}
 
@@ -232,6 +233,7 @@
 			<span class="field-label">{t('compose.subject')}</span>
 			<input
 				id="subject"
+				aria-label={t('compose.subject')}
 				type="text"
 				bind:value={subject}
 				required
@@ -320,6 +322,7 @@
 	}
 
 	.copies-toggle {
+		order: 1;
 		display: none;
 	}
 

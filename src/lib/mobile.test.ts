@@ -72,7 +72,7 @@ test('stacked back controls do not trust the tab session history length', () => 
 	for (const file of [
 		'src/lib/components/SwipeBack.svelte',
 		'src/lib/components/StackHeader.svelte',
-		'src/routes/mail/[id]/+page.svelte'
+		'src/lib/components/ClassicThread.svelte'
 	]) {
 		const source = readFileSync(join(root, file), 'utf8');
 		assert.match(source, /hasInAppHistory/, file);

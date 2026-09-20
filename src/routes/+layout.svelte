@@ -86,6 +86,13 @@
 
 <svelte:head>
 	<link rel="icon" type="image/png" href={favicon} />
+	{#if data.uiTheme === 'classic'}
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+			rel="stylesheet"
+			media="(min-width: 901px)"
+		/>
+	{/if}
 </svelte:head>
 
 {#if showShell && shellData}

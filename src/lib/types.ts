@@ -287,6 +287,20 @@ export type ThreadMessage = {
 	labels: ThreadLabel[];
 };
 
+/** Complete reader data shared by Classic's page and preview pane. */
+export type ThreadViewData = {
+	threadId: string;
+	focusId: string;
+	snoozedUntil: string | null;
+	trashed: boolean;
+	archived: boolean;
+	spam: boolean;
+	subject: string;
+	replyFrom: string | null;
+	replyFromName: string | null;
+	messages: (ThreadMessage & { received_label: string | null })[];
+};
+
 export type AttachmentDisposition = 'attachment' | 'inline';
 
 export type EmailAttachmentMeta = {

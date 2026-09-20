@@ -28,11 +28,15 @@
 	let {
 		view,
 		mailbox,
-		filters
+		filters,
+		onOpen,
+		activeMessageId = null
 	}: {
 		view: MailboxView;
 		mailbox: MailboxPage;
 		filters: MailboxFilters;
+		onOpen?: (id: string) => void;
+		activeMessageId?: string | null;
 	} = $props();
 
 	const META = $derived<Record<MailboxView, { title: string; icon: string; empty: string }>>({
@@ -235,6 +239,7 @@
 	/** Builds a URL for this mailbox with some query params changed. */
 	function withParams(changes: Record<string, string | number | boolean | null>): string {
 		const params = new URLSearchParams($currentPage.url.searchParams);
+		params.delete('thread');
 
 		for (const [key, value] of Object.entries(changes)) {
 			if (value === null || value === false || value === '') params.delete(key);
@@ -797,6 +802,7 @@
 						class="row"
 						class:unread={!thread.is_read}
 						class:checked={selected.includes(thread.latest_id)}
+						class:previewing={activeMessageId === thread.latest_id}
 					>
 						<SwipeRow
 							disabled={selecting}
@@ -828,6 +834,9 @@
 								if (longPressFired || selecting) {
 									event.preventDefault();
 									if (selecting) toggle(thread.latest_id);
+								} else if (onOpen && !thread.is_draft && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+									event.preventDefault();
+									onOpen(thread.latest_id);
 								}
 							}}
 							onpointerdown={(event) => beginLongPress(thread, event)}
@@ -964,6 +973,7 @@
 
 <style>
 	.mailbox {
+		container: classic-mail-list / inline-size;
 		position: relative;
 		display: flex;
 		flex-direction: column;
@@ -1305,6 +1315,11 @@
 		background: var(--color-accent-soft);
 	}
 
+	.row.previewing :global(.swipe-content) {
+		background: var(--color-accent-soft);
+		box-shadow: inset 3px 0 var(--color-accent);
+	}
+
 	.star {
 		display: flex;
 		align-items: center;
@@ -1474,6 +1489,18 @@
 		font-size: 0.75rem;
 		color: var(--color-muted);
 		box-shadow: inset 0 1px 0 var(--color-line);
+	}
+
+	@container classic-mail-list (max-width: 38rem) {
+		.toolbar { flex-wrap: wrap; }
+		.toolbar-right { margin-left: auto; }
+		.row-link { grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: 0.25rem 0.5rem; }
+		.avatar { grid-column: 1; grid-row: 1 / 3; width: 1.5rem; height: 1.5rem; }
+		.sender { grid-column: 2; grid-row: 1; }
+		.body { grid-column: 2; grid-row: 2; }
+		.indicators { grid-column: 3; grid-row: 2; }
+		.date { grid-column: 3; grid-row: 1; }
+		.preview { display: none; }
 	}
 
 	@media (max-width: 900px) {

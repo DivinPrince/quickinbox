@@ -20,6 +20,7 @@ no servers to maintain.
 - **Hosted MCP with OAuth** — paste `https://your-instance/mcp` into Claude, Cursor, or ChatGPT and approve access in the browser; disconnect apps from Settings
 - **Inbox tabs** — optional TypeSafe classification into Primary, Social, Promotions, Updates, Forums, plus a spam mailbox
 - **Import / Export** — import EML messages or ZIP archives; export mailbox, label, and date selections as EML in ZIP files
+- **Interface choices** — choose Zero (adjustable panes and docked compose) or Classic (traditional mailbox and full-page compose) in Settings → Appearance → Interface; both interfaces offer no-split, vertical, and horizontal layouts with separately saved preferences
 - Light and dark themes
 
 ## Quick start

@@ -20,6 +20,7 @@
 	import { clientBrand, clientInitials } from '$lib/oauth-brand';
 	import type { ApiTokenSummary, ConnectedApp, Domain, MailAddress, MailLabel } from '$lib/types';
 	import type { SettingsSection } from '$lib/settings-section';
+	import UiThemePicker from './UiThemePicker.svelte';
 	import LocalePicker from './LocalePicker.svelte';
 	import LabelsSettings from './LabelsSettings.svelte';
 	import MailTransferSettings from './MailTransferSettings.svelte';
@@ -679,6 +680,9 @@
 				</button>
 			{/each}
 		</div>
+
+		<p class="card-hint" style="margin-top: 1.25rem;">{t('settings.interface')}</p>
+		<UiThemePicker />
 
 		<p class="card-hint" style="margin-top: 1.25rem;">{t('settings.language')}</p>
 		<p class="card-hint">{t('settings.languageHint')}</p>

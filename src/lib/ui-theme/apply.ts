@@ -8,11 +8,12 @@ export function persistUiTheme(id: string): void {
 }
 
 export async function switchUiTheme(id: string): Promise<void> {
-	persistUiTheme(id);
-	await fetch('/api/settings/ui-theme', {
+	const response = await fetch('/api/settings/ui-theme', {
 		method: 'PATCH',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ theme: id })
 	});
+	if (!response.ok) throw new Error('Could not save interface preference');
+	persistUiTheme(id);
 	window.location.reload();
 }

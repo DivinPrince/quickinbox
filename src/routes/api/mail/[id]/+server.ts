@@ -1,4 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
+import { loadThreadView } from '$lib/server/thread-view';
 import {
 	describeProviderError,
 	getEmailProvider,
@@ -29,7 +30,7 @@ type ReplyBody = {
 	attachments?: OutboundAttachmentInput[];
 };
 
-export const GET: RequestHandler = async ({ params, locals, platform }) => {
+export const GET: RequestHandler = async ({ params, locals, platform, url }) => {
 	const db = platform?.env.DB;
 	if (!db || !locals.user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
@@ -38,6 +39,10 @@ export const GET: RequestHandler = async ({ params, locals, platform }) => {
 	const email = await getEmailForUser(db, locals.user.id, params.id!);
 	if (!email) {
 		return json({ error: 'Not found' }, { status: 404 });
+	}
+
+	if (url.searchParams.get('view') === 'classic') {
+		return json(await loadThreadView(db, locals.user, email));
 	}
 
 	await markThreadRead(db, locals.user.id, email);
