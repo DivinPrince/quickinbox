@@ -1,11 +1,10 @@
-import { theme as classic } from '$themes/classic/index';
 import { theme as zero } from '$themes/zero/index';
-import { DEFAULT_UI_THEME, parseThemeId } from './ids';
+import { parseThemeId } from './ids';
 import type { ThemeModule } from './types';
 
-const builtins: ThemeModule[] = [zero, classic];
+const builtins: ThemeModule[] = [zero];
 
-const discovered = import.meta.glob('../../themes/*/index.ts', { eager: true }) as Record<
+const discovered = import.meta.glob(['../../themes/*/index.ts', '!../../themes/classic/index.ts'], { eager: true }) as Record<
 	string,
 	{ theme?: ThemeModule }
 >;

@@ -809,6 +809,8 @@
 		"remove": "Remove"
 	},
 	"panes": {
+		"noSplit": "No split",
+		"backToList": "Back to list",
 		"resizeMessageList": "Resize message list",
 		"resizeHint": "Drag or use the arrow keys to resize. Double-click or press Enter to reset.",
 		"splitLayout": "Split layout",

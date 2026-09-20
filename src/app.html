@@ -68,7 +68,7 @@
 						(cookieTheme ? decodeURIComponent(cookieTheme) : '') ||
 						localStorage.getItem('quickinbox:ui-theme') ||
 						'zero';
-					const ui = /^[a-z0-9-]+$/.test(uiStored) ? uiStored : 'zero';
+					const ui = uiStored !== 'classic' && /^[a-z0-9-]+$/.test(uiStored) ? uiStored : 'zero';
 					document.documentElement.dataset.uiTheme = ui;
 					const color = ui === 'zero' ? (dark ? '#141414' : '#ffffff') : dark ? '#17171a' : '#ffffff';
 					document.documentElement.style.background = color;

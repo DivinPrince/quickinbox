@@ -809,8 +809,10 @@
 		"remove": "删除"
 	},
 	"panes": {
-		"resizeMessageList": "调整邮件列表宽度",
-		"resizeHint": "拖动或使用方向键调整宽度。双击或按回车键恢复默认宽度。",
+		"noSplit": "不分栏",
+		"backToList": "返回邮件列表",
+		"resizeMessageList": "调整邮件列表大小",
+		"resizeHint": "拖动或使用方向键调整大小。双击或按回车键恢复默认大小。",
 		"splitLayout": "分栏布局",
 		"verticalSplit": "垂直分栏（左右并排）",
 		"horizontalSplit": "水平分栏（上下排列）",

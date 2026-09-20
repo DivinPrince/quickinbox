@@ -809,6 +809,8 @@
 		"remove": "Supprimer"
 	},
 	"panes": {
+		"noSplit": "Aucune division",
+		"backToList": "Retour à la liste",
 		"resizeMessageList": "Redimensionner la liste des messages",
 		"resizeHint": "Faites glisser ou utilisez les flèches pour redimensionner. Double-cliquez ou appuyez sur Entrée pour réinitialiser.",
 		"splitLayout": "Disposition des volets",

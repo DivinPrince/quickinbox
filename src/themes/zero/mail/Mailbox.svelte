@@ -20,7 +20,7 @@
 	import Icon from '../icons/Icon.svelte';
 	import ThreadPane from './ThreadPane.svelte';
 	import PaneResizer from '../PaneResizer.svelte';
-	import SplitLayoutPicker from './SplitLayoutPicker.svelte';
+	import SplitLayoutPicker, { type SplitLayout } from './SplitLayoutPicker.svelte';
 
 	let {
 		view,
@@ -37,17 +37,18 @@
 	let refreshing = $state(false);
 	let isMac = $state(true);
 	let viewsOpen = $state(false);
-	let splitLayout = $state<'vertical' | 'horizontal'>('vertical');
+	let splitLayout = $state<SplitLayout>('vertical');
 
 	onMount(() => {
 		try {
-			if (localStorage.getItem('quickinbox:zero-split-layout') === 'horizontal') {
-				splitLayout = 'horizontal';
+			const saved = localStorage.getItem('quickinbox:zero-split-layout');
+			if (saved === 'horizontal' || saved === 'none') {
+				splitLayout = saved;
 			}
 		} catch { /* Use the default layout when browser storage is unavailable. */ }
 	});
 
-	function setSplitLayout(next: 'vertical' | 'horizontal') {
+	function setSplitLayout(next: SplitLayout) {
 		splitLayout = next;
 		try {
 			localStorage.setItem('quickinbox:zero-split-layout', next);
@@ -84,7 +85,7 @@
 		void goto(`${url.pathname}?${url.searchParams.toString()}`.replace(/\?$/, ''), {
 			keepFocus: true,
 			noScroll: true,
-			replaceState: true
+			replaceState: splitLayout !== 'none' || !id
 		});
 	}
 
@@ -186,8 +187,13 @@
 		const target = event.target as HTMLElement | null;
 		if (
 			target &&
-			(target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+			(target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)
 		) {
+			return;
+		}
+		if (event.key === 'Escape' && (threadId || selected.length)) {
+			selected = [];
+			setThread(null);
 			return;
 		}
 		const current = threadId ? items.find((thread) => thread.latest_id === threadId) : null;
@@ -225,9 +231,6 @@
 		} else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
 			event.preventDefault();
 			selected = items.map((thread) => thread.thread_id);
-		} else if (event.key === 'Escape') {
-			selected = [];
-			setThread(null);
 		}
 	}
 </script>
@@ -451,22 +454,30 @@
 		</div>
 	</section>
 
-	{#key splitLayout}
-		<PaneResizer
-			paneId="zero-message-list"
-			storageKey={splitLayout === 'horizontal' ? 'quickinbox:zero-list-height' : 'quickinbox:zero-list-width'}
-			label={t('panes.resizeMessageList')}
-			orientation={splitLayout}
-			min={splitLayout === 'horizontal' ? 12 : 16}
-			max={45}
-			remaining={splitLayout === 'horizontal' ? 12 : 20}
-		/>
-	{/key}
+	{#if splitLayout !== 'none'}
+		{#key splitLayout}
+			<PaneResizer
+				paneId="zero-message-list"
+				storageKey={splitLayout === 'horizontal' ? 'quickinbox:zero-list-height' : 'quickinbox:zero-list-width'}
+				label={t('panes.resizeMessageList')}
+				orientation={splitLayout}
+				min={splitLayout === 'horizontal' ? 12 : 16}
+				max={45}
+				remaining={splitLayout === 'horizontal' ? 12 : 20}
+			/>
+		{/key}
+	{/if}
+
+	{#snippet layoutControls()}
+		<SplitLayoutPicker value={splitLayout} onChange={setSplitLayout} />
+	{/snippet}
 
 	<section class="z-panel z-read">
 		<ThreadPane
 			id={threadId}
 			view={view}
+			singlePane={splitLayout === 'none'}
+			layoutControls={splitLayout === 'none' ? layoutControls : undefined}
 			onClose={() => setThread(null)}
 			onCompose={openCompose}
 			onRead={markThreadRead}

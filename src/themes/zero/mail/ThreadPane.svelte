@@ -3,7 +3,7 @@
 	import DeliveryStatus from '$lib/components/DeliveryStatus.svelte';
 	import { createMailSender } from '$lib/mail/send';
 	const sendMail = createMailSender();
-	import { tick, untrack } from 'svelte';
+	import { tick, untrack, type Snippet } from 'svelte';
 	import { page } from '$app/stores';
 	import { invalidateAll } from '$app/navigation';
 	import EmailBody from '$lib/components/EmailBody.svelte';
@@ -29,13 +29,17 @@
 		view,
 		onClose,
 		onCompose,
-		onRead
+		onRead,
+		singlePane = false,
+		layoutControls
 	}: {
 		id: string | null;
 		view: MailboxView;
 		onClose: () => void;
 		onCompose?: () => void;
 		onRead?: (threadId: string) => void;
+		singlePane?: boolean;
+		layoutControls?: Snippet;
 	} = $props();
 
 	type ThreadPayload = {
@@ -139,6 +143,7 @@
 	});
 
 	const latest = $derived(thread?.messages[thread.messages.length - 1] ?? null);
+	const closeLabel = $derived(singlePane ? t('panes.backToList') : t('thread.close'));
 	const starred = $derived(thread?.messages.some((message) => message.is_starred) ?? false);
 	const currentCategory = $derived(latest?.category ?? 'primary');
 	const allLabels = $derived(($page.data.labels ?? []) as MailLabel[]);
@@ -354,7 +359,7 @@
 		if (target?.closest('.z-compose-window')) return;
 		if (
 			target &&
-			(target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+			(target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)
 		) {
 			if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && replyOpen) {
 				event.preventDefault();
@@ -447,6 +452,21 @@
 	onclick={closeMenus}
 />
 
+{#snippet closeControl()}
+	<Tooltip text={closeLabel}>
+		<button type="button" class="z-thread-icon" aria-label={closeLabel} onclick={onClose}>
+			<Icon name={singlePane ? 'ArrowLeft' : 'X'} size={14} />
+		</button>
+	</Tooltip>
+{/snippet}
+
+{#if id && (loading || error)}
+	<div class="z-thread-bar">
+		{@render closeControl()}
+		{#if layoutControls}{@render layoutControls()}{/if}
+	</div>
+{/if}
+
 {#if !id}
 	<div class="z-empty">
 		<img src={dark ? '/themes/zero/empty-state.svg' : '/themes/zero/empty-state-light.svg'} alt="" />
@@ -466,12 +486,9 @@
 {:else if thread && latest}
 	<div class="z-thread">
 		<div class="z-thread-bar">
-			<Tooltip text={t('thread.close')}>
-				<button type="button" class="z-thread-icon" aria-label={t('thread.close')} onclick={onClose}>
-					<Icon name="X" size={14} />
-				</button>
-			</Tooltip>
+			{@render closeControl()}
 			<div class="z-thread-bar-right">
+				{#if layoutControls}{@render layoutControls()}{/if}
 				{#if view !== 'spam' && view !== 'trash'}<SnoozeControl ids={[latest.id]} snoozed={view === 'snoozed'} onDone={onClose} />{/if}
 				<button type="button" class="z-thread-replyall" aria-label={t('thread.forwardAll')} title={t('thread.forwardAll')} onclick={startForwardAll}>
 					<Icon name="Forward" size={14} />

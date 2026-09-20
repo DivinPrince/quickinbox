@@ -809,8 +809,10 @@
 		"remove": "Eliminar"
 	},
 	"panes": {
-		"resizeMessageList": "Cambiar el ancho de la lista de mensajes",
-		"resizeHint": "Arrastra o usa las flechas para cambiar el ancho. Haz doble clic o pulsa Intro para restablecerlo.",
+		"noSplit": "Sin división",
+		"backToList": "Volver a la lista",
+		"resizeMessageList": "Cambiar el tamaño de la lista de mensajes",
+		"resizeHint": "Arrastra o usa las flechas para cambiar el tamaño. Haz doble clic o pulsa Intro para restablecerlo.",
 		"splitLayout": "Distribución de paneles",
 		"verticalSplit": "División vertical (lado a lado)",
 		"horizontalSplit": "División horizontal (apilados)",
