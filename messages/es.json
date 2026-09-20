@@ -664,8 +664,8 @@
 		"saveError": "No se pudo guardar la preferencia. Inténtalo de nuevo."
 	},
 	"outbox": {
-		"hint": "Los mensajes se guardan antes del envío. Los fallos temporales se reintentan automáticamente cuando es seguro hacerlo.",
-		"empty": "Todavía no hay mensajes salientes.",
+		"hint": "Aquí aparecen los mensajes pendientes de envío o que necesitan atención. Los fallos temporales se reintentan automáticamente cuando es seguro hacerlo.",
+		"empty": "No hay mensajes pendientes de envío ni que necesiten atención.",
 		"incomplete": "Mensaje incompleto",
 		"attempts": "Intentos: {count}",
 		"refresh": "Actualizar",
@@ -674,7 +674,7 @@
 		"retrying": "Reintentando…",
 		"retryError": "No se pudo reintentar este mensaje.",
 		"confirmDuplicate": "He comprobado el intento anterior y entiendo que volver a enviar puede crear un duplicado.",
-		"limit": "Se muestran hasta 100 mensajes salientes recientes, con los pendientes primero.",
+		"limit": "Se muestran hasta 100 mensajes pendientes de envío o que necesitan atención.",
 		"states": {
 			"preparing": "Guardando",
 			"pending": "Pendiente de envío",

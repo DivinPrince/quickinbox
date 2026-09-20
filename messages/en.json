@@ -664,8 +664,8 @@
 		"saveError": "Could not save the image preference. Please try again."
 	},
 	"outbox": {
-		"hint": "Messages are saved before delivery. Temporary failures are retried automatically when it is safe to do so.",
-		"empty": "No outgoing messages yet.",
+		"hint": "Messages waiting to send or needing attention appear here. Temporary failures are retried automatically when it is safe to do so.",
+		"empty": "No messages waiting to send or needing attention.",
 		"incomplete": "Incomplete message",
 		"attempts": "Attempts: {count}",
 		"refresh": "Refresh",
@@ -674,7 +674,7 @@
 		"retrying": "Retrying…",
 		"retryError": "Could not retry this message.",
 		"confirmDuplicate": "I checked the previous attempt and understand that sending again may create a duplicate.",
-		"limit": "Showing up to 100 recent outgoing messages, with unfinished messages first.",
+		"limit": "Showing up to 100 messages waiting to send or needing attention.",
 		"states": {
 			"preparing": "Saving",
 			"pending": "Waiting to send",

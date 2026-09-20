@@ -8,8 +8,8 @@ export const load: PageServerLoad = async ({ locals, platform, setHeaders }) => 
   const rows = await platform.env.DB.prepare(`SELECT j.id, j.state, j.prepared, j.attempts,
     j.last_error, j.created_at, j.next_attempt_at, j.first_attempt_at, j.provider,
     e.subject, e.to_addr, e.id AS email_id FROM outbox_jobs j
-    LEFT JOIN emails e ON e.id = j.email_id WHERE j.user_id = ?
-    ORDER BY CASE WHEN j.state = 'accepted' THEN 1 ELSE 0 END, j.created_at DESC LIMIT 100`)
+    LEFT JOIN emails e ON e.id = j.email_id WHERE j.user_id = ? AND j.state != 'accepted'
+    ORDER BY j.created_at DESC LIMIT 100`)
     .bind(locals.user.id).all<{
       id: string; state: OutboxState; prepared: number; attempts: number;
       last_error: string | null; created_at: string; next_attempt_at: number;

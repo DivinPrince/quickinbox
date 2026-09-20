@@ -664,8 +664,8 @@
 		"saveError": "Impossible d’enregistrer la préférence. Réessayez."
 	},
 	"outbox": {
-		"hint": "Les messages sont enregistrés avant leur envoi. Les échecs temporaires sont réessayés automatiquement lorsque cela ne risque pas de créer un doublon.",
-		"empty": "Aucun message sortant.",
+		"hint": "Les messages en attente d’envoi ou nécessitant votre attention apparaissent ici. Les échecs temporaires sont réessayés automatiquement lorsque cela ne risque pas de créer un doublon.",
+		"empty": "Aucun message en attente d’envoi ou nécessitant votre attention.",
 		"incomplete": "Message incomplet",
 		"attempts": "Tentatives : {count}",
 		"refresh": "Actualiser",
@@ -674,7 +674,7 @@
 		"retrying": "Nouvelle tentative…",
 		"retryError": "Impossible de réessayer cet envoi.",
 		"confirmDuplicate": "J’ai vérifié la tentative précédente et je comprends qu’un nouvel envoi peut créer un doublon.",
-		"limit": "Jusqu’à 100 messages sortants récents, avec les messages en attente en premier.",
+		"limit": "Jusqu’à 100 messages en attente d’envoi ou nécessitant votre attention.",
 		"states": {
 			"preparing": "Enregistrement",
 			"pending": "En attente d’envoi",
