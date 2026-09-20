@@ -132,10 +132,9 @@
 	.split { display: flex; height: 100%; min-height: 0; }
 	.split .classic-list { flex: 0 0 clamp(20rem, var(--z-pane-width, 42%), calc(100% - 22rem)); overflow: auto; background: var(--color-surface); }
 	.split .classic-list :global(.mailbox) { border-radius: 0; box-shadow: none; }
-	.split .classic-reader { flex: 1; min-height: 0; overflow: auto; padding: 0 0.75rem 1rem; background: var(--color-surface); }
+	.split .classic-reader { flex: 1; min-height: 0; overflow: auto; padding: 0.75rem 0.75rem 1rem; background: var(--color-surface); }
 	.split[data-layout='horizontal'] { flex-direction: column; }
 	.split[data-layout='horizontal'] .classic-list { flex: 0 0 clamp(10rem, var(--z-pane-height, 40%), calc(100% - 14rem)); }
-	.split[data-layout='horizontal'] .classic-reader { padding-top: 0.75rem; }
 	.classic-mailbox :global(.z-pane-resizer) { position: relative; flex: 0 0 9px; align-self: stretch; display: flex; align-items: center; justify-content: center; cursor: col-resize; touch-action: none; user-select: none; }
 	.classic-mailbox :global(.z-pane-resizer > span) { width: 3px; height: 28px; border-radius: 2px; background: var(--color-muted); opacity: 0.5; }
 	.classic-mailbox :global(.z-pane-resizer:is(:hover, :focus-visible, .dragging)) { background: var(--color-accent-soft); outline: 2px solid var(--color-accent); outline-offset: -2px; border-radius: 4px; }
