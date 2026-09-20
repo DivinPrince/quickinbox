@@ -20,7 +20,7 @@
 	import Icon from '../icons/Icon.svelte';
 	import ThreadPane from './ThreadPane.svelte';
 	import PaneResizer from '../PaneResizer.svelte';
-	import SplitLayoutPicker, { type SplitLayout } from './SplitLayoutPicker.svelte';
+	import SplitLayoutPicker, { type SplitLayout } from '$lib/components/SplitLayoutPicker.svelte';
 
 	let {
 		view,

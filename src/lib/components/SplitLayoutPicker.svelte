@@ -35,3 +35,41 @@
 		<option value="horizontal">{t('panes.horizontalSplit')}</option>
 	</select>
 </div>
+
+<style>
+.z-layout-picker {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 3rem;
+	width: 3rem;
+	gap: 0.25rem;
+	height: 2rem;
+	border-radius: 0.5rem;
+	color: var(--z-muted, var(--color-muted));
+}
+
+.z-layout-picker:hover {
+	background: var(--z-hover, var(--color-surface-hover));
+	color: var(--z-fg, var(--color-text));
+}
+
+.z-layout-picker:has(select:focus-visible) {
+	outline: 2px solid var(--z-fg, var(--color-text));
+	outline-offset: 2px;
+}
+
+.z-layout-picker select {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	opacity: 0;
+	cursor: pointer;
+}
+
+@media (max-width: 767px) {
+	.z-layout-picker { display: none; }
+}
+</style>

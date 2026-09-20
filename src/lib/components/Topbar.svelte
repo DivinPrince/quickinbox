@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { haptic } from '$lib/app-chrome';
@@ -13,7 +14,8 @@
 		addresses,
 		accounts = [],
 		onLogout,
-		onLogoutAll
+		onLogoutAll,
+		actions
 	}: {
 		userName: string;
 		userEmail: string;
@@ -22,6 +24,7 @@
 		accounts?: LinkedAccount[];
 		onLogout: () => void;
 		onLogoutAll?: () => void;
+		actions?: Snippet;
 	} = $props();
 
 	const otherAccounts = $derived(accounts.filter((account) => !account.current));
@@ -99,6 +102,7 @@
 	</form>
 
 	<div class="topbar-actions">
+		{@render actions?.()}
 		<div class="account">
 			<button
 				type="button"

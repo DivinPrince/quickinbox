@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { getContext, onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto, invalidateAll } from '$app/navigation';
 	import MailboxView from '$lib/components/MailboxView.svelte';
@@ -8,11 +8,12 @@
 	import PaneResizer from '$themes/zero/PaneResizer.svelte';
 	import { MAIL_CHANGED_MESSAGE } from '$lib/mail/sync';
 	import { t } from '$lib/i18n';
+	import { CLASSIC_LAYOUT, type ClassicLayoutContext } from './layout';
 	import type { MailboxFilters, MailboxPage, MailboxView as MailView, ThreadViewData } from '$lib/types';
 
 	let { view, mailbox, filters }: { view: MailView; mailbox: MailboxPage; filters: MailboxFilters } = $props();
-	type Layout = 'none' | 'vertical' | 'horizontal';
-	let layout = $state<Layout>('none');
+	const preference = getContext<ClassicLayoutContext>(CLASSIC_LAYOUT);
+	const layout = $derived(preference.value);
 	let desktop = $state(false);
 	const paneId = $props.id();
 	const split = $derived(desktop && layout !== 'none' && view !== 'drafts');
@@ -30,21 +31,12 @@
 	let reload: (() => Promise<void>) | undefined;
 
 	onMount(() => {
-		try {
-			const saved = localStorage.getItem('quickinbox:classic-split-layout');
-			if (saved === 'vertical' || saved === 'horizontal') layout = saved;
-		} catch { /* Keep the default when storage is unavailable. */ }
 		const media = matchMedia('(min-width: 901px)');
 		const update = () => { desktop = media.matches; };
 		update();
 		media.addEventListener('change', update);
 		return () => media.removeEventListener('change', update);
 	});
-
-	function chooseLayout(next: Layout) {
-		layout = next;
-		try { localStorage.setItem('quickinbox:classic-split-layout', next); } catch { /* Optional persistence. */ }
-	}
 
 	function openMessage(id: string) {
 		const url = new URL($page.url);
@@ -102,19 +94,6 @@
 	});
 </script>
 
-{#if view !== 'drafts'}
-	<div class="classic-layout-controls">
-		<label>
-			<span>{t('panes.splitLayout')}</span>
-			<select aria-label={t('panes.splitLayout')} value={layout} onchange={(event) => chooseLayout(event.currentTarget.value as Layout)}>
-				<option value="none">{t('panes.noSplit')}</option>
-				<option value="vertical">{t('panes.verticalSplit')}</option>
-				<option value="horizontal">{t('panes.horizontalSplit')}</option>
-			</select>
-		</label>
-	</div>
-{/if}
-
 <div class="classic-mailbox" class:split class:reading={Boolean(messageId)} data-layout={layout}>
 	<div id={paneId} class="classic-list">
 		<MailboxView {view} {mailbox} {filters} onOpen={split ? openMessage : undefined} activeMessageId={messageId} />
@@ -146,20 +125,17 @@
 </div>
 
 <style>
-	.classic-layout-controls { display: flex; justify-content: flex-end; margin-bottom: 0.75rem; }
-	.classic-layout-controls label { display: flex; align-items: center; gap: 0.5rem; color: var(--color-muted); font-size: 0.8125rem; }
-	.classic-layout-controls select { max-width: 15rem; padding: 0.4rem 0.6rem; border: 1px solid var(--color-line); border-radius: 0.5rem; background: var(--color-surface); color: var(--color-text); }
-	.classic-layout-controls select:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 	.classic-mailbox { min-width: 0; }
 	.classic-list, .classic-reader { min-width: 0; }
 	.classic-mailbox:not(.split).reading .classic-list { display: none; }
 	.reader-status { padding: 2rem; color: var(--color-muted); text-align: center; }
-	.split { display: flex; height: calc(100dvh - var(--topbar-height) - 6.75rem); min-height: 28rem; }
-	.split .classic-list { flex: 0 0 clamp(20rem, var(--z-pane-width, 42%), calc(100% - 22rem)); overflow: auto; }
-	.split .classic-reader { flex: 1; min-height: 0; overflow: auto; padding: 0.25rem 0.25rem 1rem 0.75rem; }
+	.split { display: flex; height: 100%; min-height: 0; }
+	.split .classic-list { flex: 0 0 clamp(20rem, var(--z-pane-width, 42%), calc(100% - 22rem)); overflow: auto; background: var(--color-surface); }
+	.split .classic-list :global(.mailbox) { border-radius: 0; box-shadow: none; }
+	.split .classic-reader { flex: 1; min-height: 0; overflow: auto; padding: 0 0.75rem 1rem; background: var(--color-surface); }
 	.split[data-layout='horizontal'] { flex-direction: column; }
 	.split[data-layout='horizontal'] .classic-list { flex: 0 0 clamp(10rem, var(--z-pane-height, 40%), calc(100% - 14rem)); }
-	.split[data-layout='horizontal'] .classic-reader { padding: 0.75rem 0.25rem 1rem; }
+	.split[data-layout='horizontal'] .classic-reader { padding-top: 0.75rem; }
 	.classic-mailbox :global(.z-pane-resizer) { position: relative; flex: 0 0 9px; align-self: stretch; display: flex; align-items: center; justify-content: center; cursor: col-resize; touch-action: none; user-select: none; }
 	.classic-mailbox :global(.z-pane-resizer > span) { width: 3px; height: 28px; border-radius: 2px; background: var(--color-muted); opacity: 0.5; }
 	.classic-mailbox :global(.z-pane-resizer:is(:hover, :focus-visible, .dragging)) { background: var(--color-accent-soft); outline: 2px solid var(--color-accent); outline-offset: -2px; border-radius: 4px; }
@@ -167,7 +143,4 @@
 	.classic-mailbox :global(.z-pane-resizer[aria-orientation='horizontal'] > span) { width: 28px; height: 3px; }
 	.classic-mailbox :global(.z-resize-shield) { position: fixed; inset: 0; z-index: 1000; cursor: col-resize; }
 	.classic-mailbox :global(.z-resize-shield.horizontal) { cursor: row-resize; }
-	@media (max-width: 900px) {
-		.classic-layout-controls { display: none; }
-	}
 </style>
