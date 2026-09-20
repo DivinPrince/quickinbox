@@ -4,6 +4,7 @@ export const SETTINGS_SECTIONS = [
 	'connections',
 	'notifications',
 	'labels',
+	'import-export',
 	'shortcuts'
 ] as const;
 

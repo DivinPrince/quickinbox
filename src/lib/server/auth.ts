@@ -618,9 +618,10 @@ export async function deleteUser(
 				 WHERE storage_key IS NOT NULL
 				   AND email_id IN (SELECT id FROM emails WHERE user_id = ?)
 				 UNION ALL SELECT payload_key AS storage_key FROM outbox_jobs WHERE user_id = ?
-				 UNION ALL SELECT draft_payload_key AS storage_key FROM emails WHERE user_id = ? AND draft_payload_key IS NOT NULL`
+				 UNION ALL SELECT draft_payload_key AS storage_key FROM emails WHERE user_id = ? AND draft_payload_key IS NOT NULL
+				 UNION ALL SELECT raw_message_key AS storage_key FROM emails WHERE user_id = ? AND raw_message_key IS NOT NULL`
 			)
-			.bind(targetId, targetId, targetId),
+			.bind(targetId, targetId, targetId, targetId),
 		db
 			.prepare(
 				`DELETE FROM users

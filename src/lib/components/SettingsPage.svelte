@@ -22,6 +22,7 @@
 	import type { SettingsSection } from '$lib/settings-section';
 	import LocalePicker from './LocalePicker.svelte';
 	import LabelsSettings from './LabelsSettings.svelte';
+	import MailTransferSettings from './MailTransferSettings.svelte';
 	import SenderRulesSettings from './SenderRulesSettings.svelte';
 	import ImagePrivacySettings from './ImagePrivacySettings.svelte';
 	import TwoFactorSettings from './TwoFactorSettings.svelte';
@@ -98,6 +99,8 @@
 				return t('nav.notifications');
 			case 'labels':
 				return t('nav.labels');
+			case 'import-export':
+				return t('nav.importExport');
 			case 'shortcuts':
 				return t('nav.shortcuts');
 			case 'all':
@@ -1017,6 +1020,9 @@
 
 	{#if show('labels')}
 		<LabelsSettings labels={($page.data.labels ?? []) as MailLabel[]} />
+	{/if}
+	{#if show('import-export')}
+		<MailTransferSettings addresses={data.addresses} labels={($page.data.labels ?? []) as MailLabel[]} />
 	{/if}
 
 	{#if section === 'shortcuts'}

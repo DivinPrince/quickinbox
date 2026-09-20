@@ -19,6 +19,7 @@ no servers to maintain.
 - **REST API, CLI, and MCP server** — send and read mail from scripts, the terminal, or AI agents
 - **Hosted MCP with OAuth** — paste `https://your-instance/mcp` into Claude, Cursor, or ChatGPT and approve access in the browser; disconnect apps from Settings
 - **Inbox tabs** — optional TypeSafe classification into Primary, Social, Promotions, Updates, Forums, plus a spam mailbox
+- **Import / Export** — import EML messages or ZIP archives; export mailbox, label, and date selections as EML in ZIP files
 - Light and dark themes
 
 ## Quick start
@@ -54,6 +55,44 @@ You need:
 ## Updating an existing install
 
 If you already deployed from this repo, pulling updates only changes the product name in the UI and docs. It does **not** rename your Worker, D1 database, or R2 bucket — leave those as they are (often `quickmail` / `quickmail-attachments`). Existing `qm_live_` API keys keep working, and `quickmail` remains a CLI alias.
+
+### Importing and exporting mail
+
+Apply `0028_mail_transfer.sql` before serving this version. The normal
+`bun run deploy` command applies migrations first. This feature uses the existing
+D1 database and R2 bucket; no additional services are needed.
+
+Open **Settings → Import / Export** (in the classic theme, scroll down in Settings).
+
+- Import `.eml` files or `.zip` archives into one of your addresses and choose
+  Inbox, Archive, Sent, Spam, or Trash. Imports are marked read and preserve the
+  original message date. They do not send mail, trigger notifications, classify
+  messages, or unarchive existing conversations.
+- Optionally apply a label and preserve ZIP folder paths as labels. A selected
+  label becomes the parent, e.g. `Imported/Projects/2025`. These are labels, not
+  nested mailbox folders; paths must fit the existing 40-character label limit.
+- Imports accept up to 500 MiB of selected files and expanded mail, and 10,000
+  messages at a time. Each EML is limited to 20 MiB, with at most five attachments
+  of 5 MiB each. Oversized, encrypted, corrupt, or unsupported files are reported.
+  Keep the page open; Stop finishes the current message before stopping. Retrying
+  skips duplicates in the current account by original file hash or Message-ID.
+- Export all mail or filter by address, mailbox, label, and inclusive UTC dates.
+  Drafts and pending outbox messages are excluded. Large selections split into
+  ZIP downloads of at most 1,000 messages and roughly 400 MiB each; download every
+  part. A selection may contain up to 100,000 messages. Exports stream directly
+  to the browser's download manager.
+- Imported messages export their original MIME verbatim. Other messages export
+  EML reconstructed from stored message fields, including attachments and inline
+  Content-IDs. Headers that were never stored cannot be recovered. Read/starred
+  state and label assignments are not encoded in EML; a label-filtered export
+  uses the label path as its ZIP directory.
+- Each ZIP contains `export-report.json`. Check `complete` and `failures` before
+  treating the export as complete: messages with missing stored files are listed
+  there and omitted rather than exported as partial EML. Exports are not an atomic
+  snapshot of mail being edited during the download.
+
+This is file-based migration; direct IMAP, PST, and MBOX imports are not included.
+Use the separate admin maintenance archive for an export of application metadata.
 
 ### Durable sending, image privacy, and maintenance
 

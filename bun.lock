@@ -9,6 +9,8 @@
         "@fontsource-variable/geist-mono": "^5.3.0",
         "@modelcontextprotocol/sdk": "^1.30.0",
         "@typesafe-ai/sdk": "^0.6.0",
+        "@zip.js/zip.js": "^2.16.0",
+        "fflate": "^0.8.3",
         "postal-mime": "^3.0.0",
         "qrcode": "^1.5.4",
         "remixicon": "^4.9.1",
@@ -377,6 +379,8 @@
     "@typesafe-ai/sdk": ["@typesafe-ai/sdk@0.6.0", "", {}, "sha512-IddX+Q0XM+VagOUZFeP7wZjaO4SHMdvnh2zEBdrZZnXedWI3BNK1lKhMx3ayrkFWvVLbVcUHJy6AVZlY+e6Jaw=="],
 
     "@vue/shared": ["@vue/shared@3.5.42", "", {}, "sha512-2rPxex1jQf4jvl9MOHl6YaXCPcrNqz/FstMOEh3QWY+/OME9nQTvl9WYeCwhW7AFjaR0SnngZGlp/wkR6rkI6g=="],
+
+    "@zip.js/zip.js": ["@zip.js/zip.js@2.16.0", "", {}, "sha512-D2DZ0Gdn4TP0HlIERuLLRyzKd65C7YUqxF2A6tpthM9TAcWBE+oWGvN52tJ12smenv6vo9J2tXVX4Obzh6skuA=="],
 
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 

@@ -791,7 +791,8 @@ export async function deleteEmailsPermanently(
 			const payloads = await db.prepare(`SELECT payload_key FROM outbox_jobs WHERE user_id = ? AND email_id IN (${ownedPlaceholders})`)
 				.bind(userId, ...ownedIds).all<{ payload_key: string }>();
 			const draftPayloads = await db.prepare(`SELECT draft_payload_key FROM emails WHERE user_id = ? AND id IN (${ownedPlaceholders}) AND draft_payload_key IS NOT NULL`).bind(userId, ...ownedIds).all<{ draft_payload_key: string }>();
-			await Promise.all([...files.map((file) => file.storage_key), ...payloads.results.map((job) => job.payload_key), ...draftPayloads.results.map((draft) => draft.draft_payload_key)]
+			const originals = await db.prepare(`SELECT raw_message_key FROM emails WHERE user_id = ? AND id IN (${ownedPlaceholders}) AND raw_message_key IS NOT NULL`).bind(userId, ...ownedIds).all<{ raw_message_key: string }>();
+			await Promise.all([...files.map((file) => file.storage_key), ...payloads.results.map((job) => job.payload_key), ...draftPayloads.results.map((draft) => draft.draft_payload_key), ...originals.results.map((row) => row.raw_message_key)]
 				.map((key) => bucket.delete(key)));
 		}
 

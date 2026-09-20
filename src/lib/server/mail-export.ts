@@ -48,6 +48,11 @@ export async function* mailArchive(db: D1Database, bucket: R2Bucket): AsyncGener
           data.draft_content = draft ? await draft.json() : null;
           if (!draft) missingAttachments++;
         }
+        if (table === 'emails' && typeof data.raw_message_key === 'string') {
+          const original = await bucket.get(data.raw_message_key);
+          data.raw_message_base64 = original ? bytesToBase64(new Uint8Array(await original.arrayBuffer())) : null;
+          if (!original) missingAttachments++;
+        }
         counts[table]++;
         yield JSON.stringify({ type: table, data }) + '\n';
       }

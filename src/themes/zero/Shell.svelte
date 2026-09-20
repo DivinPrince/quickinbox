@@ -136,6 +136,7 @@
 		{ href: '/settings/connections', icon: 'Users', label: t('nav.connections') },
 		{ href: '/settings/notifications', icon: 'Bell', label: t('nav.notifications') },
 		{ href: '/settings/labels', icon: 'Tag', label: t('nav.labels') },
+		{ href: '/settings/import-export', icon: 'ArrowCircle', label: t('nav.importExport') },
 		{ href: '/settings/shortcuts', icon: 'Tabs', label: t('nav.shortcuts'), shortcut: '?' },
 		...(data.user.is_admin ? [{ href: '/admin', icon: 'SettingsGear', label: t('nav.admin') }, { href: '/admin/maintenance', icon: 'SettingsGear', label: t('nav.maintenance') }] : [])
 	]);
