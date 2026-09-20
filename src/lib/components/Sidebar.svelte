@@ -51,6 +51,8 @@
 	]);
 
 	const tools = $derived<NavItem[]>([
+		{ href: '/contacts', icon: 'contacts-book-line', label: 'Contacts' },
+		{ href: '/calendar', icon: 'calendar-line', label: 'Calendar' },
 		{ href: '/settings', icon: 'user-settings-line', label: t('nav.settings') },
 		...(isAdmin ? [{ href: '/admin', icon: 'settings-3-line', label: t('nav.admin') }, { href: '/admin/maintenance', icon: 'pulse-line', label: t('nav.maintenance') }] : [])
 	]);
@@ -169,6 +171,7 @@
 
 <style>
 	.sidebar {
+		overflow-y: auto;
 		position: fixed;
 		top: 0;
 		left: 0;
@@ -188,6 +191,7 @@
 		padding-left: 0.5rem;
 		padding-right: 0.5rem;
 	}
+	.sidebar > * { flex-shrink: 0; }
 
 	.sidebar-top {
 		display: flex;

@@ -26,6 +26,7 @@
 	const settings = $derived(pathname.startsWith('/settings') || pathname.startsWith('/admin'));
 	let composeOpen = $state(false);
 	let draftId = $state<string | null>(null);
+	let composeTo = $state('');
 	let composer: ComposeDialog | undefined = $state();
 	let composeOwner = untrack(() => data.user.id);
 
@@ -40,6 +41,7 @@
 	afterNavigate((navigation) => {
 		const url = new URL($page.url);
 		if (url.searchParams.get('compose') === '1' || url.pathname === '/compose') {
+			if (!composeOpen) composeTo = (url.searchParams.get('to') || '').slice(0, 1000);
 			draftId = url.searchParams.get('draft');
 			composeOpen = true;
 		} else if (navigation.type === 'popstate') {
@@ -104,6 +106,8 @@
 				{ href: '/sent', icon: 'Plane2', label: t('nav.sent'), shortcut: 'g t' },
 				{ href: '/outbox', icon: 'Plane2', label: t('nav.outbox') },
 				{ href: '/snoozed', icon: 'Clock', label: t('cleanup.snoozed') },
+				{ href: '/contacts', icon: 'Users', label: 'Contacts' },
+				{ href: '/calendar', icon: 'Calendar', label: 'Calendar' },
 				{ href: '/search', icon: 'Search', label: t('common.search') }
 			]
 		},
@@ -175,6 +179,7 @@
 
 	function closeCompose() {
 		composeOpen = false;
+		composeTo = '';
 		draftId = null;
 		if (pathname === '/compose') {
 			void goto('/inbox');
@@ -182,6 +187,7 @@
 		}
 		const url = new URL($page.url);
 		url.searchParams.delete('compose');
+		url.searchParams.delete('to');
 		url.searchParams.delete('draft');
 		void goto(`${url.pathname}${url.search ? `?${url.searchParams}` : ''}`, {
 			replaceState: true,
@@ -409,6 +415,8 @@
 	</div>
 
 	<nav class="z-mobile-nav">
+		<Tooltip text="Contacts" side="top"><a href="/contacts" aria-label="Contacts"><Icon name="Users" size={18} /></a></Tooltip>
+		<Tooltip text="Calendar" side="top"><a href="/calendar" aria-label="Calendar"><Icon name="Calendar" size={18} /></a></Tooltip>
 		<Tooltip text={t('nav.inbox')} side="top">
 			<a href="/inbox" aria-label={t('nav.inbox')}><Icon name="Inbox" size={18} /></a>
 		</Tooltip>
@@ -425,7 +433,7 @@
 </div>
 
 {#if composeOpen}
-	<ComposeDialog bind:this={composer} addresses={data.addresses} draftId={draftId} onClose={closeCompose} />
+	<ComposeDialog bind:this={composer} addresses={data.addresses} draftId={draftId} initialTo={composeTo} onClose={closeCompose} />
 {/if}
 
 {#if paletteOpen}

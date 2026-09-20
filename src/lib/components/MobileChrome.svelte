@@ -154,6 +154,8 @@
 	>
 		<div class="sheet-handle" aria-hidden="true"></div>
 		<nav class="sheet-nav">
+			<a href="/contacts" class="sheet-link"><Icon name="contacts-book-line" size={20} /><span>Contacts</span></a>
+			<a href="/calendar" class="sheet-link"><Icon name="calendar-line" size={20} /><span>Calendar</span></a>
 			<a href="/drafts" class="sheet-link" class:active={$page.url.pathname === '/drafts'}>
 				<Icon name="draft-line" size={20} />
 				<span>{t('nav.drafts')}</span>

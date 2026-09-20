@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { contactSuggestions } from '$lib/organizer/contact-suggestions';
 	import DraftAutosave from '$lib/components/DraftAutosave.svelte';
 	import { createMailSender } from '$lib/mail/send';
 	const sendMail = createMailSender();
@@ -31,7 +32,7 @@
 
 	let draftId = $state(draft?.id ?? crypto.randomUUID());
 	let autosave: DraftAutosave | undefined = $state();
-	let to = $state(draft?.to_addr ?? '');
+	let to = $state(draft?.to_addr ?? untrack(() => data.initialTo));
 	let cc = $state(draft?.cc_addr ?? '');
 	let bcc = $state(draft?.bcc_addr ?? '');
 	let subject = $state(draft?.subject ?? '');
@@ -212,6 +213,7 @@
 				inputmode="email"
 				autocomplete="email"
 				bind:value={to}
+				use:contactSuggestions
 				required
 				placeholder={t('compose.recipientPlaceholder')}
 				class="field-input"
@@ -221,11 +223,11 @@
 		{#if showCopies}
 			<div class="field-row">
 				<span class="field-label">{t('compose.cc')}</span>
-				<input type="text" aria-label={t('compose.cc')} bind:value={cc} placeholder={t('compose.commaSeparated')} class="field-input" />
+				<input use:contactSuggestions type="text" aria-label={t('compose.cc')} bind:value={cc} placeholder={t('compose.commaSeparated')} class="field-input" />
 			</div>
 			<div class="field-row">
 				<span class="field-label">{t('compose.bcc')}</span>
-				<input type="text" aria-label={t('compose.bcc')} bind:value={bcc} placeholder={t('compose.commaSeparated')} class="field-input" />
+				<input use:contactSuggestions type="text" aria-label={t('compose.bcc')} bind:value={bcc} placeholder={t('compose.commaSeparated')} class="field-input" />
 			</div>
 		{/if}
 

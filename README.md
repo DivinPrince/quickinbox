@@ -20,6 +20,8 @@ no servers to maintain.
 - **Hosted MCP with OAuth** — paste `https://your-instance/mcp` into Claude, Cursor, or ChatGPT and approve access in the browser; disconnect apps from Settings
 - **Inbox tabs** — optional TypeSafe classification into Primary, Social, Promotions, Updates, Forums, plus a spam mailbox
 - **Import / Export** — import EML messages or ZIP archives; export mailbox, label, and date selections as EML in ZIP files
+- **Contacts** — a private address book with multiple email addresses, favorites, search, and recipient suggestions in both interfaces; save a sender from a message, compose to a contact, or invite them to an event
+- **Calendar** — month, week, and agenda views; timed and all-day events with time zones, guest invitations, updates, cancellations, in-message RSVP, and reminders
 - **Interface choices** — choose Zero (adjustable panes and docked compose) or Classic (traditional mailbox and full-page compose) in Settings → Appearance → Interface; both interfaces offer no-split, vertical, and horizontal layouts with separately saved preferences
 - Light and dark themes
 
@@ -56,6 +58,36 @@ You need:
 ## Updating an existing install
 
 If you already deployed from this repo, pulling updates only changes the product name in the UI and docs. It does **not** rename your Worker, D1 database, or R2 bucket — leave those as they are (often `quickmail` / `quickmail-attachments`). Existing `qm_live_` API keys keep working, and `quickmail` remains a CLI alias.
+
+### Contacts and calendar
+
+Apply `0029_contacts_calendar.sql` before deploying this version (`bun run deploy`
+applies migrations automatically). Contacts and events use the existing D1
+database; calendar email attachments use R2 and the existing durable Outbox.
+Keep the existing once-per-minute scheduled trigger enabled for invitation
+delivery and reminders. No new bindings or Google account are required.
+
+Open **Contacts** or **Calendar** from the navigation. A message's **Save contact**
+and **Create event** links connect mail to both tools. In recipient fields,
+type a contact's name or address, choose with the arrow keys and Enter, or keep
+typing; Tab advances to the next form field.
+
+Saving an event with guests queues invitation emails. Editing it sends updates;
+removing a guest or cancelling sends cancellation notices. Incoming `.ics`
+invitations offer Accept, Maybe, and Decline inside the message. Guest replies
+and cancellations offer an explicit action to update the calendar. Open an
+event's **Invitation delivery** section or **Outbox** to inspect delivery errors.
+
+Reminders appear while the app is open, and use browser push when enabled in
+Settings → Notifications. Push is best effort; in-app reminders remain available
+until dismissed or the event ends. A due reminder is normally picked up within
+one minute. Events can be downloaded as `.ics` files.
+
+This is the first built-in release: one personal calendar, individual events,
+up to 30 guests per event, and one reminder per event. Recurring invitations are
+identified and left available for download rather than partially imported.
+Calendar sharing, recurring series, contact/calendar bulk import, Google sync,
+and appointment booking are future work. See the [parity roadmap](docs/mail-parity.md).
 
 ### Importing and exporting mail
 

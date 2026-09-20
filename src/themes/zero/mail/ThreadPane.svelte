@@ -1,4 +1,6 @@
 <script lang="ts">
+	import MessageOrganizer from '$lib/organizer/MessageOrganizer.svelte';
+	import { contactSuggestions } from '$lib/organizer/contact-suggestions';
 	import SnoozeControl from '$lib/components/SnoozeControl.svelte';
 	import DeliveryStatus from '$lib/components/DeliveryStatus.svelte';
 	import { createMailSender } from '$lib/mail/send';
@@ -712,6 +714,7 @@
 					{#if isOpen}
 						{@const files = visibleAttachments(message.body_html, message.attachments)}
 						<div class="z-msg-body">
+							<MessageOrganizer {message} />
 							<div class="z-msg-html">
 								{#if message.body_html}
 									<EmailBody messageId={message.id} sender={message.from_addr} inbound={message.direction === 'inbound'} html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
@@ -774,7 +777,7 @@
 					<div class="z-composer-fields">
 						<div class="z-composer-row">
 							<span class="z-composer-label">{t('compose.toColon')}</span>
-							<input class="z-composer-input" bind:value={replyTo} aria-label={t('compose.to')} placeholder={t('compose.emailPlaceholder')} />
+							<input use:contactSuggestions class="z-composer-input" bind:value={replyTo} aria-label={t('compose.to')} placeholder={t('compose.emailPlaceholder')} />
 							<div class="z-composer-row-actions">
 								<button type="button" class="z-composer-link" onclick={() => (showCc = !showCc)}>{t('compose.cc')}</button>
 								<button type="button" class="z-composer-link" onclick={() => (showBcc = !showBcc)}>{t('compose.bcc')}</button>
@@ -793,13 +796,13 @@
 						{#if showCc}
 							<div class="z-composer-row">
 								<span class="z-composer-label">{t('compose.ccColon')}</span>
-								<input class="z-composer-input" bind:value={replyCc} aria-label={t('compose.cc')} placeholder={t('compose.ccPlaceholder')} />
+								<input use:contactSuggestions class="z-composer-input" bind:value={replyCc} aria-label={t('compose.cc')} placeholder={t('compose.ccPlaceholder')} />
 							</div>
 						{/if}
 						{#if showBcc}
 							<div class="z-composer-row">
 								<span class="z-composer-label">{t('compose.bccColon')}</span>
-								<input class="z-composer-input" bind:value={replyBcc} aria-label={t('compose.bcc')} placeholder={t('compose.bccPlaceholder')} />
+								<input use:contactSuggestions class="z-composer-input" bind:value={replyBcc} aria-label={t('compose.bcc')} placeholder={t('compose.bccPlaceholder')} />
 							</div>
 						{/if}
 					</div>

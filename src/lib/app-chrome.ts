@@ -30,6 +30,7 @@ export function isPrimaryTab(pathname: string): boolean {
 /** Settings and admin — keep the tab bar, hide the search topbar. */
 export function isUtilityPath(pathname: string): boolean {
 	return (
+		pathname === '/contacts' || pathname === '/calendar' ||
 		pathname === '/settings' ||
 		pathname === '/admin' ||
 		pathname.startsWith('/settings/') ||
@@ -39,6 +40,7 @@ export function isUtilityPath(pathname: string): boolean {
 
 export function isMorePath(pathname: string): boolean {
 	return (
+		pathname === '/contacts' || pathname === '/calendar' ||
 		pathname === '/drafts' ||
 		pathname === '/trash' ||
 		pathname === '/archive' ||

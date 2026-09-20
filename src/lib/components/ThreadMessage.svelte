@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MessageOrganizer from '$lib/organizer/MessageOrganizer.svelte';
 	import Icon from './Icon.svelte';
 	import AttachmentList from './AttachmentList.svelte';
 	import DeliveryStatus from './DeliveryStatus.svelte';
@@ -133,6 +134,7 @@
 		</header>
 
 		<div class="body mail-body">
+			<MessageOrganizer {message} />
 			{#if message.body_html}
 				<EmailBody messageId={message.id} sender={message.from_addr} inbound={message.direction === 'inbound'} html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
 			{:else if text.body}

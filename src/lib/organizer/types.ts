@@ -1,0 +1,48 @@
+export type Contact = {
+	id: string;
+	name: string;
+	emails: string[];
+	company: string;
+	phone: string;
+	notes: string;
+	starred: boolean;
+	version: number;
+};
+export type Attendance = 'NEEDS-ACTION' | 'ACCEPTED' | 'TENTATIVE' | 'DECLINED';
+export type CalendarGuest = { email: string; name: string; status: Attendance };
+export type CalendarEvent = {
+	id: string;
+	uid: string;
+	title: string;
+	description: string;
+	location: string;
+	startsAt: string;
+	endsAt: string;
+	startLocal: string;
+	endLocal: string;
+	timeZone: string;
+	allDay: boolean;
+	color: string;
+	organizer: { email: string; name: string };
+	guests: CalendarGuest[];
+	owned: boolean;
+	fromAddressId: string | null;
+	sourceEmailId: string | null;
+	response: Attendance;
+	reminderMinutes: number | null;
+	version: number;
+	sequence: number;
+	cancelled: boolean;
+	updatedAt: string;
+};
+export type CalendarReminder = { id: string; event_id: string; title: string; starts_at: string };
+export type CalendarInvitation = {
+	attachmentId: string;
+	event: CalendarEvent;
+	method: string;
+	canRespond: boolean;
+	warning: string | null;
+	existingId: string | null;
+	response: Attendance | null;
+	existingVersion?: number;
+};

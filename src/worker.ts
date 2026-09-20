@@ -2,6 +2,7 @@ import { deploymentPolicyResponse } from './lib/server/deployment-policy';
 import { getEmailProvider } from './lib/server/context';
 import { wakeSnoozedMail } from './lib/server/mail-cleanup';
 import { flushOutbox } from './lib/server/durable-outbox';
+import { flushCalendarNotices, sendCalendarReminders } from './lib/server/calendar';
 import { recordOperationalFailure } from './lib/server/operational-events';
 import type { ScheduledController, ExecutionContext } from '@cloudflare/workers-types';
 import {
@@ -35,7 +36,19 @@ export default {
 	},
 
 	async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-		await Promise.all([wakeSnoozedMail(env.DB), flushOutbox(env, getEmailProvider({ env, ctx }))]);
+		const provider = getEmailProvider({ env, ctx });
+		await flushCalendarNotices(env, provider.kind).catch(() =>
+			recordOperationalFailure(
+				env.DB,
+				'outbound',
+				'Calendar invitation handoff failed. It will retry on the next scheduled run.'
+			)
+		);
+		await Promise.all([
+			wakeSnoozedMail(env.DB),
+			flushOutbox(env, provider),
+			sendCalendarReminders(env)
+		]);
 	},
 
 	async email(message: CloudflareInboundMessage, env: Env, ctx: ExecutionContext) {
@@ -61,7 +74,11 @@ export default {
 		try {
 			await handleCloudflareInbound(message, inboundEnv);
 		} catch (error) {
-			await recordOperationalFailure(env.DB, 'inbound', 'Cloudflare inbound processing failed. Check Worker logs for details.');
+			await recordOperationalFailure(
+				env.DB,
+				'inbound',
+				'Cloudflare inbound processing failed. Check Worker logs for details.'
+			);
 			throw error;
 		}
 	}

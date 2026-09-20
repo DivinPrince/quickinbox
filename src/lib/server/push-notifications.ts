@@ -92,7 +92,11 @@ function validAuthSecret(value: unknown): value is string {
 function validVapidKeyPair(publicKey: string, privateKey: string): boolean {
 	const publicBytes = decodeBase64Url(publicKey);
 	const privateBytes = decodeBase64Url(privateKey);
-	if (publicBytes?.byteLength !== 65 || publicBytes[0] !== 0x04 || privateBytes?.byteLength !== 32) {
+	if (
+		publicBytes?.byteLength !== 65 ||
+		publicBytes[0] !== 0x04 ||
+		privateBytes?.byteLength !== 32
+	) {
 		return false;
 	}
 
@@ -154,7 +158,8 @@ export function readVapidConfiguration(
 	const publicKey = env.VAPID_PUBLIC_KEY?.trim();
 	const privateKey = env.VAPID_PRIVATE_KEY?.trim();
 	const subject = env.VAPID_SUBJECT?.trim();
-	if (!publicKey || !privateKey || !subject || !validVapidKeyPair(publicKey, privateKey)) return null;
+	if (!publicKey || !privateKey || !subject || !validVapidKeyPair(publicKey, privateKey))
+		return null;
 	try {
 		const subjectUrl = new URL(subject);
 		if (subjectUrl.protocol !== 'mailto:' && subjectUrl.protocol !== 'https:') return null;
@@ -298,7 +303,7 @@ export async function notifyNewMail(
 	input: NewMailNotificationInput
 ): Promise<void> {
 	try {
-		await deliverNewMailNotification(env, input);
+		await deliverUserNotification(env, input.userId, buildNewMailPayload(input));
 	} catch (error) {
 		console.error(
 			'Failed to deliver new-mail push notifications',
@@ -320,18 +325,30 @@ export async function scheduleNewMailNotification(
 	await task;
 }
 
-async function deliverNewMailNotification(
+export async function notifyUser(
 	env: PushNotificationEnv,
-	input: NewMailNotificationInput
+	userId: string,
+	payload: NewMailPushPayload
+): Promise<void> {
+	try {
+		await deliverUserNotification(env, userId, payload);
+	} catch {
+		console.error('Failed to deliver calendar push notification');
+	}
+}
+
+async function deliverUserNotification(
+	env: PushNotificationEnv,
+	userId: string,
+	input: NewMailPushPayload
 ): Promise<void> {
 	const vapid = readVapidConfiguration(env);
 	if (!vapid) return;
 
-	const subscriptions = await listPushSubscriptions(env.DB, input.userId);
+	const subscriptions = await listPushSubscriptions(env.DB, userId);
 	if (subscriptions.length === 0) return;
 
-	webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
-	const payload = JSON.stringify(buildNewMailPayload(input));
+	const payload = JSON.stringify(input);
 	const deadEndpoints: string[] = [];
 
 	await Promise.all(
@@ -344,7 +361,7 @@ async function deliverNewMailNotification(
 						keys: { p256dh: subscription.p256dh, auth: subscription.auth }
 					},
 					payload,
-						{ TTL: 300, urgency: 'high', timeout: PUSH_REQUEST_TIMEOUT_MS }
+					{ TTL: 300, urgency: 'high', timeout: PUSH_REQUEST_TIMEOUT_MS, vapidDetails: vapid }
 				);
 			} catch (error) {
 				const status = pushErrorStatus(error);

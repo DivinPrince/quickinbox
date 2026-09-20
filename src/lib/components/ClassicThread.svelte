@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { contactSuggestions } from '$lib/organizer/contact-suggestions';
 	import { tick } from 'svelte';
 	import SnoozeControl from '$lib/components/SnoozeControl.svelte';
 	import { runMailAction } from '$lib/mail/client';
@@ -533,6 +534,7 @@
 					id="forward-to"
 					type="text"
 					bind:value={forwardTo}
+					use:contactSuggestions
 					placeholder={t('compose.recipientPlaceholder')}
 					autocomplete="off"
 					autocapitalize="none"

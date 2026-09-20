@@ -2176,7 +2176,7 @@
 		height: 3.5rem;
 	}
 
-	[data-ui-theme='zero'] .z-mobile-nav :global(.tip-wrap) {
+	[data-ui-theme='zero'] .z-mobile-nav .tip-wrap {
 		flex: 1;
 		height: 100%;
 	}

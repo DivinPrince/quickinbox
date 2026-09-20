@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { contactSuggestions } from '$lib/organizer/contact-suggestions';
 	import { tick, untrack } from 'svelte';
 	import DraftAutosave from '$lib/components/DraftAutosave.svelte';
 	import { createMailSender } from '$lib/mail/send';
@@ -16,10 +17,12 @@
 	let {
 		addresses,
 		draftId = null,
+		initialTo = '',
 		onClose
 	}: {
 		addresses: MailAddress[];
 		draftId?: string | null;
+		initialTo?: string;
 		onClose: () => void;
 	} = $props();
 
@@ -33,7 +36,7 @@
 	let loaded = $state(!untrack(() => draftId));
 	let revision = $state(0);
 	let autosave: DraftAutosave | undefined = $state();
-	let to = $state('');
+	let to = $state(untrack(() => initialTo));
 	let cc = $state('');
 	let bcc = $state('');
 	let subject = $state('');
@@ -233,18 +236,18 @@
 					<button type="button" class="z-composer-link" aria-expanded={showBcc} onclick={() => (showBcc = !showBcc)}>{t('compose.bcc')}</button>
 				</div>
 				<span class="z-composer-label">{t('compose.toColon')}</span>
-				<input class="z-composer-input" bind:this={recipientInput} bind:value={to} aria-label={t('compose.to')} required placeholder={t('compose.emailPlaceholder')} />
+				<input use:contactSuggestions class="z-composer-input" bind:this={recipientInput} bind:value={to} aria-label={t('compose.to')} required placeholder={t('compose.emailPlaceholder')} />
 			</div>
 			{#if showCc}
 				<div class="z-composer-row">
 					<span class="z-composer-label">{t('compose.ccColon')}</span>
-					<input class="z-composer-input" bind:value={cc} aria-label={t('compose.cc')} placeholder={t('compose.ccPlaceholder')} />
+					<input use:contactSuggestions class="z-composer-input" bind:value={cc} aria-label={t('compose.cc')} placeholder={t('compose.ccPlaceholder')} />
 				</div>
 			{/if}
 			{#if showBcc}
 				<div class="z-composer-row">
 					<span class="z-composer-label">{t('compose.bccColon')}</span>
-					<input class="z-composer-input" bind:value={bcc} aria-label={t('compose.bcc')} placeholder={t('compose.bccPlaceholder')} />
+					<input use:contactSuggestions class="z-composer-input" bind:value={bcc} aria-label={t('compose.bcc')} placeholder={t('compose.bccPlaceholder')} />
 				</div>
 			{/if}
 			<div class="z-composer-row">

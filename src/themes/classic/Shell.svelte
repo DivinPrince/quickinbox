@@ -24,6 +24,7 @@
 	const stacked = $derived(isStackedPath($page.url.pathname));
 	const mailbox = $derived(isMailboxPath($page.url.pathname));
 	const utility = $derived(isUtilityPath($page.url.pathname));
+	const organizer = $derived($page.url.pathname === '/contacts' || $page.url.pathname === '/calendar');
 	const canSplit = $derived(mailbox && $page.url.pathname !== '/drafts');
 	let layout = $state<SplitLayout>('none');
 	setContext<ClassicLayoutContext>(CLASSIC_LAYOUT, { get value() { return layout; } });
@@ -100,7 +101,7 @@
 			{/snippet}
 		</Topbar>
 
-		<main class="app-main" class:app-main-narrow={narrow} class:app-main-split={canSplit && layout !== 'none'}>
+		<main class="app-main" class:app-main-narrow={narrow} class:app-main-organizer={organizer} class:app-main-split={canSplit && layout !== 'none'}>
 			{#if stacked}
 				<SwipeBack href="/inbox">
 					{@render children()}
@@ -126,6 +127,8 @@
 </div>
 
 <style>
+	.app-main.app-main-organizer { padding:0; height:calc(100dvh - var(--topbar-height)); flex:none; overflow:hidden; }
+	@media(max-width:900px) { .app-main.app-main-organizer { height:calc(100dvh - var(--bottom-nav-height) - env(safe-area-inset-bottom)); padding:0; } }
 	@media (min-width: 901px) {
 		.app-main-split {
 			flex: none;
