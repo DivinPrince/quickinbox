@@ -807,5 +807,13 @@
 		"contains": "主题包含：{text}",
 		"enabled": "已启用",
 		"remove": "删除"
+	},
+	"panes": {
+		"resizeMessageList": "调整邮件列表宽度",
+		"resizeHint": "拖动或使用方向键调整宽度。双击或按回车键恢复默认宽度。",
+		"splitLayout": "分栏布局",
+		"verticalSplit": "垂直分栏（左右并排）",
+		"horizontalSplit": "水平分栏（上下排列）",
+		"size": "{size} 像素"
 	}
 }

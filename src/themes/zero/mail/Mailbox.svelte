@@ -1,6 +1,6 @@
 <script lang="ts">
 	import SnoozeControl from '$lib/components/SnoozeControl.svelte';
-	import { untrack } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { formatRelativeDate } from '$lib/utils/date';
@@ -19,6 +19,8 @@
 	} from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import ThreadPane from './ThreadPane.svelte';
+	import PaneResizer from '../PaneResizer.svelte';
+	import SplitLayoutPicker from './SplitLayoutPicker.svelte';
 
 	let {
 		view,
@@ -35,6 +37,22 @@
 	let refreshing = $state(false);
 	let isMac = $state(true);
 	let viewsOpen = $state(false);
+	let splitLayout = $state<'vertical' | 'horizontal'>('vertical');
+
+	onMount(() => {
+		try {
+			if (localStorage.getItem('quickinbox:zero-split-layout') === 'horizontal') {
+				splitLayout = 'horizontal';
+			}
+		} catch { /* Use the default layout when browser storage is unavailable. */ }
+	});
+
+	function setSplitLayout(next: 'vertical' | 'horizontal') {
+		splitLayout = next;
+		try {
+			localStorage.setItem('quickinbox:zero-split-layout', next);
+		} catch { /* Changing the layout does not require browser storage. */ }
+	}
 
 	$effect(() => {
 		const next = mailbox.threads;
@@ -216,8 +234,8 @@
 
 <svelte:window onkeydown={onListKey} onpointerdown={onDocPointer} />
 
-<div class="z-mail" class:reading={Boolean(threadId)}>
-	<section class="z-panel z-list">
+<div class="z-mail" class:reading={Boolean(threadId)} data-split={splitLayout}>
+	<section class="z-panel z-list" id="zero-message-list">
 		<div class="z-list-head">
 			<div class="z-list-tools">
 				{#if selected.length && !['drafts', 'spam', 'trash'].includes(view)}<SnoozeControl ids={items.filter((item) => selected.includes(item.thread_id)).map((item) => item.latest_id)} snoozed={view === 'snoozed'} />{/if}
@@ -264,6 +282,7 @@
 						</div>
 					{/if}
 				</div>
+				<SplitLayoutPicker value={splitLayout} onChange={setSplitLayout} />
 				<Tooltip text={t('common.refresh')}>
 					<button
 						type="button"
@@ -431,6 +450,18 @@
 			{/if}
 		</div>
 	</section>
+
+	{#key splitLayout}
+		<PaneResizer
+			paneId="zero-message-list"
+			storageKey={splitLayout === 'horizontal' ? 'quickinbox:zero-list-height' : 'quickinbox:zero-list-width'}
+			label={t('panes.resizeMessageList')}
+			orientation={splitLayout}
+			min={splitLayout === 'horizontal' ? 12 : 16}
+			max={45}
+			remaining={splitLayout === 'horizontal' ? 12 : 20}
+		/>
+	{/key}
 
 	<section class="z-panel z-read">
 		<ThreadPane

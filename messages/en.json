@@ -807,5 +807,13 @@
 		"contains": "Subject contains: {text}",
 		"enabled": "Enabled",
 		"remove": "Remove"
+	},
+	"panes": {
+		"resizeMessageList": "Resize message list",
+		"resizeHint": "Drag or use the arrow keys to resize. Double-click or press Enter to reset.",
+		"splitLayout": "Split layout",
+		"verticalSplit": "Vertical split (side by side)",
+		"horizontalSplit": "Horizontal split (stacked)",
+		"size": "{size} pixels"
 	}
 }
