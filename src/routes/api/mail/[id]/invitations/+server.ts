@@ -17,19 +17,28 @@ export const GET: RequestHandler = async (event) => {
 		.all<{ id: string }>();
 	const invitations: CalendarInvitation[] = [],
 		warnings: string[] = [];
+	const seen = new Set<string>();
 	for (const row of rows.results) {
 		try {
-			invitations.push(
-				(
-					await readCalendarInvitation(
-						env,
-						user,
-						event.params.id,
-						row.id,
-						event.url.searchParams.get('timeZone') || 'UTC'
-					)
-				).invitation
+			const { invitation } = await readCalendarInvitation(
+				env,
+				user,
+				event.params.id,
+				row.id,
+				event.url.searchParams.get('timeZone') || 'UTC'
 			);
+			// Mail clients can include the same event inline and as a downloadable .ics.
+			// Compare parsed content, excluding the timestamp generated when reading it.
+			const { updatedAt, ...content } = invitation.event;
+			const key = JSON.stringify({
+				method: invitation.method,
+				...content,
+				guests: [...content.guests].sort((a, b) => a.email.localeCompare(b.email))
+			});
+			if (!seen.has(key)) {
+				seen.add(key);
+				invitations.push(invitation);
+			}
 		} catch (cause) {
 			if (!isHttpError(cause)) throw cause;
 			warnings.push(cause.body.message);

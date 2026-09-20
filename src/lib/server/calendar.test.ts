@@ -16,9 +16,10 @@ import { eventTimes } from '$lib/organizer/dates';
 import { flushOutbox } from './durable-outbox';
 import { insertEmail } from './mail-store';
 import { insertAttachmentBytes } from './attachments';
-import type { CalendarEvent } from '$lib/organizer/types';
+import type { CalendarEvent, CalendarInvitation } from '$lib/organizer/types';
 import type { EmailProvider } from './email-provider';
 import { handleCloudflareInbound } from './cloudflare-inbound';
+import { GET as getInvitations } from '../../routes/api/mail/[id]/invitations/+server';
 const input = {
 	title: 'Project planning',
 	description: 'Line one\nLine two, with semicolons; and unicode ✉',
@@ -33,14 +34,27 @@ const input = {
 const count = (s: ReturnType<typeof testStore>, table: string) =>
 	(s.sqlite.query(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
 
-test('received MIME calendar parts survive ingestion and expose a valid invitation', async () => {
+async function invitationsForMessage(s: ReturnType<typeof testStore>, emailId: string) {
+	const response = await getInvitations({
+		locals: { user: s.user },
+		platform: { env: s.env },
+		params: { id: emailId },
+		url: new URL(`https://mail.example.test/api/mail/${emailId}/invitations`)
+	} as never);
+	return (await response.json()) as { invitations: CalendarInvitation[]; warnings: string[] };
+}
+
+test('inline and attached MIME calendar copies expose one invitation and one RSVP', async () => {
 	const s = testStore();
 	const template = await saveCalendarEvent(s.db, s.user, { ...input, guests: [] });
 	const event = {
 		...template,
 		uid: 'mime-invitation',
 		organizer: { email: 'host@example.test', name: 'Host' },
-		guests: [{ email: s.user.email, name: 'Me', status: 'NEEDS-ACTION' as const }]
+		guests: [
+			{ email: s.user.email, name: 'Me', status: 'NEEDS-ACTION' as const },
+			{ email: 'other@example.test', name: 'Other', status: 'NEEDS-ACTION' as const }
+		]
 	};
 	const raw = [
 		'From: Host <host@example.test>',
@@ -48,6 +62,9 @@ test('received MIME calendar parts survive ingestion and expose a valid invitati
 		'Subject: Calendar test',
 		'Message-ID: <calendar-test@example.test>',
 		'MIME-Version: 1.0',
+		'Content-Type: multipart/mixed; boundary="mail-part"',
+		'',
+		'--mail-part',
 		'Content-Type: multipart/alternative; boundary="calendar-part"',
 		'',
 		'--calendar-part',
@@ -60,6 +77,15 @@ test('received MIME calendar parts survive ingestion and expose a valid invitati
 		'',
 		invitationFile(event, 'REQUEST'),
 		'--calendar-part--',
+		'--mail-part',
+		'Content-Type: application/ics; name="invite.ics"',
+		'Content-Disposition: attachment; filename="invite.ics"',
+		'Content-Transfer-Encoding: base64',
+		'',
+		Buffer.from(
+			invitationFile({ ...event, guests: [...event.guests].reverse() }, 'REQUEST').replace(/\r\n/g, '\n')
+		).toString('base64'),
+		'--mail-part--',
 		''
 	].join('\r\n');
 	await handleCloudflareInbound(
@@ -82,6 +108,55 @@ test('received MIME calendar parts survive ingestion and expose a valid invitati
 	const read = await readCalendarInvitation(s.env, s.user, attachment.email_id, attachment.id);
 	assert.equal(read.invitation.canRespond, true);
 	assert.equal(read.invitation.event.uid, 'mime-invitation');
+	assert.equal(count(s, 'email_attachments'), 2);
+	const result = await invitationsForMessage(s, attachment.email_id);
+	assert.deepEqual(result.warnings, []);
+	assert.equal(result.invitations.length, 1);
+	assert.equal(result.invitations[0].event.uid, 'mime-invitation');
+	assert.equal(count(s, 'calendar_events'), 1); // Reading does not import the offered event.
+	const accepted = await respondToInvitation(s.env, s.user, attachment.email_id, {
+		attachmentId: result.invitations[0].attachmentId,
+		response: 'ACCEPTED',
+		version: 0
+	});
+	assert.equal(accepted.response, 'ACCEPTED');
+	const refreshed = await invitationsForMessage(s, attachment.email_id);
+	assert.equal(refreshed.invitations.length, 1);
+	assert.equal(refreshed.invitations[0].response, 'ACCEPTED');
+	assert.equal(count(s, 'calendar_events'), 2);
+	assert.equal(count(s, 'calendar_notices'), 1);
+	assert.equal(count(s, 'email_attachments'), 2); // Original downloads are preserved.
+});
+
+test('invitation deduplication preserves different events, revisions, methods and content', async () => {
+	const s = testStore();
+	const template = await saveCalendarEvent(s.db, s.user, { ...input, guests: [] });
+	const offered = {
+		...template,
+		uid: 'external-invitation',
+		organizer: { email: 'host@example.test', name: 'Host' },
+		guests: [{ email: s.user.email, name: 'Me', status: 'NEEDS-ACTION' as const }]
+	};
+	const { emailId } = await incoming(s, offered, offered.organizer.email, 'REQUEST');
+	for (const [event, method] of [
+		[{ ...offered, uid: 'separate-event' }, 'REQUEST'],
+		[{ ...offered, sequence: 1 }, 'REQUEST'],
+		[offered, 'CANCEL'],
+		[{ ...offered, location: 'Changed meeting room' }, 'REQUEST']
+	] as const) {
+		await insertAttachmentBytes(s.db, s.bucket, emailId, {
+			filename: 'invite.ics',
+			type: 'text/calendar',
+			bytes: new TextEncoder().encode(invitationFile(event, method))
+		});
+	}
+	const result = await invitationsForMessage(s, emailId);
+	assert.deepEqual(result.warnings, []);
+	assert.equal(result.invitations.length, 5);
+	assert.equal(result.invitations.filter((i) => i.event.uid === 'separate-event').length, 1);
+	assert.equal(result.invitations.filter((i) => i.event.sequence === 1).length, 1);
+	assert.equal(result.invitations.filter((i) => i.method === 'CANCEL').length, 1);
+	assert.equal(result.invitations.filter((i) => i.event.location === 'Changed meeting room').length, 1);
 });
 
 test('calendar stores UTC instants, isolates owners, and atomically creates notices/reminders', async () => {
