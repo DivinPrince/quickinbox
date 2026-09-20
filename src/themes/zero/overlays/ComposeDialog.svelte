@@ -209,30 +209,6 @@
 
 	<form id={composerId} class="z-composer" hidden={minimized} onsubmit={send} inert={!loaded || sending}>
 		<div class="z-composer-fields">
-			<div class="z-composer-row">
-				<span class="z-composer-label">{t('compose.toColon')}</span>
-				<input class="z-composer-input" bind:this={recipientInput} bind:value={to} aria-label={t('compose.to')} required placeholder={t('compose.emailPlaceholder')} />
-				<div class="z-composer-row-actions">
-					<button type="button" class="z-composer-link" onclick={() => (showCc = !showCc)}>{t('compose.cc')}</button>
-					<button type="button" class="z-composer-link" onclick={() => (showBcc = !showBcc)}>{t('compose.bcc')}</button>
-				</div>
-			</div>
-			{#if showCc}
-				<div class="z-composer-row">
-					<span class="z-composer-label">{t('compose.ccColon')}</span>
-					<input class="z-composer-input" bind:value={cc} aria-label={t('compose.cc')} placeholder={t('compose.ccPlaceholder')} />
-				</div>
-			{/if}
-			{#if showBcc}
-				<div class="z-composer-row">
-					<span class="z-composer-label">{t('compose.bccColon')}</span>
-					<input class="z-composer-input" bind:value={bcc} aria-label={t('compose.bcc')} placeholder={t('compose.bccPlaceholder')} />
-				</div>
-			{/if}
-			<div class="z-composer-row">
-					<span class="z-composer-label">{t('compose.subjectColon')}</span>
-					<input class="z-composer-input" bind:value={subject} aria-label={t('compose.subject')} required placeholder={t('compose.subject')} />
-			</div>
 			{#if addresses.length > 1}
 				<div class="z-composer-row">
 					<span class="z-composer-label">{t('compose.fromColon')}</span>
@@ -250,6 +226,31 @@
 					</select>
 				</div>
 			{/if}
+			<div class="z-composer-row">
+				<!-- Disclosure controls remain reachable with Shift+Tab from To. -->
+				<div class="z-composer-row-actions">
+					<button type="button" class="z-composer-link" aria-expanded={showCc} onclick={() => (showCc = !showCc)}>{t('compose.cc')}</button>
+					<button type="button" class="z-composer-link" aria-expanded={showBcc} onclick={() => (showBcc = !showBcc)}>{t('compose.bcc')}</button>
+				</div>
+				<span class="z-composer-label">{t('compose.toColon')}</span>
+				<input class="z-composer-input" bind:this={recipientInput} bind:value={to} aria-label={t('compose.to')} required placeholder={t('compose.emailPlaceholder')} />
+			</div>
+			{#if showCc}
+				<div class="z-composer-row">
+					<span class="z-composer-label">{t('compose.ccColon')}</span>
+					<input class="z-composer-input" bind:value={cc} aria-label={t('compose.cc')} placeholder={t('compose.ccPlaceholder')} />
+				</div>
+			{/if}
+			{#if showBcc}
+				<div class="z-composer-row">
+					<span class="z-composer-label">{t('compose.bccColon')}</span>
+					<input class="z-composer-input" bind:value={bcc} aria-label={t('compose.bcc')} placeholder={t('compose.bccPlaceholder')} />
+				</div>
+			{/if}
+			<div class="z-composer-row">
+					<span class="z-composer-label">{t('compose.subjectColon')}</span>
+					<input class="z-composer-input" bind:value={subject} aria-label={t('compose.subject')} required placeholder={t('compose.subject')} />
+			</div>
 		</div>
 
 		<div class="z-composer-body">

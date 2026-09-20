@@ -220,6 +220,24 @@
 <svelte:document onselectionchange={rememberSelection} />
 
 <div class="editor-shell" class:editor-shell-embedded={embedded} class:editor-shell-fill={fill}>
+	<!-- Keep the message field before formatting controls in the keyboard order. -->
+	<div
+		use:hydrateEditor={{ html, attachments }}
+		contenteditable="true"
+		aria-busy={imagesLoading}
+		role="textbox"
+		tabindex="0"
+		aria-label={placeholder}
+		aria-multiline="true"
+		class="editor prose prose-sm max-w-none px-4 py-3 outline-none"
+		style:--editor-min-height="{minHeight}px"
+		data-placeholder={placeholder}
+		oninput={handleInput}
+		onpaste={handlePaste}
+		ondragover={(event) => { if (event.dataTransfer?.types.includes('Files')) event.preventDefault(); }}
+		ondrop={handleDrop}
+	></div>
+
 	<div class="toolbar">
 		{#each tools as tool (tool.command)}
 			<Tooltip text={tool.label}>
@@ -252,22 +270,6 @@
 		{/if}
 	</div>
 
-	<div
-		use:hydrateEditor={{ html, attachments }}
-		contenteditable="true"
-		aria-busy={imagesLoading}
-		role="textbox"
-		tabindex="0"
-		aria-label={placeholder}
-		aria-multiline="true"
-		class="editor prose prose-sm max-w-none px-4 py-3 outline-none"
-		style:--editor-min-height="{minHeight}px"
-		data-placeholder={placeholder}
-		oninput={handleInput}
-		onpaste={handlePaste}
-		ondragover={(event) => { if (event.dataTransfer?.types.includes('Files')) event.preventDefault(); }}
-		ondrop={handleDrop}
-	></div>
 	{#if imagesLoading || imageError}
 		<p class="image-status" role="status">{imagesLoading ? t('editor.addingImages') : imageError}</p>
 	{/if}
@@ -275,6 +277,8 @@
 
 <style>
 	.editor-shell {
+		display: flex;
+		flex-direction: column;
 		overflow: hidden;
 		background: var(--color-surface);
 		border-radius: 1rem;
@@ -298,6 +302,7 @@
 	}
 
 	.toolbar {
+		order: -1;
 		display: flex;
 		align-items: center;
 		gap: 0.125rem;

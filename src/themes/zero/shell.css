@@ -1657,6 +1657,7 @@
 }
 
 [data-ui-theme='zero'] .z-composer-row-actions {
+	order: 1;
 	display: flex;
 	align-items: center;
 	gap: 0.35rem;
