@@ -83,20 +83,22 @@
 			bind:this={input}
 			type="file"
 			multiple
-			class="hidden"
+			hidden
 			onchange={(event) => addFiles(event.currentTarget.files)}
 		/>
 	{/if}
 
 	{#if showChips}
 		{#each attachments as file, index (file.filename + index)}
-			<span class="attachment-chip">
-				<Icon name="file-3-line" size={14} />
-				<span class="max-w-[140px] truncate">{file.filename}</span>
-				<button type="button" class="chip-remove" aria-label={t('common.remove')} onclick={() => remove(index)}>
-					<Icon name="close-line" size={14} />
-				</button>
-			</span>
+			{#if file.disposition !== 'inline'}
+				<span class="attachment-chip">
+					<Icon name="file-3-line" size={14} />
+					<span class="max-w-[140px] truncate">{file.filename}</span>
+					<button type="button" class="chip-remove" aria-label={t('common.remove')} onclick={() => remove(index)}>
+						<Icon name="close-line" size={14} />
+					</button>
+				</span>
+			{/if}
 		{/each}
 	{/if}
 </div>

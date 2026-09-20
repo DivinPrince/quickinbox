@@ -559,6 +559,10 @@
 		"progress": "Setup progress"
 	},
 	"editor": {
+		"insertImage": "Insert image",
+		"addingImages": "Adding images…",
+		"imageFormats": "Choose a PNG, JPEG, GIF, or WebP image.",
+		"imageFailed": "Could not read this image. Please try another file.",
 		"bold": "Bold",
 		"italic": "Italic",
 		"underline": "Underline",

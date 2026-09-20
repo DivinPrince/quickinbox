@@ -559,6 +559,10 @@
 		"progress": "Progreso de la configuración"
 	},
 	"editor": {
+		"insertImage": "Insertar imagen",
+		"addingImages": "Añadiendo imágenes…",
+		"imageFormats": "Elige una imagen PNG, JPEG, GIF o WebP.",
+		"imageFailed": "No se pudo leer la imagen. Prueba con otro archivo.",
 		"bold": "Negrita",
 		"italic": "Cursiva",
 		"underline": "Subrayado",

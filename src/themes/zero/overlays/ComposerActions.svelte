@@ -8,6 +8,7 @@
 
 	let {
 		sending = false,
+		disabled = false,
 		attachments = $bindable([]),
 		includeOriginalAttachments = $bindable(true),
 		error = '',
@@ -16,6 +17,7 @@
 		extra
 	}: {
 		sending?: boolean;
+		disabled?: boolean;
 		attachments?: OutboundAttachmentInput[];
 		includeOriginalAttachments?: boolean;
 		error?: string;
@@ -78,7 +80,7 @@
 </script>
 
 <div class="z-composer-foot">
-	<button type="submit" class="z-send" disabled={sending}>
+	<button type="submit" class="z-send" disabled={sending || disabled}>
 		<span>{sending ? t('common.sending') : t('common.send')}</span>
 		<span class="z-send-kbd">
 			<span>{isMac ? '⌘' : 'Ctrl'}</span>
@@ -86,7 +88,7 @@
 		</span>
 	</button>
 	{#if allowNewAttachments}
-		<button type="button" class="z-add" onclick={() => input?.click()}>
+		<button type="button" class="z-add" disabled={sending || disabled} onclick={() => input?.click()}>
 			<AttachmentIcon name="attachment-2" size={12} />
 			<span>{t('attach.attach')}</span>
 		</button>
@@ -94,7 +96,7 @@
 			bind:this={input}
 			type="file"
 			multiple
-			class="hidden"
+			hidden
 			onchange={(event) => addFiles(event.currentTarget.files)}
 		/>
 	{/if}
@@ -109,18 +111,20 @@
 	{#if extra}
 		{@render extra()}
 	{/if}
-	{#if attachments.length > 0}
+	{#if attachments.some((file) => file.disposition !== 'inline')}
 		<div class="z-attach-chips">
 			{#each attachments as file, index (file.filename + index)}
-				<span class="z-attach-chip">
-					<Icon name="Paper" size={12} />
-					<span class="z-attach-name">{file.filename}</span>
-					<Tooltip text={t('common.remove')}>
-						<button type="button" class="z-attach-remove" aria-label={t('common.remove')} onclick={() => remove(index)}>
-							<Icon name="X" size={12} />
-						</button>
-					</Tooltip>
-				</span>
+				{#if file.disposition !== 'inline'}
+					<span class="z-attach-chip">
+						<Icon name="Paper" size={12} />
+						<span class="z-attach-name">{file.filename}</span>
+						<Tooltip text={t('common.remove')}>
+							<button type="button" class="z-attach-remove" aria-label={t('common.remove')} onclick={() => remove(index)}>
+								<Icon name="X" size={12} />
+							</button>
+						</Tooltip>
+					</span>
+				{/if}
 			{/each}
 		</div>
 	{/if}

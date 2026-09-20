@@ -12,6 +12,7 @@ no servers to maintain.
 - **Real mail in and out** — the provider delivers straight into the Worker, nothing is polled
 - **Threads** — replies group into conversations, quoted history collapses; conversations never mix messages from different domains
 - **Attachments** — inbound files land in R2, outbound files upload from the composer
+- **Inline images** — insert, paste, or drop PNG, JPEG, GIF, and WebP images into new messages and replies; images are preserved in saved drafts and sent as embedded attachments (5 MB per file, 5 files total including ordinary attachments)
 - **Safe HTML** — received HTML renders in a sandboxed iframe
 - **Multiple domains and users** — per-user addresses, admin catch-all, unrouted-mail view; the combined inbox tags each conversation with the address it arrived on and can filter by it
 - **Delivery status** — delivered / bounced / complained tracking

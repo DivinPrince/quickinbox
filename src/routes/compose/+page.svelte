@@ -40,25 +40,27 @@
 	let showCopies = $state(Boolean(draft?.cc_addr || draft?.bcc_addr));
 	let error = $state('');
 	let sending = $state(false);
+	let imagesLoading = $state(false);
 	let savingDraft = $state(false);
 	const hasSavedDraft = $derived(Boolean(draft) || $page.url.searchParams.has('draft'));
 
 	const hasDraftText = $derived(Boolean(to.trim() || cc.trim() || bcc.trim() || subject.trim() || !isHtmlEmpty(html) || attachments.length));
 	const draftPayload = $derived({ fromAddressId, to, cc, bcc, subject, html, text: typeof window === 'undefined' || isHtmlEmpty(html) ? '' : htmlToPlainText(html), attachments });
 	async function saveDraft(): Promise<boolean> {
+		if (imagesLoading) return false;
 		savingDraft = true;
 		try { return await autosave?.flush() ?? false; } finally { savingDraft = false; }
 	}
 
 	async function closeComposer() {
-		if (sending || !(await saveDraft())) return;
+		if (sending || imagesLoading || !(await saveDraft())) return;
 		autosave?.finish();
 		requestSkipViewTransition();
 		await goto(hasSavedDraft ? '/drafts' : '/inbox');
 	}
 
 	async function discardDraft() {
-		if (sending) return;
+		if (sending || imagesLoading) return;
 		try {
 			if (!(await saveDraft())) return;
 			const response = await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' });
@@ -75,7 +77,7 @@
 			return;
 		}
 
-		if (sending || !(await saveDraft())) return;
+		if (sending || imagesLoading || !(await saveDraft())) return;
 		sending = true;
 		error = '';
 
@@ -129,7 +131,7 @@
 			<h1 class="page-title">{hasSavedDraft ? t('compose.draft') : t('nav.compose')}</h1>
 
 		</div>
-		<button type="submit" class="btn-primary" disabled={sending}>
+		<button type="submit" class="btn-primary" disabled={sending || imagesLoading}>
 			{sending ? t('common.sending') : t('common.send')}
 		</button>
 	</header>
@@ -149,7 +151,7 @@
 			>
 				{t('compose.ccBcc')}
 			</button>
-			<button type="button" class="btn-ghost" disabled={savingDraft || !hasDraftText} onclick={saveDraft}>
+			<button type="button" class="btn-ghost" disabled={imagesLoading || savingDraft || !hasDraftText} onclick={saveDraft}>
 				<Icon name="save-line" size={15} />
 				{savingDraft ? t('common.saving') : t('compose.saveDraft')}
 			</button>
@@ -158,14 +160,14 @@
 					<Icon name="delete-bin-line" size={15} />
 				</button>
 			{/if}
-			<button type="submit" class="btn-primary" disabled={sending}>
+			<button type="submit" class="btn-primary" disabled={sending || imagesLoading}>
 				<Icon name="send-plane-2-fill" size={16} />
 				{sending ? t('common.sending') : t('common.send')}
 			</button>
 		</div>
 	</header>
 
-	<DraftAutosave bind:this={autosave} id={draftId} revision={draft?.draft_revision ?? 0} payload={draftPayload} hasContent={hasDraftText} disabled={sending} />
+	<DraftAutosave bind:this={autosave} id={draftId} revision={draft?.draft_revision ?? 0} payload={draftPayload} hasContent={hasDraftText} disabled={sending || imagesLoading} />
 
 	<div class="surface compose-fields">
 		<!-- With several domains connected, choosing the identity matters. -->
@@ -239,20 +241,20 @@
 		</div>
 	</div>
 
-	{#if attachments.length}
+	{#if attachments.some((file) => file.disposition !== 'inline')}
 		<div class="compose-chips">
 			<AttachmentPicker bind:attachments mode="chips" />
 		</div>
 	{/if}
 
 	<div class="compose-editor">
-		<RichTextEditor bind:html fill minHeight={320}>
+		<RichTextEditor bind:html bind:attachments bind:imagesLoading allowImages fill minHeight={320}>
 			{#snippet toolbarEnd()}
 				<AttachmentPicker bind:attachments mode="button" />
 				<button
 					type="button"
 					class="icon-btn"
-					disabled={savingDraft || !hasDraftText}
+					disabled={imagesLoading || savingDraft || !hasDraftText}
 					aria-label={savingDraft ? t('common.saving') : t('compose.saveDraft')}
 					onclick={saveDraft}
 				>

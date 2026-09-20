@@ -68,6 +68,7 @@
 	let attachments = $state<OutboundAttachmentInput[]>([]);
 	let includeOriginalAttachments = $state(true);
 	let sending = $state(false);
+	let imagesLoading = $state(false);
 	let sendError = $state('');
 	let dark = $state(false);
 	let detailsFor = $state<string | null>(null);
@@ -380,6 +381,7 @@
 	}
 
 	async function sendReply() {
+		if (sending || imagesLoading) return;
 		const message = replyTarget ?? latest;
 		if (!message || (!forwarding && isHtmlEmpty(replyHtml))) return;
 		if (forwarding && !replyTo.trim()) {
@@ -805,6 +807,9 @@
 						<RichTextEditor
 							bind:this={replyEditor}
 							bind:html={replyHtml}
+							bind:attachments
+							bind:imagesLoading
+							allowImages={!forwarding}
 							embedded
 							minHeight={80}
 							placeholder={t(forwarding ? 'thread.notePlaceholder' : 'compose.writeReplyPlaceholder')}
@@ -814,6 +819,7 @@
 						bind:attachments
 						bind:includeOriginalAttachments
 						sending={sending}
+						disabled={imagesLoading}
 						error={sendError}
 						allowNewAttachments={!forwarding}
 						originalAttachmentCount={forwardedAttachmentCount}

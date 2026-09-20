@@ -559,6 +559,10 @@
 		"progress": "设置进度"
 	},
 	"editor": {
+		"insertImage": "插入图片",
+		"addingImages": "正在添加图片…",
+		"imageFormats": "请选择 PNG、JPEG、GIF 或 WebP 图片。",
+		"imageFailed": "无法读取此图片，请尝试其他文件。",
 		"bold": "粗体",
 		"italic": "斜体",
 		"underline": "下划线",

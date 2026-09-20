@@ -27,6 +27,7 @@
 	let replySection = $state<HTMLFormElement>();
 	let replyEditor = $state<RichTextEditor>();
 	let sending = $state(false);
+	let imagesLoading = $state(false);
 	let error = $state('');
 
 	type ForwardTarget = { kind: 'thread' } | { kind: 'message'; id: string };
@@ -303,6 +304,7 @@
 	/** Replies continue from the newest message, so the chain stays intact. */
 	async function sendReply(event: SubmitEvent) {
 		event.preventDefault();
+		if (sending || imagesLoading) return;
 		if (!latest || isHtmlEmpty(replyHtml)) return;
 
 		sending = true;
@@ -551,7 +553,7 @@
 					<button type="button" class="btn-ghost" onclick={() => (forwardTarget = null)}>
 						{t('common.cancel')}
 					</button>
-					<button type="submit" class="btn-primary" disabled={sending}>
+					<button type="submit" class="btn-primary" disabled={sending || imagesLoading}>
 						<Icon name="share-forward-line" size={16} />
 						{sending ? t('common.sending') : t('thread.forward')}
 					</button>
@@ -579,7 +581,7 @@
 				</p>
 			{/if}
 
-			<RichTextEditor bind:this={replyEditor} bind:html={replyHtml} embedded minHeight={160} placeholder={t('thread.replyPlaceholder')} />
+			<RichTextEditor bind:this={replyEditor} bind:html={replyHtml} bind:attachments={replyAttachments} bind:imagesLoading allowImages embedded minHeight={160} placeholder={t('thread.replyPlaceholder')} />
 
 			<div class="reply-footer">
 				<AttachmentPicker bind:attachments={replyAttachments} />
@@ -587,7 +589,7 @@
 					<button type="button" class="btn-ghost" onclick={() => (replyOpen = false)}>
 						{t('common.cancel')}
 					</button>
-					<button type="submit" class="btn-primary" disabled={sending}>
+					<button type="submit" class="btn-primary" disabled={sending || imagesLoading}>
 						<Icon name="send-plane-2-fill" size={16} />
 						{sending ? t('common.sending') : t('common.send')}
 					</button>

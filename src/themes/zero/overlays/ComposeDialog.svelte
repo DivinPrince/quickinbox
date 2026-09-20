@@ -43,6 +43,7 @@
 	let showBcc = $state(false);
 	let error = $state('');
 	let sending = $state(false);
+	let imagesLoading = $state(false);
 	let savingDraft = $state(false);
 	let minimized = $state(false);
 	let expanded = $state(false);
@@ -106,6 +107,7 @@
 	const hasDraftText = $derived(Boolean(to.trim() || cc.trim() || bcc.trim() || subject.trim() || !isHtmlEmpty(html) || attachments.length));
 	const draftPayload = $derived({ fromAddressId, to, cc, bcc, subject, html, text: typeof window === 'undefined' || isHtmlEmpty(html) ? '' : htmlToPlainText(html), attachments });
 	async function saveDraft(): Promise<boolean> {
+		if (imagesLoading) return false;
 		savingDraft = true;
 		try { return await autosave?.flush() ?? false; } finally { savingDraft = false; }
 	}
@@ -116,7 +118,7 @@
 			error = t('compose.writeMessage');
 			return;
 		}
-		if (!loaded || sending || !(await saveDraft())) return;
+		if (!loaded || sending || imagesLoading || !(await saveDraft())) return;
 		sending = true;
 		error = '';
 		try {
@@ -151,7 +153,7 @@
 	}
 
 	async function close() {
-		if (sending) return;
+		if (sending || imagesLoading) return;
 		if (!loaded) { onClose(); return; }
 		if (!(await saveDraft())) return;
 		autosave?.finish();
@@ -198,7 +200,7 @@
 				</Tooltip>
 			</div>
 			<Tooltip text={t('common.close')}>
-				<button type="button" class="z-icon-btn" aria-label={t('common.close')} onclick={close} disabled={sending || savingDraft}>
+				<button type="button" class="z-icon-btn" aria-label={t('common.close')} onclick={close} disabled={sending || savingDraft || imagesLoading}>
 					<Icon name="X" size={14} />
 				</button>
 			</Tooltip>
@@ -251,17 +253,17 @@
 		</div>
 
 		<div class="z-composer-body">
-			<RichTextEditor bind:html embedded minHeight={200} placeholder={t('compose.writeMessagePlaceholder')} />
+			<RichTextEditor bind:html bind:attachments bind:imagesLoading allowImages embedded minHeight={200} placeholder={t('compose.writeMessagePlaceholder')} />
 		</div>
 
-		{#if loaded}{#key activeDraft}<DraftAutosave bind:this={autosave} id={activeDraft} {revision} payload={draftPayload} hasContent={hasDraftText} disabled={sending} />{/key}{/if}
-		<ComposerActions bind:attachments sending={sending} error={error}>
+		{#if loaded}{#key activeDraft}<DraftAutosave bind:this={autosave} id={activeDraft} {revision} payload={draftPayload} hasContent={hasDraftText} disabled={sending || imagesLoading} />{/key}{/if}
+		<ComposerActions bind:attachments sending={sending} disabled={imagesLoading} error={error}>
 			{#snippet extra()}
 				<button
 					type="button"
 					class="z-text-btn"
 					onclick={saveDraft}
-					disabled={savingDraft || !hasDraftText}
+					disabled={imagesLoading || savingDraft || !hasDraftText}
 				>
 					{savingDraft ? t('common.saving') : t('compose.saveDraft')}
 				</button>

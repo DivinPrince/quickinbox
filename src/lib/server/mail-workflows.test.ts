@@ -7,9 +7,39 @@ import { searchMail, searchFilters } from './search';
 import { cleanupMail, undoCleanup, wakeSnoozedMail } from './mail-cleanup';
 import { saveSenderRule } from './sender-rules';
 import { createLabel } from './labels';
+import { createInlineImage } from '../mail/inline-images';
+import { sendAndStore } from './outbox';
+import { createCloudflareProvider } from './providers/cloudflare-provider';
+import { listAttachments } from './attachments';
 
 const content = { id: 'draft-test', revision: 0, saveId: 'save-1', fromAddressId: 'address-1', to: 'friend@example.test', cc: '', bcc: '', subject: 'Draft invoice', text: 'Remember me', html: '<p>Remember me</p>', attachments: [{ filename: 'receipt.txt', type: 'text/plain', content: btoa('receipt contents') }] };
 const incoming = { userId: 'user-1', direction: 'inbound' as const, from: 'billing@example.test', to: 'me@example.test', subject: 'Invoice September', bodyText: 'The monthly subscription invoice is attached.' };
+
+test('an image-only draft reopens and sends with matching inline bytes and Sent-folder metadata', async () => {
+  const s = testStore();
+  const image = await createInlineImage(new File([new Uint8Array([137, 80, 78, 71])], 'screen.png', { type: 'image/png' }));
+  const html = `<img src="cid:${image.contentId}" alt="screen.png" style="max-width:100%;height:auto">`;
+  await persistDraft(s.env, s.user, { ...content, html, text: '', attachments: [image] });
+  const draft = await readSavedDraft(s.env, s.user.id, content.id);
+  assert.equal(draft?.body_html, html);
+  assert.deepEqual(draft?.attachments, [image]);
+  let delivered = false;
+  const provider = createCloudflareProvider({ async send(payload) {
+    assert.ok(payload.html?.includes(`cid:${image.contentId}`));
+    assert.ok(!payload.html?.includes('data:image/'));
+    const part = payload.attachments?.[0];
+    assert.equal(part?.disposition, 'inline');
+    assert.equal(part?.contentId, image.contentId);
+    assert.deepEqual(new Uint8Array(part!.content as ArrayBuffer), new Uint8Array([137, 80, 78, 71]));
+    delivered = true;
+    return { messageId: 'inline-message' };
+  } }, 'example.test');
+  const result = await sendAndStore(s.env, provider, s.user, { fromAddress: s.from, to: content.to, subject: content.subject, html: draft!.body_html, attachments: draft!.attachments });
+  assert.ok(delivered);
+  const stored = await listAttachments(s.db, result.emailId);
+  assert.equal(stored[0].content_id, image.contentId);
+  assert.equal(stored[0].content_disposition, 'inline');
+});
 
 test('draft snapshots preserve attachments, replay lost responses, and reject stale tabs', async () => {
   const s = testStore();
