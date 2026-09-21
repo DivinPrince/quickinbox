@@ -1,8 +1,5 @@
 # Quickinbox
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/DivinPrince/quickinbox)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
-
 Self-hosted email for your own domain, running on Cloudflare Workers.
 Get `you@yourdomain.com` with a full web client — no third-party mailbox,
 no servers to maintain.
