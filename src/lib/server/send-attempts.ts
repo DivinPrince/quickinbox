@@ -47,6 +47,25 @@ export async function sha256Hex(value: string): Promise<string> {
 	return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function attemptId(userId: string, key: string): Promise<string> {
+	return sha256Hex(`${userId}\u0000${key}`);
+}
+
+/**
+ * Whether this key's message already went out. A retry of it only replays the
+ * result, so checks about the conversation's state no longer apply to it.
+ */
+export async function keyAlreadySent(db: D1Database, userId: string, key: string): Promise<boolean> {
+	const row = await db
+		.prepare(
+			`SELECT 1 AS found FROM send_attempts
+			 WHERE id = ? AND user_id = ? AND (status = 'sent' OR provider_id IS NOT NULL)`
+		)
+		.bind(await attemptId(userId, key), userId)
+		.first<{ found: number }>();
+	return Boolean(row);
+}
+
 /**
  * Take ownership of a send, or learn that it already happened. Throws
  * SendAttemptError when the key is in flight or was used for other content.
@@ -57,7 +76,7 @@ export async function claimSendAttempt(
 	key: string,
 	requestHash: string
 ): Promise<SendAttempt> {
-	const id = await sha256Hex(`${userId}\u0000${key}`);
+	const id = await attemptId(userId, key);
 
 	const inserted = await db
 		.prepare(

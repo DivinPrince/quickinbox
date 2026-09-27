@@ -7,7 +7,9 @@ import {
 	type EmailProviderKind
 } from './email-provider';
 import { ConfigError } from './errors';
+import { ReplyGuardError } from './outbox';
 import { SendAttemptError } from './send-attempts';
+import { SendPolicyError } from './send-policy';
 import { createCloudflareProvider } from './providers/cloudflare-provider';
 import { createResendProvider, getResendReceivingClient } from './providers/resend-provider';
 import type { ResendClient } from './resend';
@@ -124,7 +126,13 @@ export function describeProviderError(error: unknown, fallback = 'Failed to send
 
 export function statusForProviderError(error: unknown): number {
 	if (error instanceof ConfigError) return 503;
-	if (error instanceof SendAttemptError) return error.status;
+	if (
+		error instanceof SendAttemptError ||
+		error instanceof SendPolicyError ||
+		error instanceof ReplyGuardError
+	) {
+		return error.status;
+	}
 	if (error instanceof ProviderError) return error.status >= 500 ? 502 : 400;
 	return 400;
 }

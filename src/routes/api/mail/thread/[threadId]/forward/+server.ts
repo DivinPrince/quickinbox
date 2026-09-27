@@ -7,6 +7,7 @@ import {
 import { sendForwardedMessages, type ForwardRequest } from '$lib/server/forward-mail';
 import { listForwardThreadMessages } from '$lib/server/mail-store';
 import { readIdempotencyKey } from '$lib/server/send-attempts';
+import { apiSendPolicyFor } from '$lib/server/send-policy';
 import { parseRecipients } from '$lib/server/send-mail';
 
 /** Forward every message in an authenticated user's conversation, oldest first. */
@@ -39,7 +40,11 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 			provider,
 			locals.user,
 			messages,
-			{ ...body, idempotencyKey }
+			{
+				...body,
+				idempotencyKey,
+				apiPolicy: apiSendPolicyFor(locals.authMethod, platform?.env)
+			}
 		);
 
 		return json({ ok: true, id: emailId });

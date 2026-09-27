@@ -7,6 +7,7 @@ import {
 import { deleteDraft, listMailbox } from '$lib/server/mail-store';
 import { sendAndStore } from '$lib/server/outbox';
 import { readIdempotencyKey } from '$lib/server/send-attempts';
+import { apiSendPolicyFor } from '$lib/server/send-policy';
 import type { MailboxView, OutboundAttachmentInput } from '$lib/types';
 import { mailboxCategoryFilter } from '$lib/mail/categories';
 
@@ -113,7 +114,8 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 				text: body.text,
 				html: body.html,
 				attachments: body.attachments,
-				idempotencyKey
+				idempotencyKey,
+				apiPolicy: apiSendPolicyFor(locals.authMethod, platform?.env)
 			}
 		);
 

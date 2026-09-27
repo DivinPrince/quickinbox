@@ -4,6 +4,7 @@ import { getUserByApiToken, readBearerToken } from '$lib/server/api-tokens';
 import { getEmailProvider } from '$lib/server/context';
 import { handleMcpRequest } from '$lib/server/mcp';
 import { bearerChallenge, getUserByOAuthToken } from '$lib/server/oauth';
+import { apiSendPolicy } from '$lib/server/send-policy';
 import type { User } from '$lib/types';
 
 /**
@@ -56,7 +57,8 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
 		provider: () => getEmailProvider(platform),
 		user: auth.user,
 		scopes: auth.scopes,
-		origin: url.origin
+		origin: url.origin,
+		sendPolicy: apiSendPolicy(platform?.env)
 	});
 };
 

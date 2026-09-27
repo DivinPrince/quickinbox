@@ -10,12 +10,17 @@ import {
 import { ProviderError, type EmailProvider } from './email-provider';
 import {
 	assertOutboundAttachments,
+	assertReplyReviewed,
 	assertTotalAttachmentBytes,
 	persistableAddressId,
+	replyTarget,
+	ReplyGuardError,
 	resolveReplyFromAddress,
 	sendAndStore
 } from './outbox';
+import { getEmailForUser } from './mail-store';
 import { SendAttemptError } from './send-attempts';
+import { SendPolicyError } from './send-policy';
 import type { OutboundMailInput } from './send-mail';
 import { createTestDb, insertTestUser } from './test-db';
 
@@ -275,51 +280,51 @@ describe('outbound attachment totals', () => {
 	});
 });
 
+const from: MailAddress = {
+	id: 'addr-1',
+	user_id: user.id,
+	domain_id: 'dom-1',
+	domain_name: 'example.com',
+	address: 'ada@example.com',
+	label: 'Ada',
+	signature: null,
+	is_default: true,
+	created_at: user.created_at
+};
+
+function setup(send: (input: OutboundMailInput) => Promise<{ providerId: string }>) {
+	const { db, sqlite } = createTestDb();
+	insertTestUser(sqlite, user.id);
+	sqlite.query(`INSERT INTO domains (id, name) VALUES ('dom-1', 'example.com')`).run();
+	sqlite
+		.query(
+			`INSERT INTO addresses (id, user_id, domain_id, address, is_default)
+			 VALUES ('addr-1', ?, 'dom-1', 'ada@example.com', 1)`
+		)
+		.run(user.id);
+	const sent: OutboundMailInput[] = [];
+	const provider = {
+		kind: 'cloudflare',
+		async send(input: OutboundMailInput) {
+			sent.push(input);
+			return send(input);
+		}
+	} as unknown as EmailProvider;
+	const env = { DB: db, ATTACHMENTS: { put: async () => null } as unknown as R2Bucket };
+	const outbound = () =>
+		sqlite.query(`SELECT id FROM emails WHERE direction = 'outbound'`).all() as { id: string }[];
+	return { env, provider, sent, outbound, sqlite, db };
+}
+
+const message = {
+	fromAddress: from,
+	to: 'sam@other.test',
+	subject: 'Hello',
+	text: 'Are we still on for Thursday?',
+	idempotencyKey: 'retry-key-0001'
+};
+
 describe('sendAndStore with an idempotency key', () => {
-	const from: MailAddress = {
-		id: 'addr-1',
-		user_id: user.id,
-		domain_id: 'dom-1',
-		domain_name: 'example.com',
-		address: 'ada@example.com',
-		label: 'Ada',
-		signature: null,
-		is_default: true,
-		created_at: user.created_at
-	};
-
-	function setup(send: (input: OutboundMailInput) => Promise<{ providerId: string }>) {
-		const { db, sqlite } = createTestDb();
-		insertTestUser(sqlite, user.id);
-		sqlite.query(`INSERT INTO domains (id, name) VALUES ('dom-1', 'example.com')`).run();
-		sqlite
-			.query(
-				`INSERT INTO addresses (id, user_id, domain_id, address, is_default)
-				 VALUES ('addr-1', ?, 'dom-1', 'ada@example.com', 1)`
-			)
-			.run(user.id);
-		const sent: OutboundMailInput[] = [];
-		const provider = {
-			kind: 'cloudflare',
-			async send(input: OutboundMailInput) {
-				sent.push(input);
-				return send(input);
-			}
-		} as unknown as EmailProvider;
-		const env = { DB: db, ATTACHMENTS: { put: async () => null } as unknown as R2Bucket };
-		const outbound = () =>
-			sqlite.query(`SELECT id FROM emails WHERE direction = 'outbound'`).all() as { id: string }[];
-		return { env, provider, sent, outbound, sqlite };
-	}
-
-	const message = {
-		fromAddress: from,
-		to: 'sam@other.test',
-		subject: 'Hello',
-		text: 'Are we still on for Thursday?',
-		idempotencyKey: 'retry-key-0001'
-	};
-
 	test('a retry returns the first send instead of emailing again', async () => {
 		const { env, provider, sent, outbound } = setup(async () => ({ providerId: 'provider-1' }));
 
@@ -442,5 +447,138 @@ describe('sendAndStore with an idempotency key', () => {
 
 		assert.equal(sent.length, 2);
 		assert.equal(outbound().length, 2);
+	});
+});
+
+describe('sendAndStore for API keys and MCP', () => {
+	const ok = async () => ({ providerId: 'provider-1' });
+
+	test('refuses every send when API sending is turned off', async () => {
+		const { env, provider, sent } = setup(ok);
+
+		await assert.rejects(
+			sendAndStore(env, provider, user, {
+				...message,
+				apiPolicy: { enabled: false, dailyLimit: null }
+			}),
+			(error: unknown) =>
+				error instanceof SendPolicyError && error.code === 'api_sending_disabled'
+		);
+		assert.equal(sent.length, 0);
+	});
+
+	test('stops at the daily limit without calling the provider', async () => {
+		const { env, provider, sent } = setup(ok);
+		const apiPolicy = { enabled: true, dailyLimit: 1 };
+
+		await sendAndStore(env, provider, user, { ...message, apiPolicy });
+		await assert.rejects(
+			sendAndStore(env, provider, user, {
+				...message,
+				idempotencyKey: 'retry-key-0002',
+				apiPolicy
+			}),
+			(error: unknown) =>
+				error instanceof SendPolicyError && error.code === 'daily_send_limit' && error.status === 429
+		);
+		assert.equal(sent.length, 1);
+	});
+
+	test('a replayed retry does not use up the allowance', async () => {
+		const { env, provider, sent } = setup(ok);
+		const apiPolicy = { enabled: true, dailyLimit: 1 };
+
+		await sendAndStore(env, provider, user, { ...message, apiPolicy });
+		await sendAndStore(env, provider, user, { ...message, apiPolicy });
+
+		assert.equal(sent.length, 1);
+	});
+
+	test('a browser send ignores the limit', async () => {
+		const { env, provider, sent } = setup(ok);
+
+		for (let i = 0; i < 3; i++) {
+			await sendAndStore(env, provider, user, { ...message, idempotencyKey: `browser-key-${i}000` });
+		}
+		assert.equal(sent.length, 3);
+	});
+});
+
+describe('replyTarget', () => {
+	test('replies to the sender of inbound mail', () => {
+		assert.deepEqual(
+			replyTarget({ direction: 'inbound', from_addr: 'Sam@Other.test', to_addr: 'ada@example.com' }),
+			['sam@other.test']
+		);
+	});
+
+	test('continues our own message with its recipients', () => {
+		assert.deepEqual(
+			replyTarget({
+				direction: 'outbound',
+				from_addr: 'ada@example.com',
+				to_addr: 'Sam <sam@other.test>, lee@other.test'
+			}),
+			['sam@other.test', 'lee@other.test']
+		);
+	});
+});
+
+describe('assertReplyReviewed', () => {
+	function thread() {
+		const { db, sqlite } = setup(async () => ({ providerId: 'provider-1' }));
+		const insert = sqlite.query(
+			`INSERT INTO emails (id, user_id, direction, from_addr, to_addr, subject, thread_id, created_at)
+			 VALUES (?, ?, ?, ?, ?, 'Plans', 'm1', ?)`
+		);
+		const add = (id: string, direction: string, fromAddr: string, toAddr: string, at: string) =>
+			insert.run(id, user.id, direction, fromAddr, toAddr, at);
+		return { db, add };
+	}
+
+	test('passes when answering the latest message', async () => {
+		const { db, add } = thread();
+		add('m1', 'inbound', 'sam@other.test', 'ada@example.com', '2026-09-01 10:00:00');
+		add('m2', 'outbound', 'ada@example.com', 'sam@other.test', '2026-09-01 11:00:00');
+		const original = (await getEmailForUser(db, user.id, 'm2'))!;
+
+		await assertReplyReviewed(db, user.id, original, ['sam@other.test'], ['SAM@other.test']);
+	});
+
+	test('refuses a reply once someone else already answered', async () => {
+		const { db, add } = thread();
+		add('m1', 'inbound', 'sam@other.test', 'ada@example.com', '2026-09-01 10:00:00');
+		add('m2', 'outbound', 'ada@example.com', 'sam@other.test', '2026-09-01 11:00:00');
+		const original = (await getEmailForUser(db, user.id, 'm1'))!;
+
+		await assert.rejects(
+			assertReplyReviewed(db, user.id, original, ['sam@other.test'], ['sam@other.test']),
+			(error: unknown) =>
+				error instanceof ReplyGuardError && error.code === 'conversation_advanced'
+		);
+	});
+
+	test('refuses a reply once a newer message arrived', async () => {
+		const { db, add } = thread();
+		add('m1', 'inbound', 'sam@other.test', 'ada@example.com', '2026-09-01 10:00:00');
+		add('m2', 'inbound', 'sam@other.test', 'ada@example.com', '2026-09-01 12:00:00');
+		const original = (await getEmailForUser(db, user.id, 'm1'))!;
+
+		await assert.rejects(
+			assertReplyReviewed(db, user.id, original, ['sam@other.test'], ['sam@other.test']),
+			(error: unknown) =>
+				error instanceof ReplyGuardError && error.code === 'conversation_advanced'
+		);
+	});
+
+	test('refuses a reply that would reach someone the agent did not review', async () => {
+		const { db, add } = thread();
+		add('m1', 'inbound', 'sam@other.test', 'ada@example.com', '2026-09-01 10:00:00');
+		const original = (await getEmailForUser(db, user.id, 'm1'))!;
+
+		await assert.rejects(
+			assertReplyReviewed(db, user.id, original, ['sam@other.test'], ['attacker@evil.test']),
+			(error: unknown) => error instanceof ReplyGuardError && error.code === 'recipient_changed'
+		);
 	});
 });

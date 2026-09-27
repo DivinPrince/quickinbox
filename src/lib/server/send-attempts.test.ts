@@ -4,6 +4,7 @@ import {
 	claimSendAttempt,
 	completeSendAttempt,
 	failSendAttempt,
+	keyAlreadySent,
 	readIdempotencyKey,
 	SendAttemptError
 } from './send-attempts';
@@ -80,6 +81,20 @@ describe('claimSendAttempt', () => {
 		const theirs = await claimSendAttempt(db, 'user-2', 'key-12345', 'hash-b');
 		assert.equal(theirs.kind, 'claimed');
 		assert.notEqual(theirs.id, mine.id);
+	});
+});
+
+describe('keyAlreadySent', () => {
+	test('is true only once the message went out', async () => {
+		const { db } = setup();
+		assert.equal(await keyAlreadySent(db, 'user-1', 'key-12345'), false);
+
+		const attempt = await claimSendAttempt(db, 'user-1', 'key-12345', 'hash-a');
+		assert.equal(await keyAlreadySent(db, 'user-1', 'key-12345'), false);
+
+		await completeSendAttempt(db, attempt.id, 'email-1', 'provider-1');
+		assert.equal(await keyAlreadySent(db, 'user-1', 'key-12345'), true);
+		assert.equal(await keyAlreadySent(db, 'user-2', 'key-12345'), false);
 	});
 });
 

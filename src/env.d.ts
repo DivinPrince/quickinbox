@@ -19,6 +19,8 @@ declare global {
 		TELEGRAM_THREAD_ID?: string;
 		APP_URL?: string;
 		TYPESAFE_API_KEY?: string;
+		API_SEND_ENABLED?: string;
+		API_DAILY_SEND_LIMIT?: string;
 	}
 }
 

@@ -186,7 +186,13 @@ export class QuickInboxClient {
 
 	async reply(
 		id: string,
-		input: { text?: string; html?: string; fromAddressId?: string; idempotencyKey?: string }
+		input: {
+			text?: string;
+			html?: string;
+			fromAddressId?: string;
+			expectedRecipients?: string[];
+			idempotencyKey?: string;
+		}
 	): Promise<{ id: string }> {
 		const { idempotencyKey, ...body } = input;
 		return this.request(`/api/mail/${encodeURIComponent(id)}`, {

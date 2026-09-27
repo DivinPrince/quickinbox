@@ -7,6 +7,7 @@ import {
 import { sendForwardedMessages, type ForwardRequest } from '$lib/server/forward-mail';
 import { getEmailForUser } from '$lib/server/mail-store';
 import { readIdempotencyKey } from '$lib/server/send-attempts';
+import { apiSendPolicyFor } from '$lib/server/send-policy';
 import { parseRecipients } from '$lib/server/send-mail';
 
 /** Sends a copy of a message on to someone who has not seen it. */
@@ -41,7 +42,11 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 			provider,
 			locals.user,
 			[original],
-			{ ...body, idempotencyKey }
+			{
+				...body,
+				idempotencyKey,
+				apiPolicy: apiSendPolicyFor(locals.authMethod, platform?.env)
+			}
 		);
 
 		return json({ ok: true, id: emailId });
