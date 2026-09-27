@@ -257,8 +257,15 @@ spam is filed silently.
 
 ### AI drafting (optional)
 
-AI drafting needs a model. There are two ways to provide one, and a person's own
-key takes precedence:
+**Draft reply** in a reply box asks a model to write an answer to the message,
+using the conversation so far and your **Drafting instructions** (Settings → AI
+drafting: who you are, your tone, what never to promise). The draft lands in the
+reply box for you to edit; nothing is sent or saved until you press Send. The
+model is told the conversation is untrusted and that it has not seen any
+attachments.
+
+It needs a model. There are two ways to provide one, and a person's own key
+takes precedence:
 
 - **Server default** — an admin picks one under **Admin → AI drafting**:
   Workers AI (runs on this Cloudflare account through the `AI` binding, no key,

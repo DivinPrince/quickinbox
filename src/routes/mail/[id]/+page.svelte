@@ -4,7 +4,7 @@
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
 	import AttachmentPicker from '$lib/components/AttachmentPicker.svelte';
 	import ThreadMessage from '$lib/components/ThreadMessage.svelte';
-	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
+	import { htmlToPlainText, isHtmlEmpty, plainTextToHtml } from '$lib/utils/html';
 	import { hasInAppHistory, requestSkipViewTransition } from '$lib/app-chrome';
 	import { APP_NAME } from '$lib/constants';
 	import { plural, t } from '$lib/i18n';
@@ -24,6 +24,7 @@
 	let replyKey = crypto.randomUUID();
 	let forwardKey = crypto.randomUUID();
 	let error = $state('');
+	let drafting = $state(false);
 
 	type ForwardTarget = { kind: 'thread' } | { kind: 'message'; id: string };
 	let forwardTarget = $state<ForwardTarget | null>(null);
@@ -295,10 +296,43 @@
 		}
 	}
 
+	/** Fill the reply box with an AI draft of an answer to the newest message. */
+	async function draftWithAi() {
+		if (!latest || drafting) return;
+		if (!isHtmlEmpty(replyHtml) && !confirm(t('thread.replaceWithDraft'))) return;
+
+		const target = latest.id;
+		const before = replyHtml;
+		drafting = true;
+		error = '';
+		try {
+			const res = await fetch(`/api/mail/${encodeURIComponent(target)}/draft-reply`, {
+				method: 'POST'
+			});
+			const body = (await res.json()) as { text?: string; error?: string };
+			// The reply may have moved on while the model was writing.
+			if (!replyOpen || latest?.id !== target) return;
+			if (replyHtml !== before) {
+				error = t('thread.draftStale');
+				return;
+			}
+			if (!res.ok || !body.text) {
+				error = body.error ?? t('thread.draftFailed');
+				return;
+			}
+			replyHtml = plainTextToHtml(body.text);
+		} catch {
+			error = t('common.networkError');
+		} finally {
+			drafting = false;
+		}
+	}
+
 	/** Replies continue from the newest message, so the chain stays intact. */
 	async function sendReply(event: SubmitEvent) {
 		event.preventDefault();
-		if (!latest || isHtmlEmpty(replyHtml)) return;
+		// Wait for a draft in progress rather than send what is about to be replaced.
+		if (!latest || drafting || isHtmlEmpty(replyHtml)) return;
 
 		sending = true;
 		error = '';
@@ -578,10 +612,22 @@
 			<div class="reply-footer">
 				<AttachmentPicker bind:attachments={replyAttachments} />
 				<div class="reply-actions">
+					{#if $page.data.aiDrafting}
+						<button
+							type="button"
+							class="btn-ghost"
+							disabled={drafting || sending}
+							aria-busy={drafting}
+							onclick={() => void draftWithAi()}
+						>
+							<Icon name="sparkling-line" size={15} />
+							{drafting ? t('thread.drafting') : t('thread.draftReply')}
+						</button>
+					{/if}
 					<button type="button" class="btn-ghost" onclick={() => (replyOpen = false)}>
 						{t('common.cancel')}
 					</button>
-					<button type="submit" class="btn-primary" disabled={sending}>
+					<button type="submit" class="btn-primary" disabled={sending || drafting}>
 						<Icon name="send-plane-2-fill" size={16} />
 						{sending ? t('common.sending') : t('common.send')}
 					</button>

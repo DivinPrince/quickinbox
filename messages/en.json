@@ -339,7 +339,12 @@
 		"replyAllLabel": "Reply All",
 		"replyingTo": "Replying to",
 		"notePlaceholder": "Add a note…",
-		"replyPlaceholder": "Reply…"
+		"replyPlaceholder": "Reply…",
+		"draftReply": "Draft reply",
+		"drafting": "Drafting…",
+		"replaceWithDraft": "Replace what you've written with an AI draft?",
+		"draftFailed": "Couldn't draft a reply.",
+		"draftStale": "Draft discarded: the reply changed while it was being written."
 	},
 	"search": {
 		"title": "Search",
@@ -666,6 +671,10 @@
 		"testing": "Testing…",
 		"testPassed": "Connected to {model}. It replied: “{reply}”",
 		"removeOwnConfirm": "Remove your AI key? Drafting falls back to the server default, if there is one.",
-		"removeInstanceConfirm": "Remove the server default? People without their own key can no longer draft."
+		"removeInstanceConfirm": "Remove the server default? People without their own key can no longer draft.",
+		"instructions": "Drafting instructions",
+		"instructionsHint": "Used for every draft, whichever model writes it: who you are, your tone, what never to promise.",
+		"instructionsPlaceholder": "e.g. I run research partnerships at a university lab. Keep replies short and warm. Never commit to dates or prices.",
+		"instructionsSaved": "Instructions saved."
 	}
 }

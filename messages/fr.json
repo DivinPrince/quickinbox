@@ -339,7 +339,12 @@
 		"replyAllLabel": "Répondre à tous",
 		"replyingTo": "Réponse à",
 		"notePlaceholder": "Ajouter une note…",
-		"replyPlaceholder": "Répondre…"
+		"replyPlaceholder": "Répondre…",
+		"draftReply": "Rédiger une réponse",
+		"drafting": "Rédaction…",
+		"replaceWithDraft": "Remplacer votre texte par un brouillon rédigé par l’IA ?",
+		"draftFailed": "Impossible de rédiger une réponse.",
+		"draftStale": "Brouillon abandonné : la réponse a changé pendant sa rédaction."
 	},
 	"search": {
 		"title": "Recherche",
@@ -666,6 +671,10 @@
 		"testing": "Test en cours…",
 		"testPassed": "Connecté à {model}. Réponse : « {reply} »",
 		"removeOwnConfirm": "Supprimer votre clé IA ? La rédaction utilisera la valeur par défaut du serveur, s’il y en a une.",
-		"removeInstanceConfirm": "Supprimer la valeur par défaut du serveur ? Les personnes sans clé personnelle ne pourront plus rédiger."
+		"removeInstanceConfirm": "Supprimer la valeur par défaut du serveur ? Les personnes sans clé personnelle ne pourront plus rédiger.",
+		"instructions": "Consignes de rédaction",
+		"instructionsHint": "Appliquées à chaque brouillon, quel que soit le modèle : qui vous êtes, votre ton, ce qu’il ne faut jamais promettre.",
+		"instructionsPlaceholder": "p. ex. Je gère les partenariats de recherche. Réponses courtes et chaleureuses. Ne jamais s’engager sur des dates ou des prix.",
+		"instructionsSaved": "Consignes enregistrées."
 	}
 }

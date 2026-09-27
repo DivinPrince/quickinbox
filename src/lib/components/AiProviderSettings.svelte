@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 	import Icon from '$lib/components/Icon.svelte';
 	import { t } from '$lib/i18n';
 
@@ -11,6 +12,8 @@
 		fallback?: { kind: Kind; model: string } | null;
 		canStoreKeys: boolean;
 		workersAiAvailable?: boolean;
+		/** The user's standing instructions for every draft. */
+		instructions?: string;
 	};
 
 	/** `user`: the signed-in person's own key. `instance`: the admin's default for everyone. */
@@ -31,8 +34,14 @@
 	let apiKey = $state('');
 	let busy = $state(false);
 	let testing = $state(false);
-	let error = $state('');
-	let notice = $state('');
+	let loadError = $state('');
+	// Each form reports under its own buttons, even when both are busy at once.
+	let providerNotice = $state('');
+	let providerError = $state('');
+	let instructionsNotice = $state('');
+	let instructionsError = $state('');
+	let instructions = $state('');
+	let savingInstructions = $state(false);
 
 	const kinds = $derived<Kind[]>(
 		scope === 'instance' && settings?.workersAiAvailable
@@ -93,21 +102,22 @@
 			const response = await fetch(endpoint, { cache: 'no-store' });
 			const body = (await response.json()) as Settings & { error?: string };
 			if (!response.ok) {
-				error = body.error ?? t('common.tryAgain');
+				loadError = body.error ?? t('common.tryAgain');
 				return;
 			}
 			settings = body;
 			fill(body.provider);
+			instructions = body.instructions ?? '';
 		} catch {
-			error = t('common.networkError');
+			loadError = t('common.networkError');
 		}
 	}
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
 		busy = true;
-		error = '';
-		notice = '';
+		providerError = '';
+		providerNotice = '';
 		try {
 			const response = await fetch(endpoint, {
 				method: 'PUT',
@@ -116,33 +126,60 @@
 			});
 			const body = (await response.json()) as { provider?: Provider; error?: string };
 			if (!response.ok || !body.provider) {
-				error = body.error ?? t('common.tryAgain');
+				providerError = body.error ?? t('common.tryAgain');
 				return;
 			}
 			settings = { ...settings!, provider: body.provider };
 			fill(body.provider);
-			notice = t('ai.saved');
+			providerNotice = t('ai.saved');
+			// The shell decides whether to offer "Draft reply" from the layout data.
+			await invalidateAll();
 		} catch {
-			error = t('common.networkError');
+			providerError = t('common.networkError');
 		} finally {
 			busy = false;
 		}
 	}
 
+	async function saveInstructions(event: SubmitEvent) {
+		event.preventDefault();
+		savingInstructions = true;
+		instructionsError = '';
+		instructionsNotice = '';
+		try {
+			const response = await fetch(endpoint, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ instructions })
+			});
+			const body = (await response.json()) as { instructions?: string; error?: string };
+			if (!response.ok) {
+				instructionsError = body.error ?? t('common.tryAgain');
+				return;
+			}
+			instructions = body.instructions ?? '';
+			instructionsNotice = t('ai.instructionsSaved');
+		} catch {
+			instructionsError = t('common.networkError');
+		} finally {
+			savingInstructions = false;
+		}
+	}
+
 	async function test() {
 		testing = true;
-		error = '';
-		notice = '';
+		providerError = '';
+		providerNotice = '';
 		try {
 			const response = await fetch(`${endpoint}/test`, { method: 'POST' });
 			const body = (await response.json()) as { model?: string; reply?: string; error?: string };
 			if (!response.ok) {
-				error = body.error ?? t('common.tryAgain');
+				providerError = body.error ?? t('common.tryAgain');
 				return;
 			}
-			notice = t('ai.testPassed', { model: body.model ?? '', reply: body.reply ?? '' });
+			providerNotice = t('ai.testPassed', { model: body.model ?? '', reply: body.reply ?? '' });
 		} catch {
-			error = t('common.networkError');
+			providerError = t('common.networkError');
 		} finally {
 			testing = false;
 		}
@@ -152,18 +189,19 @@
 		if (!confirm(scope === 'instance' ? t('ai.removeInstanceConfirm') : t('ai.removeOwnConfirm'))) {
 			return;
 		}
-		error = '';
-		notice = '';
+		providerError = '';
+		providerNotice = '';
 		try {
 			const response = await fetch(endpoint, { method: 'DELETE' });
 			if (!response.ok) {
-				error = t('common.tryAgain');
+				providerError = t('common.tryAgain');
 				return;
 			}
 			settings = { ...settings!, provider: null };
 			fill(null);
+			await invalidateAll();
 		} catch {
-			error = t('common.networkError');
+			providerError = t('common.networkError');
 		}
 	}
 </script>
@@ -255,12 +293,41 @@
 					{busy ? t('common.saving') : t('common.save')}
 				</button>
 			</div>
+			{@render feedback(providerNotice, providerError)}
 		</form>
 	{/if}
 
-	{#if notice}<p class="notice" role="status">{notice}</p>{/if}
-	{#if error}<p class="error" role="alert">{error}</p>{/if}
+	{#if settings && scope === 'user'}
+		<form class="ai-form instructions" onsubmit={saveInstructions}>
+			<label class="field">
+				<span>{t('ai.instructions')}</span>
+				<textarea
+					bind:value={instructions}
+					rows="4"
+					maxlength={4000}
+					placeholder={t('ai.instructionsPlaceholder')}
+				></textarea>
+			</label>
+			<p class="field-hint">{t('ai.instructionsHint')}</p>
+			<div class="actions">
+				<button type="submit" class="btn-primary" disabled={savingInstructions}>
+					{savingInstructions ? t('common.saving') : t('common.save')}
+				</button>
+			</div>
+			{@render feedback(instructionsNotice, instructionsError)}
+		</form>
+	{/if}
+
+	<!-- Before the settings load there is no form to put a message under. -->
+	{#if !settings && loadError}<p class="error" role="alert">{loadError}</p>{/if}
 </section>
+
+{#snippet feedback(notice: string, error: string)}
+	{#if notice}
+		<p class="notice" role="status"><Icon name="check-line" size={15} /> {notice}</p>
+	{/if}
+	{#if error}<p class="error" role="alert">{error}</p>{/if}
+{/snippet}
 
 <style>
 	.card {
@@ -335,7 +402,14 @@
 		font-weight: 500;
 	}
 
-	.field input {
+	.instructions {
+		margin-top: 1.5rem;
+		padding-top: 1.25rem;
+		border-top: 1px solid var(--color-line);
+	}
+
+	.field input,
+	.field textarea {
 		border: 1px solid var(--color-line);
 		border-radius: 0.5rem;
 		padding: 0.5rem 0.625rem;
@@ -364,9 +438,15 @@
 
 	.notice,
 	.error {
-		margin: 0.75rem 0 0;
+		margin: 0;
 		font-size: 0.8125rem;
 		overflow-wrap: anywhere;
+	}
+
+	.notice {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
 	}
 
 	.error {
