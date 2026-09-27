@@ -255,6 +255,29 @@ message; notifications are not sent for that backfill.
 Promotions and Social do not send push/Telegram notifications. High-confidence
 spam is filed silently.
 
+### AI drafting (optional)
+
+AI drafting needs a model. There are two ways to provide one, and a person's own
+key takes precedence:
+
+- **Server default** — an admin picks one under **Admin → AI drafting**:
+  Workers AI (runs on this Cloudflare account through the `AI` binding, no key,
+  billed to the account), or a shared OpenAI-compatible or Anthropic key.
+- **Bring your own key** — anyone can add one under **Settings → AI drafting**:
+  any OpenAI-compatible server (OpenAI, OpenRouter, sub2api, your own gateway —
+  give the base URL ending in `/v1`) or Anthropic.
+
+Saved keys are encrypted with the `ENCRYPTION_KEY` secret. `bun run setup`
+generates one; otherwise set it once:
+
+```bash
+openssl rand -base64 32 | bunx wrangler secret put ENCRYPTION_KEY
+```
+
+Keep it: a new value makes every saved key unreadable, and people have to save
+their keys again. **Test connection** sends a one-word request through the
+saved provider so you can check the URL, key and model before relying on them.
+
 ## Development
 
 ```bash

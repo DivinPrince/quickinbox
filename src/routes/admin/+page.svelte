@@ -2,6 +2,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import StackHeader from '$lib/components/StackHeader.svelte';
 	import AddressField from '$lib/components/AddressField.svelte';
+	import AiProviderSettings from '$lib/components/AiProviderSettings.svelte';
 	import Check from '$lib/components/Check.svelte';
 	import { APP_NAME } from '$lib/constants';
 	import { formatDeviceActivity } from '$lib/device-activity';
@@ -399,6 +400,8 @@
 			{#if deleteError}<p class="error">{deleteError}</p>{/if}
 		</section>
 	</div>
+
+	<AiProviderSettings scope="instance" />
 
 	<section class="surface-lg admin-card">
 		<h2><Icon name="smartphone-line" size={18} /> {t('admin.mobileDevices')}</h2>
