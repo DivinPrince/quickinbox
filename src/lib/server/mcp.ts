@@ -14,6 +14,7 @@ import {
 	bumpMailboxEpoch
 } from './mail-store';
 import { resolveReplyFromAddress, sendAndStore } from './outbox';
+import { IDEMPOTENCY_KEY_PATTERN } from './send-attempts';
 import { buildReferences, displaySubject } from './threads';
 import type { EmailProvider } from './email-provider';
 import type { OAuthScope } from './oauth';
@@ -46,6 +47,13 @@ export type McpContext = {
 const views = ['inbox', 'archive', 'starred', 'drafts', 'sent', 'trash', 'spam'] as const;
 const categories = INBOX_CATEGORIES;
 const MAX_BODY_CHARS = 20_000;
+
+const idempotencyKey = z
+	.string()
+	.regex(IDEMPOTENCY_KEY_PATTERN)
+	.describe(
+		'A unique key for this send (8-200 of A-Z a-z 0-9 . _ : -). Reuse the same key when retrying the same message so it is never sent twice.'
+	);
 
 type ToolResult = {
 	content: { type: 'text'; text: string }[];
@@ -284,10 +292,11 @@ export function createMcpServer(ctx: McpContext): McpServer {
 					html: z.string().optional(),
 					cc: z.string().optional(),
 					bcc: z.string().optional(),
-					fromAddressId: z.string().optional().describe('Address id (see whoami). Defaults to the default address.')
+					fromAddressId: z.string().optional().describe('Address id (see whoami). Defaults to the default address.'),
+					idempotency_key: idempotencyKey
 				}
 			},
-			async (input) => {
+			async ({ idempotency_key, ...input }) => {
 				if (!input.text?.trim() && !input.html?.trim()) return textResult('text or html is required', true);
 				if (!ctx.bucket) return textResult('Sending is not configured on this server', true);
 				try {
@@ -295,7 +304,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
 						{ DB: ctx.db, ATTACHMENTS: ctx.bucket },
 						ctx.provider(),
 						ctx.user,
-						input
+						{ ...input, idempotencyKey: idempotency_key }
 					);
 					return textResult({ ok: true, id: emailId, from: from.address });
 				} catch (error) {
@@ -315,10 +324,11 @@ export function createMcpServer(ctx: McpContext): McpServer {
 					html: z.string().optional(),
 					to: z.string().optional(),
 					cc: z.string().optional(),
-					fromAddressId: z.string().optional()
+					fromAddressId: z.string().optional(),
+					idempotency_key: idempotencyKey
 				}
 			},
-			async ({ id, text, html, to, cc, fromAddressId }) => {
+			async ({ id, text, html, to, cc, fromAddressId, idempotency_key }) => {
 				if (!text?.trim() && !html?.trim()) return textResult('text or html is required', true);
 				if (!ctx.bucket) return textResult('Sending is not configured on this server', true);
 				try {
@@ -344,7 +354,8 @@ export function createMcpServer(ctx: McpContext): McpServer {
 							html,
 							inReplyTo: original.message_id,
 							references: buildReferences(original.references_header, original.message_id),
-							replyToEmailId: original.id
+							replyToEmailId: original.id,
+							idempotencyKey: idempotency_key
 						}
 					);
 					return textResult({ ok: true, id: emailId, from: from.address, to: recipient, subject });

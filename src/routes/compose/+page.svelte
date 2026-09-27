@@ -35,6 +35,8 @@
 	let showCopies = $state(Boolean(draft?.cc_addr || draft?.bcc_addr));
 	let error = $state('');
 	let sending = $state(false);
+	// One key per message: a resubmit after a dropped response can't send twice.
+	let sendKey = crypto.randomUUID();
 	let savingDraft = $state(false);
 	let savedAt = $state('');
 
@@ -108,7 +110,7 @@
 		try {
 			const res = await fetch('/api/mail', {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', 'Idempotency-Key': sendKey },
 				body: JSON.stringify({
 					draftId: draftId ?? undefined,
 					fromAddressId,

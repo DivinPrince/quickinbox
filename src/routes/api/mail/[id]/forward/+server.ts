@@ -6,6 +6,7 @@ import {
 } from '$lib/server/context';
 import { sendForwardedMessages, type ForwardRequest } from '$lib/server/forward-mail';
 import { getEmailForUser } from '$lib/server/mail-store';
+import { readIdempotencyKey } from '$lib/server/send-attempts';
 import { parseRecipients } from '$lib/server/send-mail';
 
 /** Sends a copy of a message on to someone who has not seen it. */
@@ -19,6 +20,11 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 	const original = await getEmailForUser(db, locals.user.id, params.id!);
 	if (!original) {
 		return json({ error: 'Not found' }, { status: 404 });
+	}
+
+	const idempotencyKey = readIdempotencyKey(request);
+	if (idempotencyKey === null) {
+		return json({ error: 'Invalid Idempotency-Key' }, { status: 400 });
 	}
 
 	const body = (await request.json()) as ForwardRequest;
@@ -35,7 +41,7 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 			provider,
 			locals.user,
 			[original],
-			body
+			{ ...body, idempotencyKey }
 		);
 
 		return json({ ok: true, id: emailId });

@@ -13,6 +13,7 @@ import {
 	setEmailFlags
 } from '$lib/server/mail-store';
 import { resolveReplyFromAddress, sendAndStore } from '$lib/server/outbox';
+import { readIdempotencyKey } from '$lib/server/send-attempts';
 import { buildReferences, displaySubject } from '$lib/server/threads';
 import { isInboxCategory } from '$lib/mail/categories';
 import { rememberSenders } from '$lib/server/labels';
@@ -138,6 +139,11 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 		return json({ error: 'Not found' }, { status: 404 });
 	}
 
+	const idempotencyKey = readIdempotencyKey(request);
+	if (idempotencyKey === null) {
+		return json({ error: 'Invalid Idempotency-Key' }, { status: 400 });
+	}
+
 	const body = (await request.json()) as ReplyBody;
 	if (!body.text?.trim() && !body.html?.trim()) {
 		return json({ error: 'Message body is required' }, { status: 400 });
@@ -177,7 +183,8 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 				// when they answer — keeps the conversation together.
 				references: buildReferences(original.references_header, original.message_id),
 				replyToEmailId: original.id,
-				attachments: body.attachments
+				attachments: body.attachments,
+				idempotencyKey
 			}
 		);
 

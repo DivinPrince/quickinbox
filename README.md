@@ -301,6 +301,12 @@ curl https://your-worker/api/mail \
 shown once. Revoking a key takes effect immediately. New keys start with
 `qi_live_`; existing `qm_live_` keys keep working after you pull this update.
 
+Sends (`POST /api/mail`, replies, forwards) accept an `Idempotency-Key` header
+— 8–200 characters of `A-Z a-z 0-9 . _ : -`, a UUID works. Retrying with the
+same key returns the first result instead of emailing twice; reusing it for a
+different message is refused with `409`. Keys are per user, and a send that
+failed can be retried under its key.
+
 ## MCP (hosted, with OAuth)
 
 Every instance is a remote MCP server. Add its URL to Claude, Cursor, ChatGPT,
@@ -320,6 +326,8 @@ its tokens stop working immediately.
 Tools: `whoami`, `list_threads`, `search_mail`, `get_thread`, `list_attachments`
 (scope `mail:read`), `send_message`, `reply`, `update_thread` (scope `mail:send`).
 A client that asks for only `mail:read` never sees the send tools.
+`send_message` and `reply` require an `idempotency_key`, so a client that
+retries after a timeout never sends the same message twice.
 
 Under the hood this is a standard OAuth 2.1 authorization server (RFC 8414 and
 RFC 9728 discovery, RFC 7591 dynamic registration, PKCE S256, refresh-token

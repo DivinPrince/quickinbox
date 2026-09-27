@@ -12,6 +12,14 @@ import {
 import { loadAccounts } from './config.ts';
 
 const views = ['inbox', 'archive', 'starred', 'drafts', 'sent', 'trash', 'spam'] as const;
+
+// Mirrors IDEMPOTENCY_KEY_PATTERN in src/lib/server/send-attempts.ts.
+const idempotencyKey = z
+	.string()
+	.regex(/^[A-Za-z0-9._:-]{8,200}$/)
+	.describe(
+		'A unique key for this send (8-200 of A-Z a-z 0-9 . _ : -). Reuse the same key when retrying the same message so it is never sent twice.'
+	);
 const categories = ['primary', 'social', 'promotions', 'updates', 'forums'] as const;
 
 function textResult(value: unknown, isError = false) {
@@ -262,16 +270,17 @@ export async function startMcpServer(): Promise<void> {
 				cc: z.string().optional(),
 				bcc: z.string().optional(),
 				fromAddressId: z.string().optional().describe('Address id within the chosen account.'),
+				idempotency_key: idempotencyKey,
 				account: accountArg(accounts)
 			}
 		},
-		async ({ account, ...input }) => {
+		async ({ account, idempotency_key, ...input }) => {
 			try {
 				if (!input.text?.trim() && !input.html?.trim()) {
 					return textResult('text or html is required', true);
 				}
 				const target = accounts.one(account);
-				const result = await target.client.sendMessage(input);
+				const result = await target.client.sendMessage({ ...input, idempotencyKey: idempotency_key });
 				return textResult({ account: target.name, ...result });
 			} catch (error) {
 				return fail(error);
@@ -288,10 +297,11 @@ export async function startMcpServer(): Promise<void> {
 				text: z.string().optional(),
 				html: z.string().optional(),
 				fromAddressId: z.string().optional().describe('Address id within the owning account.'),
+				idempotency_key: idempotencyKey,
 				account: accountArgForIdLookup(accounts)
 			}
 		},
-		async ({ id, text, html, fromAddressId, account }) => {
+		async ({ id, text, html, fromAddressId, idempotency_key, account }) => {
 			try {
 				if (!text?.trim() && !html?.trim()) {
 					return textResult('text or html is required', true);
@@ -303,7 +313,12 @@ export async function startMcpServer(): Promise<void> {
 					// Replies must go out from the instance that holds the original message.
 					target = (await findThreadAcross(accounts.searchOrder, id)).account;
 				}
-				const result = await target.client.reply(id, { text, html, fromAddressId });
+				const result = await target.client.reply(id, {
+					text,
+					html,
+					fromAddressId,
+					idempotencyKey: idempotency_key
+				});
 				return textResult({ account: target.name, ...result });
 			} catch (error) {
 				return fail(error);
