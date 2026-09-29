@@ -385,6 +385,49 @@ describe('sendAndStore with an idempotency key', () => {
 		assert.equal(sent.length, 1);
 	});
 
+	/** The same database, except that noting the provider's acceptance fails. */
+	function failAcceptedNote(env: { DB: D1Database; ATTACHMENTS: R2Bucket }) {
+		const db = env.DB;
+		const failing = {
+			...db,
+			batch: db.batch.bind(db),
+			prepare(sql: string) {
+				if (!sql.includes('SET provider_id = ?')) return db.prepare(sql);
+				const statement = {
+					bind: () => statement,
+					run: async () => {
+						throw new Error('D1 unavailable');
+					}
+				};
+				return statement;
+			}
+		} as unknown as D1Database;
+		return { ...env, DB: failing };
+	}
+
+	test('a failed note of the provider accepting still finishes the send', async () => {
+		const { env, provider, sent } = setup(async () => ({ providerId: 'provider-1' }));
+
+		const first = await sendAndStore(failAcceptedNote(env), provider, user, message);
+		const retry = await sendAndStore(env, provider, user, message);
+
+		assert.equal(retry.emailId, first.emailId);
+		assert.equal(sent.length, 1);
+	});
+
+	test('if that note and the Sent save both fail, a retry is told the outcome is unknown', async () => {
+		const { env, provider, sent, sqlite } = setup(async () => ({ providerId: 'provider-1' }));
+		sqlite.exec('ALTER TABLE emails RENAME TO emails_unavailable');
+
+		await assert.rejects(sendAndStore(failAcceptedNote(env), provider, user, message));
+		await assert.rejects(
+			sendAndStore(env, provider, user, message),
+			(error: unknown) =>
+				error instanceof SendAttemptError && error.code === 'send_outcome_unknown'
+		);
+		assert.equal(sent.length, 1);
+	});
+
 	test('a send that went out but failed to save is not sent again', async () => {
 		const { env, provider, sent, sqlite } = setup(async () => ({ providerId: 'provider-1' }));
 		sqlite.exec('ALTER TABLE emails RENAME TO emails_unavailable');
@@ -482,6 +525,41 @@ describe('sendAndStore for API keys and MCP', () => {
 				error instanceof SendPolicyError && error.code === 'daily_send_limit' && error.status === 429
 		);
 		assert.equal(sent.length, 1);
+	});
+
+	test('a send the provider refused gives its slot back', async () => {
+		let calls = 0;
+		const { env, provider, sent } = setup(async () => {
+			calls += 1;
+			if (calls === 1) throw new ProviderError(400, 'E_RECIPIENT_REJECTED', 'Recipient rejected');
+			return { providerId: 'provider-1' };
+		});
+		const apiPolicy = { enabled: true, dailyLimit: 1 };
+
+		await assert.rejects(sendAndStore(env, provider, user, { ...message, apiPolicy }));
+		await sendAndStore(env, provider, user, {
+			...message,
+			idempotencyKey: 'retry-key-0002',
+			apiPolicy
+		});
+
+		assert.equal(sent.length, 2);
+	});
+
+	test('an ambiguous failure keeps its slot, since the mail may be out', async () => {
+		let calls = 0;
+		const { env, provider } = setup(async () => {
+			calls += 1;
+			if (calls === 1) throw new Error('Network connection lost');
+			return { providerId: 'provider-1' };
+		});
+		const apiPolicy = { enabled: true, dailyLimit: 1 };
+
+		await assert.rejects(sendAndStore(env, provider, user, { ...message, apiPolicy }));
+		await assert.rejects(
+			sendAndStore(env, provider, user, { ...message, idempotencyKey: 'retry-key-0002', apiPolicy }),
+			(error: unknown) => error instanceof SendPolicyError && error.code === 'daily_send_limit'
+		);
 	});
 
 	test('a replayed retry does not use up the allowance', async () => {
