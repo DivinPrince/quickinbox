@@ -265,7 +265,14 @@ export async function sendAndStore(
 		throw error;
 	}
 
-	if (attempt) await recordProviderAccepted(env.DB, attempt.id, providerId);
+	// The mail is out. If even noting that fails, leave the attempt as "outcome
+	// unknown" rather than "still sending", so no retry waits on it forever.
+	if (attempt) {
+		await recordProviderAccepted(env.DB, attempt.id, providerId).catch(async (failure) => {
+			console.error('Failed to record the accepted send', attempt.id, failure);
+			await markSendUncertain(env.DB, attempt.id, failure).catch(() => {});
+		});
+	}
 
 	const emailId = await insertEmail(env.DB, {
 		userId: user.id,

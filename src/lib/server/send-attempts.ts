@@ -10,6 +10,13 @@ import type { D1Database } from '@cloudflare/workers-types';
 
 export const IDEMPOTENCY_HEADER = 'Idempotency-Key';
 
+/**
+ * How long a send may stay in flight before a retry stops waiting for it. A
+ * Worker that died mid-send never updates its row, and the mail may already be
+ * out, so after this the outcome is reported as unknown instead.
+ */
+export const SEND_LEASE_SECONDS = 5 * 60;
+
 /** UUIDs and similar opaque keys; long enough that collisions are the caller's intent. */
 export const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{8,200}$/;
 
@@ -85,16 +92,18 @@ export async function claimSendAttempt(
 
 	const existing = await db
 		.prepare(
-			`SELECT status, request_hash, email_id, provider_id, error
+			`SELECT status, request_hash, email_id, provider_id, error,
+			        (julianday('now') - julianday(updated_at)) * 86400 > ? AS stale
 			 FROM send_attempts WHERE id = ? AND user_id = ?`
 		)
-		.bind(id, userId)
+		.bind(SEND_LEASE_SECONDS, id, userId)
 		.first<{
 			status: 'sending' | 'sent' | 'failed';
 			request_hash: string;
 			email_id: string | null;
 			provider_id: string | null;
 			error: string | null;
+			stale: number;
 		}>();
 
 	if (existing && existing.request_hash !== requestHash) {
@@ -112,8 +121,9 @@ export async function claimSendAttempt(
 		throw new SendAttemptError('already_sent', 'This message was already sent.');
 	}
 	// Still `sending` with an error: the provider failed in a way that does not
-	// rule out delivery, such as a lost response.
-	if (existing?.error) {
+	// rule out delivery, such as a lost response. Still `sending` past its lease:
+	// whatever was sending it stopped without saying how it ended.
+	if (existing?.error || existing?.stale) {
 		throw new SendAttemptError(
 			'send_outcome_unknown',
 			"We couldn't confirm whether this message was sent. Check Sent, or with the recipient, before sending it again."
