@@ -89,8 +89,9 @@
 	}
 
 	/**
-	 * Switching provider must not carry the old one's address over: saving would
-	 * send the new key to it. Switching back restores what is saved.
+	 * Switching provider must not carry the old one's details over: saving would
+	 * send the new key to the old address, or a key typed for one provider to the
+	 * other. Switching back restores what is saved.
 	 */
 	function chooseKind(next: Kind) {
 		if (next === kind) return;
@@ -98,6 +99,7 @@
 		const saved = settings?.provider?.kind === next ? settings.provider : null;
 		baseUrl = saved?.base_url ?? '';
 		model = saved?.model ?? '';
+		apiKey = '';
 	}
 
 	async function load(): Promise<void> {
