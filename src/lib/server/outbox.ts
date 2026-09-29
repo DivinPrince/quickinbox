@@ -26,7 +26,13 @@ import {
 	recordProviderAccepted,
 	sha256Hex
 } from './send-attempts';
-import { claimDailySend, SendPolicyError, type ApiSendPolicy } from './send-policy';
+import {
+	claimDailySend,
+	refundDailySend,
+	SendPolicyError,
+	utcDay,
+	type ApiSendPolicy
+} from './send-policy';
 import { escapeHtml, parseRecipients, sendOutboundEmail, validateSubject } from './send-mail';
 
 export type ComposeInput = {
@@ -305,15 +311,21 @@ export async function sendAndStore(
 	}
 
 	const dailyLimit = input.apiPolicy?.dailyLimit;
+	// Set once a slot is taken, so a refused send can give it back.
+	let budgetDay: string | null = null;
 	let providerId: string;
 	try {
 		// Counted after the replay check: a retry that sends nothing costs nothing.
-		if (dailyLimit && !(await claimDailySend(env.DB, user.id, dailyLimit))) {
-			throw new SendPolicyError(
-				'daily_send_limit',
-				429,
-				`This account has reached its limit of ${dailyLimit} API sends today (UTC). Try again tomorrow.`
-			);
+		if (dailyLimit) {
+			const day = utcDay();
+			if (!(await claimDailySend(env.DB, user.id, dailyLimit, day))) {
+				throw new SendPolicyError(
+					'daily_send_limit',
+					429,
+					`This account has reached its limit of ${dailyLimit} API sends today (UTC). Try again tomorrow.`
+				);
+			}
+			budgetDay = day;
 		}
 		({ providerId } = await sendOutboundEmail(provider, {
 			from,
@@ -332,6 +344,12 @@ export async function sendAndStore(
 			...(attempt ? { idempotencyKey: `${attempt.id}:${fingerprint}` } : {})
 		}));
 	} catch (error) {
+		// Only a refusal proves nothing went out; an ambiguous failure keeps its slot.
+		if (budgetDay && providerRefused(error)) {
+			await refundDailySend(env.DB, user.id, budgetDay).catch((failure) =>
+				console.error('Failed to give back a refused send', user.id, failure)
+			);
+		}
 		if (attempt) {
 			const notSent = error instanceof SendPolicyError || providerRefused(error);
 			const record = notSent ? failSendAttempt : markSendUncertain;

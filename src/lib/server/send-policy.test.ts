@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { apiSendPolicy, claimDailySend, DEFAULT_API_DAILY_SEND_LIMIT } from './send-policy';
+import {
+	apiSendPolicy,
+	claimDailySend,
+	DEFAULT_API_DAILY_SEND_LIMIT,
+	refundDailySend,
+	utcDay
+} from './send-policy';
 import { createTestDb, insertTestUser } from './test-db';
 
 describe('apiSendPolicy', () => {
@@ -42,6 +48,17 @@ describe('claimDailySend', () => {
 		for (let i = 0; i < 4; i++) outcomes.push(await claimDailySend(db, 'user-1', 3));
 
 		assert.deepEqual(outcomes, [true, true, true, false]);
+	});
+
+	test('a refunded slot can be used again', async () => {
+		const { db, sqlite } = createTestDb();
+		insertTestUser(sqlite, 'user-1');
+		const day = utcDay();
+
+		assert.equal(await claimDailySend(db, 'user-1', 1, day), true);
+		await refundDailySend(db, 'user-1', day);
+		assert.equal(await claimDailySend(db, 'user-1', 1, day), true);
+		assert.equal(await claimDailySend(db, 'user-1', 1, day), false);
 	});
 
 	test('counts each user separately', async () => {
