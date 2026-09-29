@@ -346,6 +346,9 @@ async function openAiCompatibleText(
 	try {
 		response = await fetcher(chatCompletionsUrl(provider.baseUrl), {
 			method: 'POST',
+			// Never follow a redirect with the key attached: on compatibility dates
+			// before 2025-09-01, Workers keep Authorization across origins.
+			redirect: 'manual',
 			headers: {
 				Authorization: `Bearer ${provider.apiKey}`,
 				'Content-Type': 'application/json'
@@ -364,6 +367,14 @@ async function openAiCompatibleText(
 	} catch (error) {
 		throw new AiProviderError(
 			`Could not reach ${new URL(provider.baseUrl).host}: ${error instanceof Error ? error.message : 'network error'}`,
+			502
+		);
+	}
+
+	if (response.status >= 300 && response.status < 400) {
+		const target = response.headers.get('location');
+		throw new AiProviderError(
+			`The provider redirected${target ? ` to ${target}` : ''}. Use the address it redirects to as the base URL.`.slice(0, 500),
 			502
 		);
 	}

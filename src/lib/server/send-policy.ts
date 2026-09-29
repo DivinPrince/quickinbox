@@ -50,13 +50,18 @@ export class SendPolicyError extends Error {
 	}
 }
 
-/** Count one send against today's allowance; false once it is used up. */
+/** The UTC day an allowance is counted against, e.g. 2026-09-29. */
+export function utcDay(now = new Date()): string {
+	return now.toISOString().slice(0, 10);
+}
+
+/** Count one send against the day's allowance; false once it is used up. */
 export async function claimDailySend(
 	db: D1Database,
 	userId: string,
-	limit: number
+	limit: number,
+	day = utcDay()
 ): Promise<boolean> {
-	const day = new Date().toISOString().slice(0, 10);
 	// One statement, so two concurrent sends cannot both take the last slot.
 	const claimed = await db
 		.prepare(
@@ -69,4 +74,15 @@ export async function claimDailySend(
 		.bind(userId, day, limit)
 		.first<{ send_count: number }>();
 	return Boolean(claimed);
+}
+
+/** Give back a slot for a send the provider refused, so it never went out. */
+export async function refundDailySend(db: D1Database, userId: string, day: string): Promise<void> {
+	await db
+		.prepare(
+			`UPDATE api_send_budget SET send_count = send_count - 1
+			 WHERE user_id = ? AND day = ? AND send_count > 0`
+		)
+		.bind(userId, day)
+		.run();
 }
