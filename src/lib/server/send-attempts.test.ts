@@ -60,6 +60,21 @@ describe('claimSendAttempt', () => {
 		);
 	});
 
+	test('stops waiting on a send that never finished', async () => {
+		const { db, sqlite } = setup();
+		const first = await claimSendAttempt(db, 'user-1', 'key-12345', 'hash-a');
+		// The Worker died mid-send: the row was never updated again.
+		sqlite
+			.query(`UPDATE send_attempts SET updated_at = datetime('now', '-10 minutes') WHERE id = ?`)
+			.run(first.id);
+
+		await assert.rejects(
+			claimSendAttempt(db, 'user-1', 'key-12345', 'hash-a'),
+			(error: unknown) =>
+				error instanceof SendAttemptError && error.code === 'send_outcome_unknown'
+		);
+	});
+
 	test('lets a failed send be retried, even after the message was edited', async () => {
 		const { db, sqlite } = setup();
 		const first = await claimSendAttempt(db, 'user-1', 'key-12345', 'hash-a');

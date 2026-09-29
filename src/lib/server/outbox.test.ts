@@ -385,6 +385,49 @@ describe('sendAndStore with an idempotency key', () => {
 		assert.equal(sent.length, 1);
 	});
 
+	/** The same database, except that noting the provider's acceptance fails. */
+	function failAcceptedNote(env: { DB: D1Database; ATTACHMENTS: R2Bucket }) {
+		const db = env.DB;
+		const failing = {
+			...db,
+			batch: db.batch.bind(db),
+			prepare(sql: string) {
+				if (!sql.includes('SET provider_id = ?')) return db.prepare(sql);
+				const statement = {
+					bind: () => statement,
+					run: async () => {
+						throw new Error('D1 unavailable');
+					}
+				};
+				return statement;
+			}
+		} as unknown as D1Database;
+		return { ...env, DB: failing };
+	}
+
+	test('a failed note of the provider accepting still finishes the send', async () => {
+		const { env, provider, sent } = setup(async () => ({ providerId: 'provider-1' }));
+
+		const first = await sendAndStore(failAcceptedNote(env), provider, user, message);
+		const retry = await sendAndStore(env, provider, user, message);
+
+		assert.equal(retry.emailId, first.emailId);
+		assert.equal(sent.length, 1);
+	});
+
+	test('if that note and the Sent save both fail, a retry is told the outcome is unknown', async () => {
+		const { env, provider, sent, sqlite } = setup(async () => ({ providerId: 'provider-1' }));
+		sqlite.exec('ALTER TABLE emails RENAME TO emails_unavailable');
+
+		await assert.rejects(sendAndStore(failAcceptedNote(env), provider, user, message));
+		await assert.rejects(
+			sendAndStore(env, provider, user, message),
+			(error: unknown) =>
+				error instanceof SendAttemptError && error.code === 'send_outcome_unknown'
+		);
+		assert.equal(sent.length, 1);
+	});
+
 	test('a send that went out but failed to save is not sent again', async () => {
 		const { env, provider, sent, sqlite } = setup(async () => ({ providerId: 'provider-1' }));
 		sqlite.exec('ALTER TABLE emails RENAME TO emails_unavailable');
