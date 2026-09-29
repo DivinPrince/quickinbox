@@ -88,6 +88,18 @@
 		apiKey = '';
 	}
 
+	/**
+	 * Switching provider must not carry the old one's address over: saving would
+	 * send the new key to it. Switching back restores what is saved.
+	 */
+	function chooseKind(next: Kind) {
+		if (next === kind) return;
+		kind = next;
+		const saved = settings?.provider?.kind === next ? settings.provider : null;
+		baseUrl = saved?.base_url ?? '';
+		model = saved?.model ?? '';
+	}
+
 	async function load(): Promise<void> {
 		try {
 			const response = await fetch(endpoint, { cache: 'no-store' });
@@ -182,7 +194,13 @@
 				<legend class="sr-only">{t('ai.provider')}</legend>
 				{#each kinds as option (option)}
 					<label class="kind" class:selected={kind === option}>
-						<input type="radio" name="ai-kind-{scope}" value={option} bind:group={kind} />
+						<input
+							type="radio"
+							name="ai-kind-{scope}"
+							value={option}
+							checked={kind === option}
+							onchange={() => chooseKind(option)}
+						/>
 						{kindLabel(option)}
 					</label>
 				{/each}

@@ -169,6 +169,31 @@ describe('generateText', () => {
 		await assert.rejects(generateText(env, provider, request, fetcher), /404: model not found/);
 	});
 
+	test('refuses to follow a redirect with the key attached', async () => {
+		const calls: RequestInit[] = [];
+		const fetcher = (async (_url: string, init: RequestInit) => {
+			calls.push(init);
+			return new Response(null, {
+				status: 307,
+				headers: { location: 'https://elsewhere.example/v1/chat/completions' }
+			});
+		}) as unknown as typeof fetch;
+		const provider: ResolvedAiProvider = {
+			source: 'user',
+			kind: 'openai',
+			baseUrl: 'https://gateway.example.com/v1',
+			model: 'gpt-5-mini',
+			apiKey: 'sk-secret'
+		};
+
+		await assert.rejects(
+			generateText(env, provider, request, fetcher),
+			/redirected to https:\/\/elsewhere\.example/
+		);
+		assert.equal(calls.length, 1);
+		assert.equal(calls[0].redirect, 'manual');
+	});
+
 	test('calls the Anthropic Messages API', async () => {
 		const calls: { url: string; init: RequestInit }[] = [];
 		const fetcher = (async (url: string, init: RequestInit) => {
