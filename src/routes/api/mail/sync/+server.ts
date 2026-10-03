@@ -5,7 +5,7 @@ import { MAILBOX_SYNC_HOLD_MS, MAILBOX_SYNC_TICK_MS, waitForAbortable } from '$l
 /**
  * Long-poll for mailbox inserts/deletes. The inbound webhook and this request
  * run on different Worker isolates, so we watch D1 instead of pushing from
- * the receive path.
+ * the receive path. Each tick reads a single users row.
  */
 export const GET: RequestHandler = async ({ locals, platform, url, request }) => {
 	const db = platform?.env.DB;
@@ -14,13 +14,13 @@ export const GET: RequestHandler = async ({ locals, platform, url, request }) =>
 	}
 
 	const held = url.searchParams.get('cursor');
-	let cursor = await getMailboxCursor(db, locals.user.id, locals.activeDomainId);
+	let cursor = await getMailboxCursor(db, locals.user.id);
 	const deadline = Date.now() + MAILBOX_SYNC_HOLD_MS;
 
 	while (held && cursor === held && Date.now() < deadline) {
 		const stillOpen = await waitForAbortable(MAILBOX_SYNC_TICK_MS, request.signal);
 		if (!stillOpen) break;
-		cursor = await getMailboxCursor(db, locals.user.id, locals.activeDomainId);
+		cursor = await getMailboxCursor(db, locals.user.id);
 	}
 
 	return json(
