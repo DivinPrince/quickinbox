@@ -273,6 +273,26 @@ export function emailCss(rich: boolean): string {
 	return BASE_CSS + (rich ? RICH_CSS : SIMPLE_CSS);
 }
 
+/**
+ * Measures the full painted height of an email document.
+ *
+ * A first child's top margin can collapse through <body>. In that case the
+ * body reports only its own box height even though its contents end farther
+ * down the page. The body's bottom edge catches that missing margin without
+ * relying on the root's scroll height, which Safari floors at the iframe's
+ * current viewport height after the first sizing pass.
+ */
+export function measureEmailDocument(doc: Document, includeRoot: boolean): number {
+	const bodyBottom =
+		doc.body.getBoundingClientRect().bottom - doc.documentElement.getBoundingClientRect().top;
+	const body = Math.max(doc.body.scrollHeight, doc.body.offsetHeight, bodyBottom);
+	const root = includeRoot
+		? Math.max(doc.documentElement.scrollHeight, doc.documentElement.offsetHeight)
+		: 0;
+
+	return Math.ceil(Math.max(body, root));
+}
+
 /** Marks our stylesheet so a later pass can tell it is already in place. */
 export const EMAIL_STYLE_ID = '__mail-frame-style';
 
