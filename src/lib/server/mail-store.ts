@@ -502,50 +502,18 @@ export async function listEmails(
 }
 
 /**
- * Cheap "has anything been inserted or deleted?" fingerprint. Flag changes
- * (read, star, archive) do not move this, so a live poll can refresh on new
- * mail without fighting the user's current selection.
+ * Cheap "has anything changed?" fingerprint for live sync. Triggers bump the
+ * epoch on every insert and delete (migration 0030), and label, category and
+ * spam edits bump it explicitly, so this reads one row however large the
+ * mailbox is. Flag changes (read, star, archive) do not move it, so a live
+ * poll can refresh on new mail without fighting the user's current selection.
  */
-export function encodeMailboxCursor(
-	messageCount: number,
-	latestRowid: number,
-	epoch = 0
-): string {
-	if (!epoch) return `${messageCount}:${latestRowid}`;
-	return `${messageCount}:${latestRowid}:${epoch}`;
-}
-
-export async function getMailboxCursor(
-	db: D1Database,
-	userId: string,
-	domainId?: string | null
-): Promise<string> {
-	const bindings: unknown[] = [userId];
-	let scope = 'user_id = ?';
-	if (domainId) {
-		scope += ' AND domain_id = ?';
-		bindings.push(domainId);
-	}
-
-	const [row, epochRow] = await Promise.all([
-		db
-			.prepare(
-				`SELECT COUNT(*) AS message_count, COALESCE(MAX(rowid), 0) AS latest_rowid
-				 FROM emails WHERE ${scope}`
-			)
-			.bind(...bindings)
-			.first<{ message_count: number | string | null; latest_rowid: number | string | null }>(),
-		db
-			.prepare('SELECT COALESCE(mailbox_epoch, 0) AS mailbox_epoch FROM users WHERE id = ?')
-			.bind(userId)
-			.first<{ mailbox_epoch: number | string | null }>()
-	]);
-
-	return encodeMailboxCursor(
-		Number(row?.message_count ?? 0),
-		Number(row?.latest_rowid ?? 0),
-		Number(epochRow?.mailbox_epoch ?? 0)
-	);
+export async function getMailboxCursor(db: D1Database, userId: string): Promise<string> {
+	const row = await db
+		.prepare('SELECT mailbox_epoch FROM users WHERE id = ?')
+		.bind(userId)
+		.first<{ mailbox_epoch: number | string | null }>();
+	return String(Number(row?.mailbox_epoch ?? 0));
 }
 
 export async function bumpMailboxEpoch(db: D1Database, userId: string): Promise<void> {
