@@ -20,6 +20,9 @@
 	let replyAttachments = $state<OutboundAttachmentInput[]>([]);
 	let replyOpen = $state(false);
 	let sending = $state(false);
+	// One key per message: a resubmit after a dropped response can't send twice.
+	let replyKey = crypto.randomUUID();
+	let forwardKey = crypto.randomUUID();
 	let error = $state('');
 
 	type ForwardTarget = { kind: 'thread' } | { kind: 'message'; id: string };
@@ -233,6 +236,8 @@
 	function openReply() {
 		forwardTarget = null;
 		replyOpen = !replyOpen;
+		// An empty composer starts a new message; kept text is the same one resumed.
+		if (replyOpen && isHtmlEmpty(replyHtml)) replyKey = crypto.randomUUID();
 		error = '';
 	}
 
@@ -243,6 +248,7 @@
 			(target.kind === 'thread' ||
 				(forwardTarget.kind === 'message' && forwardTarget.id === target.id));
 		forwardTarget = sameTarget ? null : target;
+		if (forwardTarget && isHtmlEmpty(forwardHtml)) forwardKey = crypto.randomUUID();
 		includeAttachments = true;
 		error = '';
 	}
@@ -262,7 +268,7 @@
 					: `/api/mail/${encodeURIComponent(forwardTarget.id)}/forward`;
 			const res = await fetch(endpoint, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', 'Idempotency-Key': forwardKey },
 				body: JSON.stringify({
 					to: forwardTo,
 					html: isHtmlEmpty(forwardHtml) ? undefined : forwardHtml,
@@ -276,6 +282,7 @@
 				return;
 			}
 
+			forwardKey = crypto.randomUUID();
 			forwardTo = '';
 			forwardHtml = '';
 			forwardTarget = null;
@@ -299,7 +306,7 @@
 		try {
 			const res = await fetch(`/api/mail/${latest.id}`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', 'Idempotency-Key': replyKey },
 				body: JSON.stringify({
 					html: replyHtml,
 					text: htmlToPlainText(replyHtml),
@@ -312,6 +319,7 @@
 				return;
 			}
 
+			replyKey = crypto.randomUUID();
 			replyHtml = '';
 			replyAttachments = [];
 			replyOpen = false;

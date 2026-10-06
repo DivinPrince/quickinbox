@@ -104,6 +104,11 @@ export type ListThreadsQuery = {
 	label?: string;
 };
 
+/** Sends that carry a key are sent at most once, however often they are retried. */
+function idempotencyHeaders(key: string | undefined): Record<string, string> {
+	return key ? { 'idempotency-key': key } : {};
+}
+
 export class QuickInboxClient {
 	readonly url: string;
 
@@ -169,17 +174,25 @@ export class QuickInboxClient {
 		cc?: string;
 		bcc?: string;
 		fromAddressId?: string;
+		idempotencyKey?: string;
 	}): Promise<{ id: string }> {
+		const { idempotencyKey, ...body } = input;
 		return this.request('/api/mail', {
 			method: 'POST',
-			body: JSON.stringify(input)
+			headers: idempotencyHeaders(idempotencyKey),
+			body: JSON.stringify(body)
 		});
 	}
 
-	async reply(id: string, input: { text?: string; html?: string; fromAddressId?: string }): Promise<{ id: string }> {
+	async reply(
+		id: string,
+		input: { text?: string; html?: string; fromAddressId?: string; idempotencyKey?: string }
+	): Promise<{ id: string }> {
+		const { idempotencyKey, ...body } = input;
 		return this.request(`/api/mail/${encodeURIComponent(id)}`, {
 			method: 'POST',
-			body: JSON.stringify(input)
+			headers: idempotencyHeaders(idempotencyKey),
+			body: JSON.stringify(body)
 		});
 	}
 

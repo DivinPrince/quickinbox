@@ -58,6 +58,8 @@
 	let attachments = $state<OutboundAttachmentInput[]>([]);
 	let includeOriginalAttachments = $state(true);
 	let sending = $state(false);
+	// One key per message: a resubmit after a dropped response can't send twice.
+	let sendKey = crypto.randomUUID();
 	let sendError = $state('');
 	let dark = $state(false);
 	let detailsFor = $state<string | null>(null);
@@ -301,6 +303,8 @@
 	}
 
 	function startReply(mode: ReplyMode, message: ThreadMessage) {
+		// A new reply or forward is a new message, so it gets its own key.
+		sendKey = crypto.randomUUID();
 		replyMode = mode;
 		replyTarget = message;
 		replyOpen = true;
@@ -374,7 +378,7 @@
 						: `/api/mail/${encodeURIComponent(message.id)}/forward`;
 				const response = await fetch(endpoint, {
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
+					headers: { 'Content-Type': 'application/json', 'Idempotency-Key': sendKey },
 					body: JSON.stringify({
 						to: replyTo,
 						cc: replyCc.trim() || undefined,
@@ -392,7 +396,7 @@
 			} else {
 				const response = await fetch(`/api/mail/${message.id}`, {
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
+					headers: { 'Content-Type': 'application/json', 'Idempotency-Key': sendKey },
 					body: JSON.stringify({
 						to: replyTo,
 						cc: replyCc.trim() || undefined,
@@ -408,6 +412,7 @@
 					return;
 				}
 			}
+			sendKey = crypto.randomUUID();
 			replyOpen = false;
 			replyHtml = '';
 			attachments = [];

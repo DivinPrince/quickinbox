@@ -14,6 +14,7 @@ export type ForwardRequest = {
 	text?: string;
 	html?: string;
 	includeAttachments?: boolean;
+	idempotencyKey?: string;
 };
 
 export async function readForwardedAttachments(
@@ -71,7 +72,8 @@ export async function sendForwardedMessages(
 		html,
 		attachments,
 		allowCombinedAttachments: ordered.length > 1,
-		subjectMatch: false
+		subjectMatch: false,
+		idempotencyKey: input.idempotencyKey
 	});
 
 	return { emailId };

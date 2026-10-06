@@ -6,6 +6,7 @@ import {
 } from '$lib/server/context';
 import { deleteDraft, listMailbox } from '$lib/server/mail-store';
 import { sendAndStore } from '$lib/server/outbox';
+import { readIdempotencyKey } from '$lib/server/send-attempts';
 import type { MailboxView, OutboundAttachmentInput } from '$lib/types';
 import { mailboxCategoryFilter } from '$lib/mail/categories';
 
@@ -86,6 +87,11 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
+	const idempotencyKey = readIdempotencyKey(request);
+	if (idempotencyKey === null) {
+		return json({ error: 'Invalid Idempotency-Key' }, { status: 400 });
+	}
+
 	const body = (await request.json()) as SendMailBody;
 
 	if (!body.to?.trim() || !body.subject?.trim() || (!body.text?.trim() && !body.html?.trim())) {
@@ -106,7 +112,8 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 				subject: body.subject,
 				text: body.text,
 				html: body.html,
-				attachments: body.attachments
+				attachments: body.attachments,
+				idempotencyKey
 			}
 		);
 
