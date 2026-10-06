@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { EMAIL_STYLE_ID, buildEmailDocument, emailCss, isRichHtml } from '$lib/utils/email-html';
+	import {
+		EMAIL_STYLE_ID,
+		buildEmailDocument,
+		emailCss,
+		isRichHtml,
+		measureEmailDocument
+	} from '$lib/utils/email-html';
 	import { canFoldQuotes, foldQuotedHtml } from '$lib/utils/quotes';
 	import { t } from '$lib/i18n';
 
@@ -76,18 +82,10 @@
 		const doc = frame?.contentDocument;
 		if (!doc?.body) return;
 
-		// WebKit can report the table's height on the root while body.scrollHeight
-		// is still the height of the last painted fragment. Use every independent
-		// signal, otherwise a late-loading marketing image can leave the upper part
-		// of a forwarded message outside the iframe's measured viewport.
-		const body = Math.max(doc.body.scrollHeight, doc.body.offsetHeight);
 		// Once sized, the root's scrollHeight includes the iframe viewport itself
 		// in Safari. It is useful only for the first pass, before that viewport has
 		// been set, or it would make a later shorter message impossible to shrink.
-		const root = height === 0
-			? Math.max(doc.documentElement.scrollHeight, doc.documentElement.offsetHeight)
-			: 0;
-		const next = Math.ceil(Math.max(body, root));
+		const next = measureEmailDocument(doc, height === 0);
 		if (next > 0 && Math.abs(next - height) > 1) height = next;
 	}
 
