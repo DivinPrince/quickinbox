@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { adaptDarkColours } from './email-html';
+import { adaptDarkColours, measureEmailDocument } from './email-html';
 
 test('adapts named black and white colors for dark mode', () => {
 	assert.equal(
@@ -43,4 +43,21 @@ test('does not scan unbounded unterminated rgb functions', () => {
 		adaptDarkColours(`<p style="color:${malformed}">Hello</p>`),
 		`<p style="color:${malformed}">Hello</p>`
 	);
+});
+
+test('measures content whose first margin collapses outside the body box', () => {
+	const doc = {
+		body: {
+			scrollHeight: 249,
+			offsetHeight: 249,
+			getBoundingClientRect: () => ({ bottom: 267.96875 })
+		},
+		documentElement: {
+			scrollHeight: 249,
+			offsetHeight: 249,
+			getBoundingClientRect: () => ({ top: 0 })
+		}
+	} as unknown as Document;
+
+	assert.equal(measureEmailDocument(doc, false), 268);
 });

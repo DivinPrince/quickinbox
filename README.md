@@ -361,12 +361,13 @@ Built for agents that read untrusted mail:
   it back as `expected_recipients`. It fails with `conversation_advanced` if the
   conversation has a newer message than the one being answered (theirs, or a
   reply someone else sent meanwhile), or `recipient_changed` if the target differs — writing to anyone else takes
-  `send_message`. Errors like these come back as `{ "error": { "code", "message",
-  "retryable" } }`.
+  `send_message`. On the hosted MCP, errors like these come back as
+  `{ "error": { "code", "message", "retryable" } }`.
 - Sends made with an API key or MCP token — REST, CLI, or MCP — are capped at
   100 per user per UTC day. Set `API_DAILY_SEND_LIMIT` to change that (`0`
   removes the cap). Set `API_SEND_ENABLED=false` to stop them all at once: the
-  send tools disappear from every MCP client, and the REST API answers `403`.
+  hosted MCP stops listing the send tools, and the REST API (and so the CLI's
+  stdio MCP) answers `403`.
   Neither touches sending from the web app.
 
 Under the hood this is a standard OAuth 2.1 authorization server (RFC 8414 and

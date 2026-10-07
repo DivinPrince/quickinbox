@@ -562,6 +562,19 @@ describe('sendAndStore for API keys and MCP', () => {
 		);
 	});
 
+	test('a failure before the provider is called leaves the key free to retry', async () => {
+		const { env, provider, sent, sqlite } = setup(ok);
+		const apiPolicy = { enabled: true, dailyLimit: 1 };
+		sqlite.query('ALTER TABLE api_send_budget RENAME TO api_send_budget_gone').run();
+
+		await assert.rejects(sendAndStore(env, provider, user, { ...message, apiPolicy }));
+		assert.equal(sent.length, 0);
+
+		sqlite.query('ALTER TABLE api_send_budget_gone RENAME TO api_send_budget').run();
+		await sendAndStore(env, provider, user, { ...message, apiPolicy });
+		assert.equal(sent.length, 1);
+	});
+
 	test('a replayed retry does not use up the allowance', async () => {
 		const { env, provider, sent } = setup(ok);
 		const apiPolicy = { enabled: true, dailyLimit: 1 };

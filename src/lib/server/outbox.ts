@@ -313,6 +313,8 @@ export async function sendAndStore(
 	const dailyLimit = input.apiPolicy?.dailyLimit;
 	// Set once a slot is taken, so a refused send can give it back.
 	let budgetDay: string | null = null;
+	// Anything that fails before the provider is called certainly sent nothing.
+	let providerCalled = false;
 	let providerId: string;
 	try {
 		// Counted after the replay check: a retry that sends nothing costs nothing.
@@ -327,6 +329,7 @@ export async function sendAndStore(
 			}
 			budgetDay = day;
 		}
+		providerCalled = true;
 		({ providerId } = await sendOutboundEmail(provider, {
 			from,
 			senderName: from.label?.trim() || user.name,
@@ -351,7 +354,8 @@ export async function sendAndStore(
 			);
 		}
 		if (attempt) {
-			const notSent = error instanceof SendPolicyError || providerRefused(error);
+			const notSent =
+				!providerCalled || error instanceof SendPolicyError || providerRefused(error);
 			const record = notSent ? failSendAttempt : markSendUncertain;
 			await record(env.DB, attempt.id, error).catch((failure) =>
 				console.error('Failed to record the failed send attempt', attempt.id, failure)

@@ -5,7 +5,6 @@ import type { EmailRow } from '$lib/types';
 import { buildThreadParticipants } from './thread-participants';
 import {
 	countUnclassifiedInbound,
-	encodeMailboxCursor,
 	getMailboxCounts,
 	getMailboxCursor,
 	listForwardThreadMessages,
@@ -141,33 +140,16 @@ test('forward-thread lookup rejects cross-user messages and returns the owned th
 	assert.deepEqual(await listForwardThreadMessages(db, 'user-3', 'thread-1'), []);
 });
 
-test('mailbox cursor is a count plus latest rowid and can scope to a domain', async () => {
-	const binds: unknown[][] = [];
+test('mailbox cursor reads one users row, not the mailbox', async () => {
+	const queries: { sql: string; binds: unknown[] }[] = [];
 	const db = {
 		prepare(sql: string) {
-			if (sql.includes('mailbox_epoch')) {
-				return {
-					bind(...values: unknown[]) {
-						binds.push(values);
-						return {
-							async first() {
-								return { mailbox_epoch: 0 };
-							}
-						};
-					}
-				};
-			}
-			assert.match(sql, /COUNT\(\*\)/);
-			assert.match(sql, /MAX\(rowid\)/);
 			return {
-				bind(...values: unknown[]) {
-					binds.push(values);
+				bind(...binds: unknown[]) {
+					queries.push({ sql, binds });
 					return {
 						async first() {
-							return {
-								message_count: values.length === 2 ? 4 : 9,
-								latest_rowid: 41
-							};
+							return { mailbox_epoch: 7 };
 						}
 					};
 				}
@@ -175,10 +157,11 @@ test('mailbox cursor is a count plus latest rowid and can scope to a domain', as
 		}
 	} as unknown as D1Database;
 
-	assert.equal(encodeMailboxCursor(0, 0), '0:0');
-	assert.equal(await getMailboxCursor(db, 'user-1'), '9:41');
-	assert.equal(await getMailboxCursor(db, 'user-1', 'domain-9'), '4:41');
-	assert.deepEqual(binds, [['user-1'], ['user-1'], ['user-1', 'domain-9'], ['user-1']]);
+	assert.equal(await getMailboxCursor(db, 'user-1'), '7');
+	assert.equal(queries.length, 1);
+	assert.match(queries[0].sql, /FROM users WHERE id = \?/);
+	assert.doesNotMatch(queries[0].sql, /emails/);
+	assert.deepEqual(queries[0].binds, ['user-1']);
 });
 
 test('mailbox counts keep Primary unread separate from Social and exclude spam from every tab', async () => {
