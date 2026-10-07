@@ -2170,7 +2170,8 @@
 }
 
 @container thread (max-width: 32rem) {
-	.z-thread .z-thread-replyall span {
+	/* The label only: the icon is a span too, and hiding it leaves an empty pill. */
+	.z-thread .z-thread-replyall span:not(.z-icon) {
 		display: none;
 	}
 }
