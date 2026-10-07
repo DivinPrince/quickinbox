@@ -379,12 +379,12 @@
 			// The reply may have moved on — closed, sent, or another thread — while
 			// the model was writing; never drop a draft into the wrong composer.
 			if (!replyOpen || (replyTarget ?? latest)?.id !== message.id) return;
-			if (replyHtml !== before) {
-				sendError = t('thread.draftStale');
-				return;
-			}
 			if (!response.ok || !body.text) {
 				sendError = body.error ?? t('thread.draftFailed');
+				return;
+			}
+			if (replyHtml !== before) {
+				sendError = t('thread.draftStale');
 				return;
 			}
 			replyHtml = plainTextToHtml(body.text);

@@ -312,12 +312,12 @@
 			const body = (await res.json()) as { text?: string; error?: string };
 			// The reply may have moved on while the model was writing.
 			if (!replyOpen || latest?.id !== target) return;
-			if (replyHtml !== before) {
-				error = t('thread.draftStale');
-				return;
-			}
 			if (!res.ok || !body.text) {
 				error = body.error ?? t('thread.draftFailed');
+				return;
+			}
+			if (replyHtml !== before) {
+				error = t('thread.draftStale');
 				return;
 			}
 			replyHtml = plainTextToHtml(body.text);
