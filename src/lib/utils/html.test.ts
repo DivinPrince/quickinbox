@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isHtmlEmpty } from './html';
+import { isHtmlEmpty, plainTextToHtml } from './html';
 
 test('treats image tags as content', () => {
 	assert.equal(isHtmlEmpty('<p><img src="x" alt=""></p>'), false);
@@ -23,4 +23,11 @@ test('SSR emptiness decodes numeric and hex whitespace entities', () => {
 	} finally {
 		if (hadParser) globalThis.DOMParser = original;
 	}
+});
+
+test('plainTextToHtml keeps paragraphs and line breaks and escapes markup', () => {
+	assert.equal(
+		plainTextToHtml('Hi Sam,\n\nThursday works.\nSee you <then> & there.\n'),
+		'<p>Hi Sam,</p><p>Thursday works.<br>See you &lt;then&gt; &amp; there.</p>'
+	);
 });

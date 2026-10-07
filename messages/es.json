@@ -339,7 +339,12 @@
 		"replyAllLabel": "Responder a todos",
 		"replyingTo": "Respondiendo a",
 		"notePlaceholder": "Añadir una nota…",
-		"replyPlaceholder": "Responder…"
+		"replyPlaceholder": "Responder…",
+		"draftReply": "Redactar respuesta",
+		"drafting": "Redactando…",
+		"replaceWithDraft": "¿Reemplazar lo que escribiste por un borrador de la IA?",
+		"draftFailed": "No se pudo redactar una respuesta.",
+		"draftStale": "Borrador descartado: la respuesta cambió mientras se redactaba."
 	},
 	"search": {
 		"title": "Buscar",
@@ -666,6 +671,10 @@
 		"testing": "Probando…",
 		"testPassed": "Conectado a {model}. Respondió: «{reply}»",
 		"removeOwnConfirm": "¿Quitar tu clave de IA? La redacción usará el valor predeterminado del servidor, si existe.",
-		"removeInstanceConfirm": "¿Quitar el valor predeterminado del servidor? Quien no tenga clave propia ya no podrá redactar."
+		"removeInstanceConfirm": "¿Quitar el valor predeterminado del servidor? Quien no tenga clave propia ya no podrá redactar.",
+		"instructions": "Instrucciones de redacción",
+		"instructionsHint": "Se aplican a cada borrador, sea cual sea el modelo: quién eres, tu tono y qué no prometer nunca.",
+		"instructionsPlaceholder": "p. ej. Gestiono colaboraciones de investigación. Respuestas breves y cordiales. Nunca comprometer fechas ni precios.",
+		"instructionsSaved": "Instrucciones guardadas."
 	}
 }

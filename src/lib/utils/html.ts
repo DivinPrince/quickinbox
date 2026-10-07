@@ -24,6 +24,22 @@ export function isHtmlEmpty(html: string): boolean {
 	return !htmlToPlainText(html);
 }
 
+/** Plain text (an AI draft) → editor HTML: paragraphs at blank lines, breaks within them. */
+export function plainTextToHtml(text: string): string {
+	return text
+		.trim()
+		.split(/\n{2,}/)
+		.map((paragraph) => {
+			const escaped = paragraph
+				.replaceAll('&', '&amp;')
+				.replaceAll('<', '&lt;')
+				.replaceAll('>', '&gt;')
+				.replaceAll('"', '&quot;');
+			return `<p>${escaped.replaceAll('\n', '<br>')}</p>`;
+		})
+		.join('');
+}
+
 export function formatFileSize(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;

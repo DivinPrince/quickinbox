@@ -339,7 +339,12 @@
 		"replyAllLabel": "全部回复",
 		"replyingTo": "正在回复",
 		"notePlaceholder": "添加备注…",
-		"replyPlaceholder": "回复…"
+		"replyPlaceholder": "回复…",
+		"draftReply": "起草回复",
+		"drafting": "起草中…",
+		"replaceWithDraft": "用 AI 草稿替换你已写的内容？",
+		"draftFailed": "无法起草回复。",
+		"draftStale": "草稿已丢弃：起草期间回复内容已更改。"
 	},
 	"search": {
 		"title": "搜索",
@@ -666,6 +671,10 @@
 		"testing": "测试中…",
 		"testPassed": "已连接到 {model}。它回复：“{reply}”",
 		"removeOwnConfirm": "删除你的 AI 密钥？起草将改用服务器默认值（如有）。",
-		"removeInstanceConfirm": "删除服务器默认值？没有个人密钥的用户将无法再起草。"
+		"removeInstanceConfirm": "删除服务器默认值？没有个人密钥的用户将无法再起草。",
+		"instructions": "起草说明",
+		"instructionsHint": "无论使用哪个模型，每份草稿都会遵循：你是谁、你的语气、绝不能承诺的事项。",
+		"instructionsPlaceholder": "例如：我负责研究合作。回复简短友好。绝不承诺日期或价格。",
+		"instructionsSaved": "说明已保存。"
 	}
 }
