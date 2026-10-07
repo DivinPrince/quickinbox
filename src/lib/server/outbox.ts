@@ -1,5 +1,5 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
-import type { MailAddress, OutboundAttachmentInput, User } from '$lib/types';
+import type { EmailRow, MailAddress, OutboundAttachmentInput, User } from '$lib/types';
 import { appendEmailSignature, pickEmailSignature } from '$lib/email-signature';
 import { base64ByteLength, insertAttachments } from './attachments';
 import {
@@ -13,10 +13,10 @@ import {
 	getDomainByName,
 	listAddressesForUser
 } from './domains';
-import { parseEmailAddress } from './email-address';
+import { parseEmailAddress, parseEmailAddresses } from './email-address';
 import { getEmailSignature } from './email-signature';
 import { stripHtml } from './html';
-import { insertEmail } from './mail-store';
+import { insertEmail, listThreadMessages } from './mail-store';
 import { initialOutboundStatus, ProviderError, type EmailProvider } from './email-provider';
 import {
 	claimSendAttempt,
@@ -26,6 +26,13 @@ import {
 	recordProviderAccepted,
 	sha256Hex
 } from './send-attempts';
+import {
+	claimDailySend,
+	refundDailySend,
+	SendPolicyError,
+	utcDay,
+	type ApiSendPolicy
+} from './send-policy';
 import { escapeHtml, parseRecipients, sendOutboundEmail, validateSubject } from './send-mail';
 
 export type ComposeInput = {
@@ -48,6 +55,8 @@ export type ComposeInput = {
 	subjectMatch?: boolean;
 	/** Retries with the same key return the first result instead of sending again. */
 	idempotencyKey?: string | null;
+	/** Set when an API key or OAuth token is sending, never for a browser session. */
+	apiPolicy?: ApiSendPolicy;
 };
 
 export function assertTotalAttachmentBytes(totalBytes: number): void {
@@ -155,6 +164,62 @@ export async function resolveReplyFromAddress(
 	return getDefaultAddress(db, user.id);
 }
 
+/** Who a reply goes to: the sender, or — replying to our own message — its recipients. */
+export function replyTarget(message: Pick<EmailRow, 'direction' | 'from_addr' | 'to_addr'>): string[] {
+	return parseEmailAddresses(message.direction === 'inbound' ? message.from_addr : message.to_addr);
+}
+
+export type ReplyGuardErrorCode = 'conversation_advanced' | 'recipient_changed';
+
+export class ReplyGuardError extends Error {
+	readonly status = 409;
+
+	constructor(
+		readonly code: ReplyGuardErrorCode,
+		message: string
+	) {
+		super(message);
+		this.name = 'ReplyGuardError';
+	}
+}
+
+function sameAddresses(left: string[], right: string[]): boolean {
+	const normalize = (values: string[]) =>
+		[...new Set(values.map((value) => parseEmailAddress(value)).filter(Boolean))].sort();
+	const a = normalize(left);
+	const b = normalize(right);
+	return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+/**
+ * An agent replies from what it last read. Refuse when that is stale: the
+ * conversation has moved past the message it is answering — a new message from
+ * them, or a reply someone else sent meanwhile — or the reply would reach
+ * someone other than the recipients it reviewed.
+ */
+export async function assertReplyReviewed(
+	db: D1Database,
+	userId: string,
+	original: EmailRow,
+	recipients: string[],
+	expectedRecipients: string[]
+): Promise<void> {
+	const messages = await listThreadMessages(db, userId, original);
+	const index = messages.findIndex((message) => message.id === original.id);
+	if (index >= 0 && index < messages.length - 1) {
+		throw new ReplyGuardError(
+			'conversation_advanced',
+			'This conversation has a newer message than the one you are replying to. Read it again and reply to the latest message.'
+		);
+	}
+	if (!sameAddresses(recipients, expectedRecipients)) {
+		throw new ReplyGuardError(
+			'recipient_changed',
+			`This reply would go to ${recipients.join(', ') || 'nobody'}, not the expected recipients. Read the conversation again before replying.`
+		);
+	}
+}
+
 /** What the recipient would receive — a reused Idempotency-Key must match it. */
 async function composeFingerprint(from: MailAddress, input: ComposeInput): Promise<string> {
 	// Each attachment is hashed on its own: joining up to 25 MB of base64 into
@@ -222,6 +287,14 @@ export async function sendAndStore(
 	const attachments = input.attachments ?? [];
 	assertOutboundAttachments(attachments, input.allowCombinedAttachments);
 
+	if (input.apiPolicy && !input.apiPolicy.enabled) {
+		throw new SendPolicyError(
+			'api_sending_disabled',
+			403,
+			'Sending with API keys and MCP is turned off on this server'
+		);
+	}
+
 	// Checked before an attempt is claimed, so a typo never locks its key.
 	const subjectError = validateSubject(input.subject);
 	if (subjectError) throw new Error(subjectError);
@@ -237,8 +310,26 @@ export async function sendAndStore(
 		return { emailId: attempt.emailId, providerId: attempt.providerId, from };
 	}
 
+	const dailyLimit = input.apiPolicy?.dailyLimit;
+	// Set once a slot is taken, so a refused send can give it back.
+	let budgetDay: string | null = null;
+	// Anything that fails before the provider is called certainly sent nothing.
+	let providerCalled = false;
 	let providerId: string;
 	try {
+		// Counted after the replay check: a retry that sends nothing costs nothing.
+		if (dailyLimit) {
+			const day = utcDay();
+			if (!(await claimDailySend(env.DB, user.id, dailyLimit, day))) {
+				throw new SendPolicyError(
+					'daily_send_limit',
+					429,
+					`This account has reached its limit of ${dailyLimit} API sends today (UTC). Try again tomorrow.`
+				);
+			}
+			budgetDay = day;
+		}
+		providerCalled = true;
 		({ providerId } = await sendOutboundEmail(provider, {
 			from,
 			senderName: from.label?.trim() || user.name,
@@ -256,8 +347,16 @@ export async function sendAndStore(
 			...(attempt ? { idempotencyKey: `${attempt.id}:${fingerprint}` } : {})
 		}));
 	} catch (error) {
+		// Only a refusal proves nothing went out; an ambiguous failure keeps its slot.
+		if (budgetDay && providerRefused(error)) {
+			await refundDailySend(env.DB, user.id, budgetDay).catch((failure) =>
+				console.error('Failed to give back a refused send', user.id, failure)
+			);
+		}
 		if (attempt) {
-			const record = providerRefused(error) ? failSendAttempt : markSendUncertain;
+			const notSent =
+				!providerCalled || error instanceof SendPolicyError || providerRefused(error);
+			const record = notSent ? failSendAttempt : markSendUncertain;
 			await record(env.DB, attempt.id, error).catch((failure) =>
 				console.error('Failed to record the failed send attempt', attempt.id, failure)
 			);
