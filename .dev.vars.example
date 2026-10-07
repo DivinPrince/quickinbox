@@ -44,3 +44,10 @@ RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Forums, and spam. Keep the placeholder to skip — everything stays in Primary.
 # Production: wrangler secret put TYPESAFE_API_KEY
 TYPESAFE_API_KEY=REPLACE_WITH_YOUR_TYPESAFE_API_KEY
+
+# --- AI drafting ---
+# Encrypts the AI provider keys people save in Settings. 32+ random characters,
+# e.g. `openssl rand -base64 32`. `bun run setup` generates one. Set it once and
+# keep it: changing it makes every saved key unreadable.
+# Production: wrangler secret put ENCRYPTION_KEY
+ENCRYPTION_KEY=REPLACE_WITH_32_OR_MORE_RANDOM_CHARACTERS

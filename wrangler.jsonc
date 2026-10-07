@@ -50,6 +50,13 @@
 		}
 	],
 
+	// Workers AI, offered to admins as the instance's drafting provider. Unused
+	// (and unbilled) until an admin picks it under Admin › AI drafting.
+	"ai": {
+		"binding": "AI",
+		"remote": true
+	},
+
 	"d1_databases": [
 		{
 			"binding": "DB",

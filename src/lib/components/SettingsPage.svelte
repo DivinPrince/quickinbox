@@ -23,6 +23,7 @@
 	import UiThemePicker from './UiThemePicker.svelte';
 	import LocalePicker from './LocalePicker.svelte';
 	import LabelsSettings from './LabelsSettings.svelte';
+	import AiProviderSettings from './AiProviderSettings.svelte';
 
 	type DeviceSession = {
 		id: string;
@@ -94,6 +95,8 @@
 				return t('nav.notifications');
 			case 'labels':
 				return t('nav.labels');
+			case 'ai':
+				return t('nav.ai');
 			case 'shortcuts':
 				return t('nav.shortcuts');
 			case 'all':
@@ -1010,6 +1013,10 @@
 
 	{#if show('labels')}
 		<LabelsSettings labels={($page.data.labels ?? []) as MailLabel[]} />
+	{/if}
+
+	{#if show('ai')}
+		<AiProviderSettings scope="user" />
 	{/if}
 
 	{#if section === 'shortcuts'}
