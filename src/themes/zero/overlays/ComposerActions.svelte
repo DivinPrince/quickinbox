@@ -8,6 +8,7 @@
 
 	let {
 		sending = false,
+		disabled = false,
 		attachments = $bindable([]),
 		includeOriginalAttachments = $bindable(true),
 		error = '',
@@ -16,6 +17,7 @@
 		extra
 	}: {
 		sending?: boolean;
+		disabled?: boolean;
 		attachments?: OutboundAttachmentInput[];
 		includeOriginalAttachments?: boolean;
 		error?: string;
@@ -78,7 +80,7 @@
 </script>
 
 <div class="z-composer-foot">
-	<button type="submit" class="z-send" disabled={sending}>
+	<button type="submit" class="z-send" disabled={sending || disabled}>
 		<span>{sending ? t('common.sending') : t('common.send')}</span>
 		<span class="z-send-kbd">
 			<span>{isMac ? '⌘' : 'Ctrl'}</span>

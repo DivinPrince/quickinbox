@@ -822,6 +822,7 @@
 						bind:attachments
 						bind:includeOriginalAttachments
 						sending={sending}
+						disabled={drafting}
 						error={sendError}
 						allowNewAttachments={!forwarding}
 						originalAttachmentCount={forwardedAttachmentCount}
