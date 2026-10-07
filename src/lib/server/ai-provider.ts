@@ -119,7 +119,10 @@ function httpsUrl(value: string): string {
 	return value.replace(/\/+$/, '');
 }
 
-/** Create or replace a provider. Leaving the key blank keeps the saved one. */
+/**
+ * Create or replace a provider. Leaving the key blank keeps the saved one, but
+ * only for the same kind and base URL, so a stored key never moves to a new host.
+ */
 export async function saveAiProvider(
 	db: D1Database,
 	env: AiEnv,
@@ -158,7 +161,7 @@ export async function saveAiProvider(
 			}
 			apiKey = await sealSecret(secret, newKey, sealContext(owner));
 			keyHint = newKey.slice(-4);
-		} else if (existing?.api_key && existing.kind === kind) {
+		} else if (existing?.api_key && existing.kind === kind && existing.base_url === baseUrl) {
 			apiKey = existing.api_key;
 			keyHint = existing.key_hint;
 		} else {
@@ -403,7 +406,10 @@ async function anthropicText(
 	const client = new Anthropic({
 		apiKey: provider.apiKey,
 		...(provider.baseUrl ? { baseURL: provider.baseUrl } : {}),
-		fetch: fetcher,
+		// x-api-key is a custom header, which fetch keeps across a cross-origin
+		// redirect. A 3xx comes back to the SDK as an error instead.
+		fetch: ((url: string | URL | Request, init?: RequestInit) =>
+			fetcher(url, { ...init, redirect: 'manual' })) as typeof fetch,
 		timeout: REQUEST_TIMEOUT_MS,
 		maxRetries: 1
 	});

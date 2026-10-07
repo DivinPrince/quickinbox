@@ -54,6 +54,22 @@ describe('saveAiProvider', () => {
 		assert.equal(resolved?.apiKey, 'sk-secret-9876');
 	});
 
+	test('asks for a new key when the base URL changes', async () => {
+		const { db } = setup();
+		await saveAiProvider(db, env, 'user-1', openai);
+
+		await assert.rejects(
+			saveAiProvider(db, env, 'user-1', {
+				...openai,
+				baseUrl: 'https://elsewhere.example/v1',
+				apiKey: ''
+			}),
+			/API key is required/
+		);
+		const resolved = await resolveAiProvider(db, env, 'user-1');
+		assert.match(resolved?.baseUrl ?? '', /sub2api\.example\.com/);
+	});
+
 	test('asks for a new key when switching provider', async () => {
 		const { db } = setup();
 		await saveAiProvider(db, env, 'user-1', openai);
@@ -222,6 +238,28 @@ describe('generateText', () => {
 		const body = JSON.parse(String(calls[0].init.body));
 		assert.equal(body.system, 'Be brief.');
 		assert.equal(body.model, 'claude-opus-5');
+	});
+
+	test('does not let the Anthropic client follow a redirect with the key', async () => {
+		const calls: RequestInit[] = [];
+		const fetcher = (async (_url: string, init: RequestInit) => {
+			calls.push(init);
+			return new Response(null, {
+				status: 307,
+				headers: { location: 'https://elsewhere.example/v1/messages' }
+			});
+		}) as unknown as typeof fetch;
+		const provider: ResolvedAiProvider = {
+			source: 'user',
+			kind: 'anthropic',
+			baseUrl: 'https://proxy.example.com',
+			model: 'claude-opus-5',
+			apiKey: 'sk-ant'
+		};
+
+		await assert.rejects(generateText(env, provider, request, fetcher), /307/);
+		assert.ok(calls.length > 0);
+		assert.ok(calls.every((init) => init.redirect === 'manual'));
 	});
 
 	test('reports a refusal instead of an empty draft', async () => {

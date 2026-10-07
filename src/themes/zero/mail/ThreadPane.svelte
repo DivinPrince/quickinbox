@@ -496,13 +496,19 @@
 				</button>
 			</Tooltip>
 			<div class="z-thread-bar-right">
-				<button type="button" class="z-thread-replyall" onclick={startForwardAll}>
+				<button
+					type="button"
+					class="z-thread-replyall"
+					aria-label={t('thread.forwardAll')}
+					onclick={startForwardAll}
+				>
 					<Icon name="Forward" size={14} />
 					<span>{t('thread.forwardAll')}</span>
 				</button>
 				<button
 					type="button"
 					class="z-thread-replyall"
+					aria-label={t('thread.replyAll')}
 					onclick={() => startReply('replyAll', latest)}
 				>
 					<Icon name="Reply" size={14} />
