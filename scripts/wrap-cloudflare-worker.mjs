@@ -29,5 +29,6 @@ await writeFile(
 	generated,
 	`/* ${MARKER} */
 export { default } from '../../src/worker.ts';
+export { MailEvents } from '../../src/worker.ts';
 `
 );

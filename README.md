@@ -392,6 +392,47 @@ setups can point at it too.
 | `POST /oauth/token` | Code exchange and refresh |
 | `POST /oauth/revoke` | Revoke a token |
 
+### Experimental MCP Events (optional)
+
+Quickinbox also has an experimental, live-only new-mail event stream at
+`/mcp/events`. This is a separate endpoint; the existing `/mcp` tools remain
+stateless. Enable it by configuring the `MAIL_EVENTS` Durable Object binding to
+the `MailEvents` class in `wrangler.jsonc` and declaring the class in a
+`new_sqlite_classes` migration, then deploy. The repository's default config
+already includes this binding and migration. If you maintain a custom Wrangler
+config, add both; the binding is optional at runtime, and without it
+`/mcp/events` returns `503`.
+
+Initialize a Streamable HTTP MCP session with a bearer OAuth token or API key
+that has `mail:read` access; keep the same credential and session ID for subsequent
+requests. Call `events/list` to discover `email.received`, then keep an `events/stream`
+request open with `{"name":"email.received","arguments":{}}`. For example,
+the server signals activation and then sends notifications like:
+
+```json
+{"method":"notifications/events/active","params":{"status":"active","_meta":{"io.modelcontextprotocol/subscriptionId":8}}}
+{"method":"notifications/events/event","params":{"eventId":"…","timestamp":"2026-01-01T12:00:00.000Z","name":"email.received","data":{"emailId":"…","threadId":"…","source":"resend"},"_meta":{"io.modelcontextprotocol/subscriptionId":8}}}
+```
+
+Publication is scheduled after the message and attachments are stored, before
+optional classification is scheduled; classification may still be running when
+the event arrives. It includes message and thread IDs plus the provider name;
+it does not include the sender, subject, or body. This is a
+best-effort live stream, with no offline replay: subscribers only receive mail
+arriving while connected, and a Durable Object restart requires reconnecting.
+The server keeps the last 256 receipt IDs to suppress provider retries.
+Clients should configure a long timeout for the outstanding stream request and
+cancel it to stop the subscription. An HTTP disconnect closes the Events session;
+on `404`, initialize a new session. The catalog advertises `delivery: ["stream"]`
+as part of this experimental extension, which requires an Events-aware client.
+For local Events testing, use the built Worker via `bun run preview`; SvelteKit's
+Vite platform proxy cannot run the internal Durable Object class.
+
+Codex's current [app-server Events API](https://github.com/openai/codex/blob/27065a91ccbf5ba8532844be3777fcf83b77820d/codex-rs/app-server/src/request_processors/mcp_event_stream.rs)
+only accepts host-owned Apps runtime integrations. Adding a normal
+user-configured `/mcp/events` URL does not wake a
+Codex chat when new mail arrives; that requires a host app bridge.
+
 ## CLI and MCP (local)
 
 ```bash

@@ -10,6 +10,7 @@ import { emailExistsByProviderId, insertEmail } from './mail-store';
 import type { PushNotificationEnv } from './push-notifications';
 import { scheduleInboundClassification } from './classify';
 import { normalizeMessageId } from './send-mail';
+import { scheduleMailEvent, type MailEventsEnv } from './mail-events';
 import {
 	scheduleTelegramNotification,
 	type StoredAttachment,
@@ -25,7 +26,7 @@ export type CloudflareInboundMessage = {
 };
 
 export type CloudflareInboundEnv = PushNotificationEnv &
-	TelegramNotificationEnv & {
+	TelegramNotificationEnv & MailEventsEnv & {
 		ATTACHMENTS: R2Bucket;
 		TYPESAFE_API_KEY?: string;
 	};
@@ -109,6 +110,7 @@ export async function handleCloudflareInbound(
 	});
 
 	const storedAttachments = await storeInboundAttachments(env, emailId, parsed.attachments);
+	await scheduleMailEvent(env, { userId: route.userId, emailId, providerId, source: 'cloudflare' });
 	scheduleInboundClassification(env, {
 		emailId,
 		userId: route.userId,

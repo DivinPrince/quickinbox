@@ -1,10 +1,11 @@
-import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
+import type { D1Database, DurableObjectNamespace, R2Bucket } from '@cloudflare/workers-types';
 import type { WorkersAiBinding } from '$lib/server/ai-provider';
 import type { CloudflareSendEmailBinding } from '$lib/server/providers/cloudflare-provider';
 
 declare global {
 	interface Env {
 		DB: D1Database;
+		MAIL_EVENTS?: DurableObjectNamespace;
 		ATTACHMENTS: R2Bucket;
 		ASSETS: Fetcher;
 		EMAIL: CloudflareSendEmailBinding;
