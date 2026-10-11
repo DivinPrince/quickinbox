@@ -9,6 +9,7 @@ import { stripHtml } from './html';
 import { emailExistsByProviderId, insertEmail, updateEmailStatusByProviderId } from './mail-store';
 import type { PushNotificationEnv } from './push-notifications';
 import type { ResendClient } from './resend';
+import { scheduleMailEvent, type MailEventsEnv } from './mail-events';
 import {
 	scheduleTelegramNotification,
 	type StoredAttachment,
@@ -27,7 +28,7 @@ export type WebhookOutcome = {
 };
 
 type InboundEnv = PushNotificationEnv &
-	TelegramNotificationEnv & { ATTACHMENTS: R2Bucket; TYPESAFE_API_KEY?: string };
+	TelegramNotificationEnv & MailEventsEnv & { ATTACHMENTS: R2Bucket; TYPESAFE_API_KEY?: string };
 
 export type InboundAttachmentMetadata = {
 	disposition?: 'attachment' | 'inline';
@@ -187,6 +188,7 @@ async function handleInboundEmail(
 	});
 
 	const storedAttachments = await storeInboundAttachments(env, client, providerId, emailId);
+	await scheduleMailEvent(env, { userId: route.userId, emailId, providerId, source: 'resend' });
 	scheduleInboundClassification(env, {
 		emailId,
 		userId: route.userId,

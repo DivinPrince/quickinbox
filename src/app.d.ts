@@ -1,4 +1,4 @@
-import type { D1Database, ExecutionContext, R2Bucket } from '@cloudflare/workers-types';
+import type { D1Database, DurableObjectNamespace, ExecutionContext, R2Bucket } from '@cloudflare/workers-types';
 import type { WorkersAiBinding } from '$lib/server/ai-provider';
 import type { ApiScope, AuthMethod } from '$lib/server/api-access';
 import type { CloudflareSendEmailBinding } from '$lib/server/providers/cloudflare-provider';
@@ -10,6 +10,8 @@ declare global {
 			ctx: ExecutionContext;
 			env: {
 				DB: D1Database;
+				/** Optional per-mailbox broker for the experimental MCP Events endpoint. */
+				MAIL_EVENTS?: DurableObjectNamespace;
 				ATTACHMENTS: R2Bucket;
 				ASSETS: Fetcher;
 				EMAIL: CloudflareSendEmailBinding;

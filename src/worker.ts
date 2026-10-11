@@ -1,4 +1,5 @@
 import type { ExecutionContext } from '@cloudflare/workers-types';
+export { MailEvents } from './lib/server/mail-events-broker';
 import {
 	handleCloudflareInbound,
 	type CloudflareInboundEnv,
@@ -34,6 +35,7 @@ export default {
 
 		const inboundEnv: CloudflareInboundEnv = {
 			DB: env.DB,
+			MAIL_EVENTS: env.MAIL_EVENTS,
 			ATTACHMENTS: env.ATTACHMENTS,
 			VAPID_PUBLIC_KEY: env.VAPID_PUBLIC_KEY,
 			VAPID_PRIVATE_KEY: env.VAPID_PRIVATE_KEY,
