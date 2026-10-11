@@ -2,6 +2,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { Domain, MailAddress } from '$lib/types';
 import { parseMailboxSignature } from '$lib/email-signature';
 import type { EmailProvider, ProviderDomain } from './email-provider';
+import { chunkIds } from './d1-chunks';
 
 type DomainRow = {
 	id: string;
@@ -325,13 +326,18 @@ export async function resolveInboundRoute(
 
 	if (candidates.length === 0) return null;
 
-	const placeholders = candidates.map(() => '?').join(', ');
-	const { results } = await db
-		.prepare(
-			`SELECT id, user_id, domain_id, address FROM addresses WHERE address IN (${placeholders})`
-		)
-		.bind(...candidates)
-		.all<{ id: string; user_id: string; domain_id: string; address: string }>();
+	// To + Cc + Bcc of a mass mailing can exceed D1's 100-parameter limit.
+	const results: { id: string; user_id: string; domain_id: string; address: string }[] = [];
+	for (const group of chunkIds([...new Set(candidates)])) {
+		const placeholders = group.map(() => '?').join(', ');
+		const { results: rows } = await db
+			.prepare(
+				`SELECT id, user_id, domain_id, address FROM addresses WHERE address IN (${placeholders})`
+			)
+			.bind(...group)
+			.all<{ id: string; user_id: string; domain_id: string; address: string }>();
+		results.push(...rows);
+	}
 
 	if (results.length > 0) {
 		// Honour the order the recipients arrived in, not SQLite's row order.

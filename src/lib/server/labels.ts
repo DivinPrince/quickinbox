@@ -1,5 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { MailLabel, ThreadLabel } from '$lib/types';
+import { chunkIds } from './d1-chunks';
 import {
 	LABEL_COLORS,
 	MAX_AUTO_LABELS,
@@ -253,9 +254,6 @@ export async function deleteLabel(db: D1Database, userId: string, labelId: strin
 	return true;
 }
 
-/** Stays under D1's 100 bound-parameter limit per statement. */
-const LABEL_LOOKUP_CHUNK = 80;
-
 export async function labelsForEmails(
 	db: D1Database,
 	emailIds: string[]
@@ -267,8 +265,7 @@ export async function labelsForEmails(
 	// easily holds more messages than that. An email falls in exactly one chunk,
 	// so each email's labels keep their sort order.
 	const results: { email_id: string; id: string; name: string; color: string; slug: string }[] = [];
-	for (let i = 0; i < emailIds.length; i += LABEL_LOOKUP_CHUNK) {
-		const group = emailIds.slice(i, i + LABEL_LOOKUP_CHUNK);
+	for (const group of chunkIds(emailIds)) {
 		const placeholders = group.map(() => '?').join(', ');
 		const { results: rows } = await db
 			.prepare(
@@ -343,11 +340,13 @@ export async function setThreadLabels(
 		}
 	}
 
-	const emailPlaceholders = emailIds.map(() => '?').join(', ');
-	await db
-		.prepare(`DELETE FROM email_labels WHERE email_id IN (${emailPlaceholders})`)
-		.bind(...emailIds)
-		.run();
+	for (const group of chunkIds(emailIds)) {
+		const placeholders = group.map(() => '?').join(', ');
+		await db
+			.prepare(`DELETE FROM email_labels WHERE email_id IN (${placeholders})`)
+			.bind(...group)
+			.run();
+	}
 
 	for (const emailId of emailIds) {
 		for (const labelId of unique) {
@@ -420,16 +419,20 @@ export async function rememberSenders(
 	disposition: SenderDisposition
 ): Promise<void> {
 	if (emailIds.length === 0) return;
-	const placeholders = emailIds.map(() => '?').join(', ');
-	const { results } = await db
-		.prepare(
-			`SELECT DISTINCT from_addr FROM emails
-			 WHERE user_id = ? AND direction = 'inbound' AND id IN (${placeholders})`
-		)
-		.bind(userId, ...emailIds)
-		.all<{ from_addr: string }>();
+	const senders = new Set<string>();
+	for (const group of chunkIds(emailIds)) {
+		const placeholders = group.map(() => '?').join(', ');
+		const { results } = await db
+			.prepare(
+				`SELECT DISTINCT from_addr FROM emails
+				 WHERE user_id = ? AND direction = 'inbound' AND id IN (${placeholders})`
+			)
+			.bind(userId, ...group)
+			.all<{ from_addr: string }>();
+		for (const row of results) senders.add(row.from_addr);
+	}
 
-	for (const row of results) {
-		await setSenderPref(db, userId, row.from_addr, disposition);
+	for (const fromAddr of senders) {
+		await setSenderPref(db, userId, fromAddr, disposition);
 	}
 }
