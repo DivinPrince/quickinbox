@@ -1060,18 +1060,22 @@ export async function listThreadMessages(
 		results.map((message) => message.id)
 	);
 
-	// Every message in the thread can carry attachments — one round trip for all.
-	const placeholders = results.map(() => '?').join(', ');
-	const { results: files } = await db
-		.prepare(
-			`SELECT id, email_id, filename, content_type, size_bytes,
-			        content_disposition, content_id, created_at
-			 FROM email_attachments
-			 WHERE email_id IN (${placeholders})
-			 ORDER BY created_at ASC`
-		)
-		.bind(...results.map((message) => message.id))
-		.all<EmailAttachmentMeta>();
+	// Every message in the thread can carry attachments — one round trip per chunk.
+	const files: EmailAttachmentMeta[] = [];
+	for (const group of chunkIds(results.map((message) => message.id))) {
+		const placeholders = group.map(() => '?').join(', ');
+		const { results: rows } = await db
+			.prepare(
+				`SELECT id, email_id, filename, content_type, size_bytes,
+				        content_disposition, content_id, created_at
+				 FROM email_attachments
+				 WHERE email_id IN (${placeholders})
+				 ORDER BY created_at ASC`
+			)
+			.bind(...group)
+			.all<EmailAttachmentMeta>();
+		files.push(...rows);
+	}
 
 	// The query already filters drafts out, so `status` is a delivery state or null
 	// and needs no further narrowing here.

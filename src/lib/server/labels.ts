@@ -253,6 +253,9 @@ export async function deleteLabel(db: D1Database, userId: string, labelId: strin
 	return true;
 }
 
+/** Stays under D1's 100 bound-parameter limit per statement. */
+const LABEL_LOOKUP_CHUNK = 80;
+
 export async function labelsForEmails(
 	db: D1Database,
 	emailIds: string[]
@@ -260,17 +263,25 @@ export async function labelsForEmails(
 	const byEmail = new Map<string, ThreadLabel[]>();
 	if (emailIds.length === 0) return byEmail;
 
-	const placeholders = emailIds.map(() => '?').join(', ');
-	const { results } = await db
-		.prepare(
-			`SELECT el.email_id, l.id, l.name, l.color, l.slug
-			 FROM email_labels el
-			 JOIN labels l ON l.id = el.label_id
-			 WHERE el.email_id IN (${placeholders})
-			 ORDER BY l.sort_order ASC, l.name ASC`
-		)
-		.bind(...emailIds)
-		.all<{ email_id: string; id: string; name: string; color: string; slug: string }>();
+	// D1 caps a statement at 100 bound parameters, and a page of long threads
+	// easily holds more messages than that. An email falls in exactly one chunk,
+	// so each email's labels keep their sort order.
+	const results: { email_id: string; id: string; name: string; color: string; slug: string }[] = [];
+	for (let i = 0; i < emailIds.length; i += LABEL_LOOKUP_CHUNK) {
+		const group = emailIds.slice(i, i + LABEL_LOOKUP_CHUNK);
+		const placeholders = group.map(() => '?').join(', ');
+		const { results: rows } = await db
+			.prepare(
+				`SELECT el.email_id, l.id, l.name, l.color, l.slug
+				 FROM email_labels el
+				 JOIN labels l ON l.id = el.label_id
+				 WHERE el.email_id IN (${placeholders})
+				 ORDER BY l.sort_order ASC, l.name ASC`
+			)
+			.bind(...group)
+			.all<{ email_id: string; id: string; name: string; color: string; slug: string }>();
+		results.push(...rows);
+	}
 
 	for (const row of results) {
 		const label: ThreadLabel = {
