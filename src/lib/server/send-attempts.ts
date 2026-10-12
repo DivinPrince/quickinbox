@@ -17,6 +17,14 @@ export const IDEMPOTENCY_HEADER = 'Idempotency-Key';
  */
 export const SEND_LEASE_SECONDS = 5 * 60;
 
+/**
+ * How long a key is remembered. Retries come within seconds or minutes, so
+ * after a day the key is forgotten and reusing it starts a new send. This also
+ * keeps the table to about a day of sends.
+ */
+export const SEND_KEY_TTL_HOURS = 24;
+const KEY_EXPIRY = `-${SEND_KEY_TTL_HOURS} hours`;
+
 /** UUIDs and similar opaque keys; long enough that collisions are the caller's intent. */
 export const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{8,200}$/;
 
@@ -66,9 +74,10 @@ export async function keyAlreadySent(db: D1Database, userId: string, key: string
 	const row = await db
 		.prepare(
 			`SELECT 1 AS found FROM send_attempts
-			 WHERE id = ? AND user_id = ? AND (status = 'sent' OR provider_id IS NOT NULL)`
+			 WHERE id = ? AND user_id = ? AND (status = 'sent' OR provider_id IS NOT NULL)
+			   AND updated_at > datetime('now', ?)`
 		)
-		.bind(await attemptId(userId, key), userId)
+		.bind(await attemptId(userId, key), userId, KEY_EXPIRY)
 		.first<{ found: number }>();
 	return Boolean(row);
 }
@@ -84,6 +93,12 @@ export async function claimSendAttempt(
 	requestHash: string
 ): Promise<SendAttempt> {
 	const id = await attemptId(userId, key);
+
+	// Forget this sender's expired keys first, so an old key starts a new send.
+	await db
+		.prepare(`DELETE FROM send_attempts WHERE user_id = ? AND updated_at <= datetime('now', ?)`)
+		.bind(userId, KEY_EXPIRY)
+		.run();
 
 	const inserted = await db
 		.prepare(
@@ -134,9 +149,24 @@ export async function claimSendAttempt(
 	if (existing?.status === 'sent' && existing.email_id && existing.provider_id) {
 		return { kind: 'replay', id, emailId: existing.email_id, providerId: existing.provider_id };
 	}
-	// Still `sending` with a provider id: the mail went out and only saving it to
-	// Sent is outstanding (or failed). Sending again would duplicate it.
+	// Still `sending` with a provider id: the mail went out. If its Sent copy was
+	// saved and only this record's last update was lost, finish the record and
+	// answer with that copy. Otherwise sending again would duplicate the mail.
 	if (existing?.provider_id) {
+		const saved = await db
+			.prepare(
+				`SELECT id FROM emails
+				 WHERE user_id = ? AND provider_id = ? AND direction = 'outbound' LIMIT 1`
+			)
+			.bind(userId, existing.provider_id)
+			.first<{ id: string }>()
+			// Not finding it is the safe answer: the retry is refused, not resent.
+			.catch(() => null);
+		if (saved) {
+			// If this write fails too, the next retry reconciles again.
+			await completeSendAttempt(db, id, saved.id, existing.provider_id).catch(() => {});
+			return { kind: 'replay', id, emailId: saved.id, providerId: existing.provider_id };
+		}
 		throw new SendAttemptError('already_sent', 'This message was already sent.');
 	}
 	// Still `sending` with an error: the provider failed in a way that does not

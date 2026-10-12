@@ -287,6 +287,7 @@
 		"couldNotSaveDraft": "无法保存草稿",
 		"couldNotLoadDraft": "无法加载草稿",
 		"failedToSend": "发送失败",
+		"sendAsNew": "无法确认之前的发送是否成功。请先查看“已发送”。要作为新邮件发送吗？",
 		"attachmentsNotSaved": "附件不会随草稿保存。请先发送邮件或移除附件。",
 		"includeAttachments": "包含 {count} 个附件",
 		"includeAttachmentsPlural": "包含 {count} 个附件",

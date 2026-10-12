@@ -14,6 +14,7 @@
 	import { initials, parseAddressList, type AddressPart } from '$lib/mail/folders';
 	import { INBOX_CATEGORIES, categoryNavKey } from '$lib/mail/categories';
 	import { t } from '$lib/i18n';
+	import { needsNewSendKey } from '$lib/mail/send-key';
 	import type { MailAddress, MailLabel, MailboxView, OutboundAttachmentInput, ThreadMessage } from '$lib/types';
 	import LabelChip from '$lib/components/LabelChip.svelte';
 	import type { ZeroIconName } from '../icons/names';
@@ -425,7 +426,11 @@
 					})
 				});
 				if (!response.ok) {
-					const body = (await response.json()) as { error?: string };
+					const body = (await response.json()) as { error?: string; code?: string };
+					if (needsNewSendKey(body.code) && confirm(t('compose.sendAsNew'))) {
+						sendKey = crypto.randomUUID();
+						return await sendReply();
+					}
 					sendError = body.error ?? t('thread.couldNotForward');
 					return;
 				}
@@ -443,7 +448,11 @@
 					})
 				});
 				if (!response.ok) {
-					const body = (await response.json()) as { error?: string };
+					const body = (await response.json()) as { error?: string; code?: string };
+					if (needsNewSendKey(body.code) && confirm(t('compose.sendAsNew'))) {
+						sendKey = crypto.randomUUID();
+						return await sendReply();
+					}
 					sendError = body.error ?? t('thread.couldNotSendReply');
 					return;
 				}
