@@ -6,6 +6,7 @@ import {
 	failSendAttempt,
 	keyAlreadySent,
 	readIdempotencyKey,
+	recordProviderAccepted,
 	SendAttemptError
 } from './send-attempts';
 import { createTestDb, insertTestUser } from './test-db';
@@ -15,6 +16,20 @@ function setup() {
 	insertTestUser(sqlite, 'user-1');
 	insertTestUser(sqlite, 'user-2');
 	return { db, sqlite };
+}
+
+function insertSentEmail(
+	sqlite: ReturnType<typeof createTestDb>['sqlite'],
+	id: string,
+	userId: string,
+	providerId: string
+) {
+	sqlite
+		.query(
+			`INSERT INTO emails (id, user_id, direction, from_addr, to_addr, subject, provider_id)
+			 VALUES (?, ?, 'outbound', 'me@example.com', 'you@example.com', 'Hello', ?)`
+		)
+		.run(id, userId, providerId);
 }
 
 describe('claimSendAttempt', () => {
@@ -96,6 +111,53 @@ describe('claimSendAttempt', () => {
 		const theirs = await claimSendAttempt(db, 'user-2', 'key-12345', 'hash-b');
 		assert.equal(theirs.kind, 'claimed');
 		assert.notEqual(theirs.id, mine.id);
+	});
+
+	test('replays the saved Sent copy when only marking the send done failed', async () => {
+		const { db, sqlite } = setup();
+		const first = await claimSendAttempt(db, 'user-1', 'key-12345', 'hash-a');
+		await recordProviderAccepted(db, first.id, 'provider-1');
+		// The Sent copy was saved, then the final update on the attempt was lost.
+		insertSentEmail(sqlite, 'email-1', 'user-1', 'provider-1');
+
+		const retry = await claimSendAttempt(db, 'user-1', 'key-12345', 'hash-a');
+		assert.deepEqual(retry, {
+			kind: 'replay',
+			id: first.id,
+			emailId: 'email-1',
+			providerId: 'provider-1'
+		});
+		assert.equal(await keyAlreadySent(db, 'user-1', 'key-12345'), true);
+		const row = sqlite.query('SELECT status, email_id FROM send_attempts WHERE id = ?').all(first.id)[0];
+		assert.deepEqual(row, { status: 'sent', email_id: 'email-1' });
+	});
+
+	test('still refuses a retry when the mail went out but no Sent copy exists', async () => {
+		const { db, sqlite } = setup();
+		const first = await claimSendAttempt(db, 'user-1', 'key-12345', 'hash-a');
+		await recordProviderAccepted(db, first.id, 'provider-1');
+		// Another user's message with the same provider id is not this send's copy.
+		insertSentEmail(sqlite, 'email-2', 'user-2', 'provider-1');
+
+		await assert.rejects(
+			claimSendAttempt(db, 'user-1', 'key-12345', 'hash-a'),
+			(error: unknown) => error instanceof SendAttemptError && error.code === 'already_sent'
+		);
+	});
+
+	test('forgets a key after a day, so reusing it starts a new send', async () => {
+		const { db, sqlite } = setup();
+		const first = await claimSendAttempt(db, 'user-1', 'key-12345', 'hash-a');
+		await completeSendAttempt(db, first.id, 'email-1', 'provider-1');
+		const other = await claimSendAttempt(db, 'user-2', 'key-67890', 'hash-a');
+		sqlite.query(`UPDATE send_attempts SET updated_at = datetime('now', '-25 hours')`).run();
+
+		assert.equal(await keyAlreadySent(db, 'user-1', 'key-12345'), false);
+		const retry = await claimSendAttempt(db, 'user-1', 'key-12345', 'hash-b');
+		assert.deepEqual(retry, { kind: 'claimed', id: first.id });
+		// Claiming sweeps only the sender's own expired rows.
+		const left = sqlite.query('SELECT id FROM send_attempts ORDER BY id').all() as { id: string }[];
+		assert.deepEqual(left.map((row) => row.id).sort(), [first.id, other.id].sort());
 	});
 });
 

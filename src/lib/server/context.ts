@@ -124,6 +124,22 @@ export function describeProviderError(error: unknown, fallback = 'Failed to send
 	return error instanceof Error ? error.message : fallback;
 }
 
+/**
+ * Why a send was refused, for clients that branch on it: `send_in_progress`
+ * means retry the same key later, `send_outcome_unknown` or `already_sent`
+ * mean don't. The same codes MCP returns.
+ */
+export function codeForSendError(error: unknown): string | undefined {
+	if (
+		error instanceof SendAttemptError ||
+		error instanceof SendPolicyError ||
+		error instanceof ReplyGuardError
+	) {
+		return error.code;
+	}
+	return undefined;
+}
+
 export function statusForProviderError(error: unknown): number {
 	if (error instanceof ConfigError) return 503;
 	if (
