@@ -287,6 +287,7 @@
 		"couldNotSaveDraft": "No se pudo guardar el borrador",
 		"couldNotLoadDraft": "No se pudo cargar el borrador",
 		"failedToSend": "Error al enviar",
+		"sendAsNew": "No pudimos confirmar si tu intento anterior se envió. Revisa primero Enviados. ¿Enviarlo como un mensaje nuevo?",
 		"attachmentsNotSaved": "Los archivos adjuntos no se guardan con los borradores. Envía el mensaje o quítalos primero.",
 		"includeAttachments": "Incluir {count} archivo adjunto",
 		"includeAttachmentsPlural": "Incluir {count} archivos adjuntos",

@@ -287,6 +287,7 @@
 		"couldNotSaveDraft": "Could not save draft",
 		"couldNotLoadDraft": "Could not load draft",
 		"failedToSend": "Failed to send",
+		"sendAsNew": "We couldn't confirm whether your earlier attempt was sent. Check Sent first. Send this as a new message?",
 		"attachmentsNotSaved": "Attachments are not saved with drafts. Send the message or remove them first.",
 		"includeAttachments": "Include {count} attachment",
 		"includeAttachmentsPlural": "Include {count} attachments",

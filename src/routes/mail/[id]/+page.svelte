@@ -8,6 +8,7 @@
 	import { hasInAppHistory, requestSkipViewTransition } from '$lib/app-chrome';
 	import { APP_NAME } from '$lib/constants';
 	import { plural, t } from '$lib/i18n';
+	import { needsNewSendKey } from '$lib/mail/send-key';
 	import { page } from '$app/stores';
 	import { INBOX_CATEGORIES, categoryNavKey, inboxCategoryPath } from '$lib/mail/categories';
 	import type { MailLabel, OutboundAttachmentInput } from '$lib/types';
@@ -279,6 +280,10 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
+				if (needsNewSendKey(body.code) && confirm(t('compose.sendAsNew'))) {
+					forwardKey = crypto.randomUUID();
+					return await sendForward(event);
+				}
 				error = body.error ?? t('thread.failedToForward');
 				return;
 			}
@@ -349,6 +354,10 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
+				if (needsNewSendKey(body.code) && confirm(t('compose.sendAsNew'))) {
+					replyKey = crypto.randomUUID();
+					return await sendReply(event);
+				}
 				error = body.error ?? t('compose.failedToSend');
 				return;
 			}

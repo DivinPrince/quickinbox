@@ -1,5 +1,6 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import {
+	codeForSendError,
 	describeProviderError,
 	getEmailProvider,
 	statusForProviderError
@@ -125,6 +126,9 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 
 		return json({ ok: true, id: emailId });
 	} catch (error) {
-		return json({ error: describeProviderError(error) }, { status: statusForProviderError(error) });
+		return json(
+			{ error: describeProviderError(error), code: codeForSendError(error) },
+			{ status: statusForProviderError(error) }
+		);
 	}
 };
