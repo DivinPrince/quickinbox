@@ -92,8 +92,7 @@ export function clerkAppearance(embedded: boolean): Record<string, unknown> {
 			footerAction: { display: 'none' },
 			footer: flat,
 			socialButtonsBlockButton: {
-				background: token('--color-surface-muted', '#f3f3f3'),
-				border: '1px solid rgba(128, 128, 128, 0.25)'
+				background: token('--color-surface-muted', '#f3f3f3')
 			},
 			socialButtonsBlockButtonText: { color: token('--color-text', '#111111') },
 			dividerLine: { background: 'rgba(128, 128, 128, 0.3)' },

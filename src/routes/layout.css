@@ -317,6 +317,14 @@ html[data-standalone='true'] .mail-body {
 	background: var(--color-surface);
 	border-radius: 1.25rem;
 	box-shadow: var(--shadow-sm);
+	border: 1px solid var(--color-focus-line);
+}
+
+/* Clerk outlines its fields with a near-invisible black box-shadow, and its
+   own class outranks the `appearance` API, so this has to be !important. */
+.auth-card .cl-formFieldInput,
+.auth-card .cl-socialButtonsBlockButton {
+	box-shadow: 0 0 0 1px var(--color-focus-line) !important;
 }
 
 .auth-card h1 {
@@ -342,6 +350,7 @@ html[data-standalone='true'] .mail-body {
 			max(1.25rem, env(safe-area-inset-left));
 		border-radius: 0;
 		box-shadow: none;
+		border: none;
 	}
 }
 
