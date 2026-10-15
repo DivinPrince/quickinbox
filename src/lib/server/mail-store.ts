@@ -21,17 +21,8 @@ import type {
 	ThreadMessage,
 	ThreadSummary
 } from '$lib/types';
+import { chunkIds } from './d1-chunks';
 
-/** D1 caps bound parameters at 100; leave room for user_id and SET values. */
-const D1_IN_CHUNK = 80;
-
-function chunkIds(ids: string[], size = D1_IN_CHUNK): string[][] {
-	const groups: string[][] = [];
-	for (let i = 0; i < ids.length; i += size) {
-		groups.push(ids.slice(i, i + size));
-	}
-	return groups;
-}
 
 export async function getUserIdByEmail(db: D1Database, email: string): Promise<string | null> {
 	const row = await db
@@ -737,45 +728,49 @@ export async function deleteEmailsPermanently(
 ): Promise<number> {
 	if (ids.length === 0) return 0;
 
-	const placeholders = ids.map(() => '?').join(', ');
-	const owned = await db
-		.prepare(`SELECT id FROM emails WHERE user_id = ? AND id IN (${placeholders})`)
-		.bind(userId, ...ids)
-		.all<{ id: string }>();
-
-	const ownedIds = owned.results.map((row) => row.id);
+	const ownedIds: string[] = [];
+	for (const group of chunkIds([...new Set(ids)])) {
+		const placeholders = group.map(() => '?').join(', ');
+		const owned = await db
+			.prepare(`SELECT id FROM emails WHERE user_id = ? AND id IN (${placeholders})`)
+			.bind(userId, ...group)
+			.all<{ id: string }>();
+		ownedIds.push(...owned.results.map((row) => row.id));
+	}
 	if (ownedIds.length === 0) return 0;
 
-	const ownedPlaceholders = ownedIds.map(() => '?').join(', ');
+	for (const group of chunkIds(ownedIds)) {
+		const placeholders = group.map(() => '?').join(', ');
 
-	if (bucket) {
-		const { results: files } = await db
-			.prepare(
-				`SELECT storage_key FROM email_attachments
-				 WHERE email_id IN (${ownedPlaceholders}) AND storage_key IS NOT NULL`
-			)
-			.bind(...ownedIds)
-			.all<{ storage_key: string }>();
+		if (bucket) {
+			const { results: files } = await db
+				.prepare(
+					`SELECT storage_key FROM email_attachments
+					 WHERE email_id IN (${placeholders}) AND storage_key IS NOT NULL`
+				)
+				.bind(...group)
+				.all<{ storage_key: string }>();
 
-		await Promise.all(files.map((file) => bucket.delete(file.storage_key)));
+			await Promise.all(files.map((file) => bucket.delete(file.storage_key)));
+		}
+
+		// Older D1 databases were created without ON DELETE CASCADE enforcement,
+		// so clear the children explicitly.
+		await db
+			.prepare(`DELETE FROM email_attachments WHERE email_id IN (${placeholders})`)
+			.bind(...group)
+			.run();
+
+		await db
+			.prepare(`DELETE FROM email_labels WHERE email_id IN (${placeholders})`)
+			.bind(...group)
+			.run();
+
+		await db
+			.prepare(`DELETE FROM emails WHERE user_id = ? AND id IN (${placeholders})`)
+			.bind(userId, ...group)
+			.run();
 	}
-
-	// Older D1 databases were created without ON DELETE CASCADE enforcement,
-	// so clear the children explicitly.
-	await db
-		.prepare(`DELETE FROM email_attachments WHERE email_id IN (${ownedPlaceholders})`)
-		.bind(...ownedIds)
-		.run();
-
-	await db
-		.prepare(`DELETE FROM email_labels WHERE email_id IN (${ownedPlaceholders})`)
-		.bind(...ownedIds)
-		.run();
-
-	await db
-		.prepare(`DELETE FROM emails WHERE user_id = ? AND id IN (${ownedPlaceholders})`)
-		.bind(userId, ...ownedIds)
-		.run();
 
 	return ownedIds.length;
 }
@@ -1060,18 +1055,22 @@ export async function listThreadMessages(
 		results.map((message) => message.id)
 	);
 
-	// Every message in the thread can carry attachments — one round trip for all.
-	const placeholders = results.map(() => '?').join(', ');
-	const { results: files } = await db
-		.prepare(
-			`SELECT id, email_id, filename, content_type, size_bytes,
-			        content_disposition, content_id, created_at
-			 FROM email_attachments
-			 WHERE email_id IN (${placeholders})
-			 ORDER BY created_at ASC`
-		)
-		.bind(...results.map((message) => message.id))
-		.all<EmailAttachmentMeta>();
+	// Every message in the thread can carry attachments — one round trip per chunk.
+	const files: EmailAttachmentMeta[] = [];
+	for (const group of chunkIds(results.map((message) => message.id))) {
+		const placeholders = group.map(() => '?').join(', ');
+		const { results: rows } = await db
+			.prepare(
+				`SELECT id, email_id, filename, content_type, size_bytes,
+				        content_disposition, content_id, created_at
+				 FROM email_attachments
+				 WHERE email_id IN (${placeholders})
+				 ORDER BY created_at ASC`
+			)
+			.bind(...group)
+			.all<EmailAttachmentMeta>();
+		files.push(...rows);
+	}
 
 	// The query already filters drafts out, so `status` is a delivery state or null
 	// and needs no further narrowing here.
