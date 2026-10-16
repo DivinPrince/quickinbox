@@ -678,7 +678,16 @@ export async function setEmailFlags(
 		bindings.push(update.isStarred ? 1 : 0);
 	}
 	if (update.archived !== undefined) {
-		assignments.push(update.archived ? "archived_at = datetime('now')" : 'archived_at = NULL');
+		if (update.archived) {
+			// Archive is a destination. Bin (`deleted_at`) and Spam (`spam_at`) both
+			// win over it, so leaving either flag set keeps the row where it was.
+			// An explicit trash or spam flag in the same update still wins below.
+			assignments.push("archived_at = datetime('now')");
+			if (update.trashed === undefined) assignments.push('deleted_at = NULL');
+			if (update.spam === undefined) assignments.push('spam_at = NULL', 'spam_source = NULL');
+		} else {
+			assignments.push('archived_at = NULL');
+		}
 	}
 	if (update.trashed !== undefined) {
 		assignments.push(update.trashed ? "deleted_at = datetime('now')" : 'deleted_at = NULL');
