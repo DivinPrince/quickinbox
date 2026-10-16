@@ -10,6 +10,7 @@
 	import { formatMailDate, formatMailTime, shouldShowSeparateTime } from '$lib/utils/date';
 	import { attachmentHref } from '$lib/utils/attachments';
 	import { runMailAction } from '$lib/mail/client';
+	import { confirmIfPermanent } from '$lib/mail/confirm';
 	import { MAIL_CHANGED_MESSAGE } from '$lib/mail/sync';
 	import { initials, parseAddressList, type AddressPart } from '$lib/mail/folders';
 	import { INBOX_CATEGORIES, categoryNavKey } from '$lib/mail/categories';
@@ -259,6 +260,7 @@
 
 	async function act(action: string, extra: Record<string, unknown> = {}) {
 		if (!latest) return;
+		if (!confirmIfPermanent(action)) return;
 		menuFor = null;
 		await runMailAction(action, [latest.id], extra);
 		onClose();

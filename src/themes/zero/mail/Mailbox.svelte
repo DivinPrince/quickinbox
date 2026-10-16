@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 	import { formatRelativeDate } from '$lib/utils/date';
 	import { runMailAction } from '$lib/mail/client';
+	import { confirmIfPermanent } from '$lib/mail/confirm';
 	import { initials, participantName } from '$lib/mail/folders';
 	import { INBOX_CATEGORIES, categoryNavKey, categoryUnread } from '$lib/mail/categories';
 	import { t } from '$lib/i18n';
@@ -142,6 +143,7 @@
 	}
 
 	async function act(action: string, ids: string[]) {
+		if (!confirmIfPermanent(action, ids.length)) return;
 		await runMailAction(action, ids);
 		await invalidateAll();
 	}
