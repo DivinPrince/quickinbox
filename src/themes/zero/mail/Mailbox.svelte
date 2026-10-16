@@ -187,7 +187,7 @@
 			else void act(view === 'archive' ? 'unarchive' : 'archive', ids);
 		} else if (event.key === 'd' || event.key === 'Backspace') {
 			event.preventDefault();
-			void act(view === 'trash' ? 'restore' : view === 'spam' ? 'delete' : 'trash', ids);
+			void act(view === 'trash' || view === 'spam' ? 'delete' : 'trash', ids);
 		} else if (event.key === 's') {
 			event.preventDefault();
 			void act(current?.is_starred ? 'unstar' : 'star', ids);
@@ -376,14 +376,28 @@
 									<Icon name="Archive2" size={14} />
 								</button>
 							</Tooltip>
-							<Tooltip text={view === 'trash' ? t('mailbox.restore') : t('nav.bin')}>
+							{#if view === 'trash'}
+								<Tooltip text={t('mailbox.restore')}>
+									<button
+										type="button"
+										aria-label={t('mailbox.restore')}
+										onclick={(event) => {
+											event.stopPropagation();
+											void act('restore', [thread.latest_id]);
+										}}
+									>
+										<Icon name="Inbox" size={14} />
+									</button>
+								</Tooltip>
+							{/if}
+							<Tooltip text={view === 'trash' ? t('mailbox.deletePermanently') : t('nav.bin')}>
 								<button
 									type="button"
 									class="danger"
-									aria-label={view === 'trash' ? t('mailbox.restore') : t('nav.bin')}
+									aria-label={view === 'trash' ? t('mailbox.deletePermanently') : t('nav.bin')}
 									onclick={(event) => {
 										event.stopPropagation();
-										void act(view === 'trash' ? 'restore' : 'trash', [thread.latest_id]);
+										void act(view === 'trash' ? 'delete' : 'trash', [thread.latest_id]);
 									}}
 								>
 									<Icon name="Trash" size={14} />
