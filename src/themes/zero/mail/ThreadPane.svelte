@@ -10,6 +10,7 @@
 	import { formatMailDate, formatMailTime, shouldShowSeparateTime } from '$lib/utils/date';
 	import { attachmentHref } from '$lib/utils/attachments';
 	import { runMailAction } from '$lib/mail/client';
+	import { confirmIfPermanent } from '$lib/mail/confirm';
 	import { MAIL_CHANGED_MESSAGE } from '$lib/mail/sync';
 	import { initials, parseAddressList, type AddressPart } from '$lib/mail/folders';
 	import { INBOX_CATEGORIES, categoryNavKey } from '$lib/mail/categories';
@@ -259,6 +260,7 @@
 
 	async function act(action: string, extra: Record<string, unknown> = {}) {
 		if (!latest) return;
+		if (!confirmIfPermanent(action)) return;
 		menuFor = null;
 		await runMailAction(action, [latest.id], extra);
 		onClose();
@@ -535,7 +537,28 @@
 						<Icon name="Archive2" size={16} />
 					</button>
 				</Tooltip>
-				{#if view !== 'trash'}
+				{#if view === 'trash'}
+					<Tooltip text={t('mailbox.restore')}>
+						<button
+							type="button"
+							class="z-thread-icon"
+							aria-label={t('mailbox.restore')}
+							onclick={() => act('restore')}
+						>
+							<Icon name="Inbox" size={16} />
+						</button>
+					</Tooltip>
+					<Tooltip text={t('mailbox.deletePermanently')}>
+						<button
+							type="button"
+							class="z-thread-trash"
+							aria-label={t('mailbox.deletePermanently')}
+							onclick={() => act('delete')}
+						>
+							<Icon name="Trash" size={16} />
+						</button>
+					</Tooltip>
+				{:else}
 					<Tooltip text={t('nav.bin')}>
 						<button type="button" class="z-thread-trash" aria-label={t('nav.bin')} onclick={() => act('trash')}>
 							<Icon name="Trash" size={16} />
@@ -562,8 +585,14 @@
 							{#if view === 'archive' || view === 'trash'}
 								<button type="button" onclick={() => act(view === 'trash' ? 'restore' : 'unarchive')}>
 									<Icon name="Inbox" size={14} />
-									{t('mailbox.moveToInbox')}
+									{t(view === 'trash' ? 'mailbox.restore' : 'mailbox.moveToInbox')}
 								</button>
+								{#if view === 'trash'}
+									<button type="button" onclick={() => act('delete')}>
+										<Icon name="Trash" size={14} />
+										{t('mailbox.deletePermanently')}
+									</button>
+								{/if}
 							{:else if view === 'spam'}
 								<button type="button" onclick={() => act('unspam')}>
 									<Icon name="Inbox" size={14} />
