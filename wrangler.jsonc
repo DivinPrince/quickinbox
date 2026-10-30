@@ -67,6 +67,8 @@
 		}
 	],
 
+	// No payment card for R2? Run `bun run setup --no-r2` or delete this block: attachments are then stored in
+	// the D1 database instead (smaller capacity, see README "Attachment storage").
 	"r2_buckets": [
 		{
 			"binding": "ATTACHMENTS",

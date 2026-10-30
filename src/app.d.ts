@@ -10,6 +10,7 @@ declare global {
 			ctx: ExecutionContext;
 			env: {
 				DB: D1Database;
+				/** Always present at request time: the hook substitutes a D1-backed store when R2 isn't bound. */
 				ATTACHMENTS: R2Bucket;
 				ASSETS: Fetcher;
 				EMAIL: CloudflareSendEmailBinding;
