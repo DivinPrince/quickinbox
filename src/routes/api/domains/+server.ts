@@ -1,7 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import {
 	ConfigError,
-	getEmailProvider,
+	getDomainProvider,
 	safeEmailProviderKind,
 	hasProviderConfigured,
 	listAvailableDomains,
@@ -35,7 +35,7 @@ export const GET: RequestHandler = async ({ locals, platform, url }) => {
 	}
 
 	try {
-		const provider = getEmailProvider(platform);
+		const provider = getDomainProvider(platform);
 
 		if (url.searchParams.get('sync') === '1') {
 			return json({
@@ -91,7 +91,7 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 	}
 
 	try {
-		const provider = getEmailProvider(platform);
+		const provider = getDomainProvider(platform);
 		const connected = [];
 
 		for (const id of ids) {

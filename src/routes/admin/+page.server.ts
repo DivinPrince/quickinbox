@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import { listAllMobileDeviceSessions, listUsers } from '$lib/server/auth';
 import {
 	safeEmailProviderKind,
+	safeInboundProviderKind,
 	listAvailableDomains,
 	providerLoadError
 } from '$lib/server/context';
@@ -14,6 +15,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	}
 
 	const providerKind = safeEmailProviderKind(platform);
+	const inboundKind = safeInboundProviderKind(platform) ?? providerKind;
 	const db = platform?.env.DB;
 	if (!db) {
 		return {
@@ -24,6 +26,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			unrouted: [],
 			devices: [],
 			providerKind,
+			inboundKind,
 			loadError: 'Database unavailable'
 		};
 	}
@@ -49,6 +52,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			domains: locals.domains,
 			available,
 			providerKind,
+			inboundKind,
 			loadError: null
 		};
 	} catch (err) {
@@ -60,6 +64,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			domains: locals.domains,
 			available: [],
 			providerKind,
+			inboundKind,
 			loadError: providerLoadError(providerKind, err)
 		};
 	}

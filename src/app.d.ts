@@ -14,7 +14,12 @@ declare global {
 				ASSETS: Fetcher;
 				EMAIL: CloudflareSendEmailBinding;
 				/** `resend` (default) or `cloudflare`. */
+				/** Selects both directions unless EMAIL_INBOUND / EMAIL_OUTBOUND override them. */
 				EMAIL_PROVIDER?: string;
+				/** Who delivers inbound mail: `resend`, `cloudflare` or `none`. Overrides EMAIL_PROVIDER. */
+				EMAIL_INBOUND?: string;
+				/** Who sends mail: `resend`, `cloudflare` or `none`. Overrides EMAIL_PROVIDER. */
+				EMAIL_OUTBOUND?: string;
 				/** Comma-separated domains when EMAIL_PROVIDER=cloudflare. */
 				CLOUDFLARE_MAIL_DOMAINS?: string;
 				/** Resend API key — `wrangler secret put RESEND_API_KEY`. */

@@ -6,6 +6,11 @@
 # resend (default) or cloudflare. Set in wrangler.jsonc vars for production;
 # uncomment here only to override locally.
 # EMAIL_PROVIDER=resend
+#
+# Optional: mix providers. Each overrides EMAIL_PROVIDER for one direction
+# (resend | cloudflare | none). Unset or empty follows EMAIL_PROVIDER.
+# EMAIL_INBOUND=cloudflare
+# EMAIL_OUTBOUND=resend
 
 # --- Resend (EMAIL_PROVIDER=resend) ---
 # From https://resend.com/api-keys — needs full access (send + domains + receiving).

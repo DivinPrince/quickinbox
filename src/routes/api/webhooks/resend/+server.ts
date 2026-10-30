@@ -1,10 +1,18 @@
 import { json, text, type RequestHandler } from '@sveltejs/kit';
-import { getResendClient, getWebhookSecret } from '$lib/server/context';
+import {
+	getResendClient,
+	getWebhookSecret,
+	safeInboundProviderKind
+} from '$lib/server/context';
 import { claimWebhookEvent, handleResendWebhook, type ResendWebhookEvent } from '$lib/server/inbound';
 import { verifyWebhookSignature } from '$lib/server/webhook';
 
 /**
- * Resend webhook receiver — used when EMAIL_PROVIDER=resend.
+ * Resend webhook receiver — used when Resend sends or receives (EMAIL_PROVIDER=resend,
+ * or EMAIL_INBOUND / EMAIL_OUTBOUND set to resend).
+ *
+ * Delivery events (sent/delivered/bounced/…) update outbound status. The
+ * `email.received` event is only acted on when inbound is Resend.
  *
  * Point a webhook at https://<your-app>/api/webhooks/resend in the Resend
  * dashboard and subscribe to `email.received` plus the delivery events.
@@ -39,6 +47,13 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 	if (!event?.type) {
 		return json({ error: 'Missing event type' }, { status: 400 });
+	}
+
+	// Resend only ingests mail when inbound is Resend. Otherwise acknowledge
+	// `email.received` without storing it, so a webhook that is still subscribed
+	// to it can never double-ingest or ingest unexpectedly.
+	if (event.type === 'email.received' && safeInboundProviderKind(platform) !== 'resend') {
+		return json({ ok: true, handled: false, note: 'Resend inbound is not enabled; ignored' });
 	}
 
 	const eventId =

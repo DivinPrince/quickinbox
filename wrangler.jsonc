@@ -28,6 +28,10 @@
 
 	// Prefer `bun run setup` (or `bash scripts/setup.sh`) over editing this by hand.
 	// Mail provider is selected by EMAIL_PROVIDER (resend | cloudflare).
+	// To mix providers, also set EMAIL_INBOUND and/or EMAIL_OUTBOUND (resend |
+	// cloudflare | none); each overrides EMAIL_PROVIDER for its direction only.
+	// Example — Cloudflare receives, Resend sends:
+	//   "EMAIL_INBOUND": "cloudflare", "EMAIL_OUTBOUND": "resend"
 	// Resend secrets (when EMAIL_PROVIDER=resend or unset):
 	//   wrangler secret put RESEND_API_KEY
 	//   wrangler secret put RESEND_WEBHOOK_SECRET
