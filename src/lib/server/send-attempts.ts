@@ -18,9 +18,9 @@ export const IDEMPOTENCY_HEADER = 'Idempotency-Key';
 export const SEND_LEASE_SECONDS = 5 * 60;
 
 /**
- * How long a key is remembered. Retries come within seconds or minutes, so
- * after a day the key is forgotten and reusing it starts a new send. This also
- * keeps the table to about a day of sends.
+ * How long a completed or definitively failed key is remembered. Unfinished
+ * sends stay recorded because they may already have been delivered; age alone
+ * must never turn an uncertain retry into a new send.
  */
 export const SEND_KEY_TTL_HOURS = 24;
 const KEY_EXPIRY = `-${SEND_KEY_TTL_HOURS} hours`;
@@ -75,7 +75,7 @@ export async function keyAlreadySent(db: D1Database, userId: string, key: string
 		.prepare(
 			`SELECT 1 AS found FROM send_attempts
 			 WHERE id = ? AND user_id = ? AND (status = 'sent' OR provider_id IS NOT NULL)
-			   AND updated_at > datetime('now', ?)`
+			   AND (status = 'sending' OR updated_at > datetime('now', ?))`
 		)
 		.bind(await attemptId(userId, key), userId, KEY_EXPIRY)
 		.first<{ found: number }>();
@@ -94,9 +94,13 @@ export async function claimSendAttempt(
 ): Promise<SendAttempt> {
 	const id = await attemptId(userId, key);
 
-	// Forget this sender's expired keys first, so an old key starts a new send.
+	// Expire only final outcomes. Keep unfinished sends, including lost provider
+	// responses and abandoned leases, so retries still require confirmation.
 	await db
-		.prepare(`DELETE FROM send_attempts WHERE user_id = ? AND updated_at <= datetime('now', ?)`)
+		.prepare(
+			`DELETE FROM send_attempts WHERE user_id = ? AND status IN ('sent', 'failed')
+			 AND updated_at <= datetime('now', ?)`
+		)
 		.bind(userId, KEY_EXPIRY)
 		.run();
 
