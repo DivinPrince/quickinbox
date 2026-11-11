@@ -5,6 +5,7 @@ import {
 	completeSendAttempt,
 	failSendAttempt,
 	keyAlreadySent,
+	markSendUncertain,
 	readIdempotencyKey,
 	recordProviderAccepted,
 	SendAttemptError
@@ -144,6 +145,24 @@ describe('claimSendAttempt', () => {
 			(error: unknown) => error instanceof SendAttemptError && error.code === 'already_sent'
 		);
 	});
+
+	for (const outcome of ['uncertain', 'abandoned', 'accepted'] as const) {
+		test(`retains an expired ${outcome} send instead of silently claiming it again`, async () => {
+			const { db, sqlite } = setup();
+			const first = await claimSendAttempt(db, 'user-1', 'key-12345', 'hash-a');
+			if (outcome === 'uncertain') await markSendUncertain(db, first.id, new Error('Lost response'));
+			if (outcome === 'accepted') await recordProviderAccepted(db, first.id, 'provider-1');
+			sqlite.query(`UPDATE send_attempts SET updated_at = datetime('now', '-25 hours')`).run();
+
+			await assert.rejects(
+				claimSendAttempt(db, 'user-1', 'key-12345', 'hash-a'),
+				(error: unknown) => error instanceof SendAttemptError &&
+					error.code === (outcome === 'accepted' ? 'already_sent' : 'send_outcome_unknown')
+			);
+			assert.equal((sqlite.query('SELECT COUNT(*) AS count FROM send_attempts').all()[0] as { count: number }).count, 1);
+			assert.equal(await keyAlreadySent(db, 'user-1', 'key-12345'), outcome === 'accepted');
+		});
+	}
 
 	test('forgets a key after a day, so reusing it starts a new send', async () => {
 		const { db, sqlite } = setup();

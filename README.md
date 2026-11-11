@@ -335,7 +335,9 @@ Sends (`POST /api/mail`, replies, forwards) accept an `Idempotency-Key` header
 — 8–200 characters of `A-Z a-z 0-9 . _ : -`, a UUID works. Retrying with the
 same key returns the first result instead of emailing twice; reusing it for a
 different message is refused with `409`. Keys are per user, a send that
-failed can be retried under its key, and keys are forgotten after 24 hours.
+failed can be retried under its key. Completed and definitively failed keys are
+forgotten after 24 hours; unfinished sends remain recorded so an uncertain
+outcome cannot silently become a new send when its key ages out.
 
 A refused send answers `{ "error", "code" }`. `send_in_progress` means retry
 the same key shortly; `send_outcome_unknown` and `already_sent` mean don't —
