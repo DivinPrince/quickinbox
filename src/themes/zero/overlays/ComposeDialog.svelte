@@ -7,6 +7,7 @@
 	import Icon from '../icons/Icon.svelte';
 	import ComposerActions from './ComposerActions.svelte';
 	import { t } from '$lib/i18n';
+	import { needsNewSendKey } from '$lib/mail/send-key';
 
 	let {
 		addresses,
@@ -138,8 +139,12 @@
 					attachments
 				})
 			});
-			const body = (await response.json()) as { error?: string };
+			const body = (await response.json()) as { error?: string; code?: string };
 			if (!response.ok) {
+				if (needsNewSendKey(body.code) && confirm(t('compose.sendAsNew'))) {
+					sendKey = crypto.randomUUID();
+					return await send(event);
+				}
 				error = body.error ?? t('compose.failedToSend');
 				return;
 			}

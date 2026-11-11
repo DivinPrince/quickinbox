@@ -1,5 +1,6 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import {
+	codeForSendError,
 	describeProviderError,
 	getEmailProvider,
 	statusForProviderError
@@ -52,7 +53,10 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 		return json({ ok: true, id: emailId });
 	} catch (error) {
 		return json(
-			{ error: describeProviderError(error, 'Failed to forward message') },
+			{
+				error: describeProviderError(error, 'Failed to forward message'),
+				code: codeForSendError(error)
+			},
 			{ status: statusForProviderError(error) }
 		);
 	}
