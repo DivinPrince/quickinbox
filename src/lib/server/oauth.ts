@@ -24,7 +24,7 @@ export const AUTH_CODE_TTL_MS = 2 * 60 * 1000;
 /** Metadata documents are re-fetched after this long. */
 const CLIENT_METADATA_TTL_MS = 60 * 60 * 1000;
 const CLIENT_METADATA_MAX_BYTES = 64 * 1024;
-const CLIENT_METADATA_TIMEOUT_MS = 5000;
+const CLIENT_METADATA_TIMEOUT_MS = 10_000;
 
 const ACCESS_TOKEN_PREFIX = 'qi_mcp_';
 const REFRESH_TOKEN_PREFIX = 'qi_rt_';
@@ -67,7 +67,6 @@ export function authorizationServerMetadata(origin: string) {
 		token_endpoint_auth_methods_supported: ['none'],
 		revocation_endpoint_auth_methods_supported: ['none'],
 		code_challenge_methods_supported: ['S256'],
-		client_id_metadata_document_supported: true,
 		authorization_response_iss_parameter_supported: true,
 		service_documentation: `${origin}/settings/connections`
 	};
@@ -402,10 +401,15 @@ async function fetchClientMetadataDocument(
 	try {
 		response = await fetchImpl(clientId, {
 			headers: { accept: 'application/json' },
-			redirect: 'error',
+			redirect: 'manual',
 			signal: controller.signal
 		});
-	} catch {
+	} catch (error) {
+		console.error(
+			'Failed to fetch client metadata document',
+			new URL(clientId).host,
+			error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+		);
 		throw new OAuthError('invalid_client', 'Could not fetch the client metadata document', 401);
 	} finally {
 		clearTimeout(timer);
