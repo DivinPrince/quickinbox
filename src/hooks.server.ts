@@ -1,5 +1,6 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { authorizeApiRequest, canAccessDuringFirstLogin } from '$lib/server/api-access';
+import { resolveAttachmentBucket } from '$lib/server/attachment-store';
 import { getUserByApiToken, readBearerToken } from '$lib/server/api-tokens';
 import { getUserByOAuthToken } from '$lib/server/oauth';
 import {
@@ -99,6 +100,14 @@ function render(
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// No R2 bucket bound: keep attachments in D1 instead. Everything downstream
+	// reads `platform.env.ATTACHMENTS` and never knows the difference.
+	if (event.platform?.env?.DB && !event.platform.env.ATTACHMENTS) {
+		event.platform = {
+			...event.platform,
+			env: { ...event.platform.env, ATTACHMENTS: resolveAttachmentBucket(event.platform.env) }
+		};
+	}
 	const db = event.platform?.env.DB;
 	const { pathname } = event.url;
 	const forwardedProtocol = event.request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();

@@ -5,7 +5,8 @@ import type { CloudflareSendEmailBinding } from '$lib/server/providers/cloudflar
 declare global {
 	interface Env {
 		DB: D1Database;
-		ATTACHMENTS: R2Bucket;
+		/** Optional: without it, attachments are stored in D1 (see attachment-store.ts). */
+		ATTACHMENTS?: R2Bucket;
 		ASSETS: Fetcher;
 		EMAIL: CloudflareSendEmailBinding;
 		EMAIL_PROVIDER?: string;

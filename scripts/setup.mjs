@@ -72,6 +72,7 @@ Options:
   --provider <name>    resend | cloudflare
   --d1-name <name>     D1 database name (e.g. quickmail)
   --r2-name <name>     R2 bucket name (e.g. quickmail-attachments)
+  --no-r2              Skip R2 (needs a payment card); store attachments in D1
   --typesafe-api-key <key>
                        Optional TypeSafe key for inbox tabs and spam
   --yes                Accept defaults (still requires --domain)
@@ -89,6 +90,7 @@ function parseArgs(argv) {
 		provider: null,
 		d1Name: null,
 		r2Name: null,
+		noR2: false,
 		typesafeApiKey: null
 	};
 	for (let i = 0; i < argv.length; i++) {
@@ -104,6 +106,9 @@ function parseArgs(argv) {
 				break;
 			case '--skip-deploy':
 				out.skipDeploy = true;
+				break;
+			case '--no-r2':
+				out.noR2 = true;
 				break;
 			case '--domain':
 				out.domain = argv[++i] ?? '';
@@ -392,6 +397,16 @@ function setAddresses(source, addresses) {
 		return source.replace(/"addresses"\s*:\s*\[[^\]]*\]/, rendered);
 	}
 	return source.replace(/\n(\t*"send_email")/, `\n\t${rendered},\n\n$1`);
+}
+
+/** True when wrangler.jsonc still declares the R2 bucket (not commented out). */
+function hasR2Binding(source) {
+	return /^\t"r2_buckets"\s*:/m.test(source);
+}
+
+/** Drop the R2 binding so deploy never asks for R2; attachments then live in D1. */
+function removeR2Binding(source) {
+	return source.replace(/\n\t"r2_buckets"\s*:\s*\[[\s\S]*?\n\t\],?\n/, '\n');
 }
 
 function removeAddresses(source) {
@@ -1150,24 +1165,35 @@ async function main() {
 		isWorkerName,
 		'Use lowercase letters, numbers, and hyphens.'
 	);
-	const bucketName = await askResourceName(
-		'R2 bucket name (e.g. quickmail-attachments)',
-		jsoncString(source, 'bucket_name') || 'quickmail-attachments',
-		args.r2Name,
-		isR2BucketName,
-		'3–63 characters, lowercase letters, numbers, and hyphens.'
-	);
+	// R2 needs a payment card on the Cloudflare account. Without it, attachments
+	// are stored in D1 instead (see README "Attachment storage").
+	const useR2 =
+		!args.noR2 &&
+		(await confirm(
+			'Store attachments in R2? (needs a payment card on your Cloudflare account; choose No to use D1)',
+			hasR2Binding(source)
+		));
+	let bucketName = null;
+	if (useR2) {
+		bucketName = await askResourceName(
+			'R2 bucket name (e.g. quickmail-attachments)',
+			jsoncString(source, 'bucket_name') || 'quickmail-attachments',
+			args.r2Name,
+			isR2BucketName,
+			'3–63 characters, lowercase letters, numbers, and hyphens.'
+		);
+	}
 	ok(`D1 ${databaseName}`);
-	ok(`R2 ${bucketName}`);
+	ok(bucketName ? `R2 ${bucketName}` : 'attachments stored in D1 (no R2)');
 	const databaseId = await ensureD1(databaseName);
-	ensureR2(bucketName);
+	if (bucketName) ensureR2(bucketName);
 
 	section(5, total, 'Config');
 	source = readWrangler();
 	source = setFirstString(source, 'name', workerName);
 	source = setFirstString(source, 'database_name', databaseName);
 	source = setFirstString(source, 'database_id', databaseId);
-	source = setFirstString(source, 'bucket_name', bucketName);
+	source = bucketName ? setFirstString(source, 'bucket_name', bucketName) : removeR2Binding(source);
 	source = setVars(source, {
 		provider,
 		domains: provider === 'cloudflare' ? domain : ''

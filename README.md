@@ -11,7 +11,7 @@ no servers to maintain.
 
 - **Real mail in and out** — the provider delivers straight into the Worker, nothing is polled
 - **Threads** — replies group into conversations, quoted history collapses; conversations never mix messages from different domains
-- **Attachments** — inbound files land in R2, outbound files upload from the composer
+- **Attachments** — inbound files land in R2 (or in D1 if you have no R2, see [Attachment storage](#attachment-storage)), outbound files upload from the composer
 - **Safe HTML** — received HTML renders in a sandboxed iframe
 - **Multiple domains and users** — per-user addresses, admin catch-all, unrouted-mail view; the combined inbox tags each conversation with the address it arrived on and can filter by it
 - **Delivery status** — delivered / bounced / complained tracking
@@ -515,3 +515,9 @@ migrations/          D1 schema, applied in order
 
 [MIT](LICENSE.md) — use it, modify it, ship it, commercially or not.
 Copyright © 2026 Irasubiza Divin Prince.
+
+## Attachment storage
+
+Attachments are stored in the R2 bucket bound as `ATTACHMENTS`. Cloudflare asks for a payment card to enable R2, so it is optional: answer **No** to the R2 question in `bun run setup` (or pass `--no-r2`), or by hand **delete the `r2_buckets` block in `wrangler.jsonc`** (and skip `wrangler r2 bucket create`) and attachments are stored in D1 instead, in the `attachment_chunks` table (migration `0031`), split into ~900 KB rows because D1 caps a row at 2 MB.
+
+Trade-offs of the D1 mode: attachments share the database's size cap with your mail (500 MB on the free plan, 10 GB paid), and files already in R2 are not copied if you switch either way. The per-file and per-email limits are unchanged.
