@@ -3,13 +3,16 @@ import { describe, test } from 'node:test';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { EmailRow } from '$lib/types';
 import { buildThreadParticipants } from './thread-participants';
+import { createTestDb, insertTestUser, type Sqlite } from './test-db';
 import {
 	countUnclassifiedInbound,
 	getMailboxCounts,
 	getMailboxCursor,
 	listForwardThreadMessages,
+	listMailbox,
 	listUnclassifiedInbound,
 	markAllRead,
+	setEmailFlags,
 	UNCLASSIFIED_INBOUND_WHERE
 } from './mail-store';
 
@@ -291,4 +294,133 @@ test('markAllRead scopes to a label without rewriting the rest of the mailbox', 
 	assert.doesNotMatch(sql, /direction = 'inbound'/);
 	assert.doesNotMatch(sql, /category = \?/);
 	assert.deepEqual(binds, ['user-1', 'label-9', 'domain-1']);
+});
+
+describe('archive from the bin', () => {
+	function setup() {
+		const { db, sqlite } = createTestDb();
+		insertTestUser(sqlite, 'user-1');
+		insertTestUser(sqlite, 'user-2');
+		const insert = sqlite.query(
+			`INSERT INTO emails (
+				id, user_id, direction, from_addr, to_addr, subject, thread_id,
+				is_starred, deleted_at, archived_at, spam_at, spam_source
+			) VALUES (?, ?, 'inbound', 'sam@other.test', 'ada@example.com', ?, ?, ?, ?, ?, ?, ?)`
+		);
+		const add = (
+			id: string,
+			userId: string,
+			flags: { starred?: boolean; deletedAt?: string | null; spamAt?: string | null; spamSource?: string | null } = {}
+		) =>
+			insert.run(
+				id,
+				userId,
+				id,
+				id,
+				flags.starred ? 1 : 0,
+				flags.deletedAt ?? null,
+				null,
+				flags.spamAt ?? null,
+				flags.spamSource ?? null
+			);
+		return { db, sqlite, add };
+	}
+
+	async function idsIn(db: D1Database, userId: string, view: 'inbox' | 'archive' | 'trash' | 'spam') {
+		const page = await listMailbox(db, userId, { view });
+		return page.threads.map((thread) => thread.thread_id).sort();
+	}
+
+	function flags(sqlite: Sqlite, id: string) {
+		return sqlite
+			.query(
+				`SELECT deleted_at, archived_at, spam_at, spam_source, is_starred
+				 FROM emails WHERE id = ?`
+			)
+			.all(id)[0] as {
+			deleted_at: string | null;
+			archived_at: string | null;
+			spam_at: string | null;
+			spam_source: string | null;
+			is_starred: number;
+		};
+	}
+
+	test('moves a binned conversation into Archive, including one that was spam', async () => {
+		const { db, sqlite, add } = setup();
+		add('binned', 'user-1', { starred: true, deletedAt: '2026-02-01 00:00:00' });
+		add('spam-binned', 'user-1', {
+			deletedAt: '2026-02-02 00:00:00',
+			spamAt: '2026-02-02 00:00:00',
+			spamSource: 'user'
+		});
+		add('stays', 'user-1', { deletedAt: '2026-02-03 00:00:00' });
+		add('inbox', 'user-1');
+		add('other', 'user-2', { deletedAt: '2026-02-04 00:00:00' });
+
+		const changed = await setEmailFlags(db, 'user-1', ['binned', 'spam-binned'], { archived: true });
+
+		assert.equal(changed, 2);
+		assert.deepEqual(await idsIn(db, 'user-1', 'trash'), ['stays']);
+		assert.deepEqual(await idsIn(db, 'user-1', 'archive'), ['binned', 'spam-binned']);
+		assert.deepEqual(await idsIn(db, 'user-1', 'inbox'), ['inbox']);
+		assert.deepEqual(await idsIn(db, 'user-1', 'spam'), []);
+		assert.deepEqual(await idsIn(db, 'user-2', 'trash'), ['other']);
+
+		const binned = flags(sqlite, 'binned');
+		assert.equal(binned.deleted_at, null);
+		assert.ok(binned.archived_at);
+		assert.equal(binned.spam_at, null);
+		assert.equal(binned.is_starred, 1);
+		const spamBinned = flags(sqlite, 'spam-binned');
+		assert.equal(spamBinned.deleted_at, null);
+		assert.equal(spamBinned.spam_at, null);
+		assert.equal(spamBinned.spam_source, null);
+		assert.ok(spamBinned.archived_at);
+
+		const counts = await getMailboxCounts(db, 'user-1');
+		assert.equal(counts.trash, 1);
+		assert.equal(counts.archive, 2);
+		assert.equal(counts.inbox, 1);
+		assert.equal(counts.spam, 0);
+		assert.equal(counts.starred, 1);
+	});
+
+	test('still archives inbox mail, and does not pull other bin mail out', async () => {
+		const { db, add } = setup();
+		add('inbox', 'user-1');
+		add('binned', 'user-1', { deletedAt: '2026-02-01 00:00:00' });
+
+		await setEmailFlags(db, 'user-1', ['inbox'], { archived: true });
+
+		assert.deepEqual(await idsIn(db, 'user-1', 'archive'), ['inbox']);
+		assert.deepEqual(await idsIn(db, 'user-1', 'inbox'), []);
+		assert.deepEqual(await idsIn(db, 'user-1', 'trash'), ['binned']);
+	});
+
+	test('unarchive leaves binned mail in the bin', async () => {
+		const { db, sqlite, add } = setup();
+		add('binned', 'user-1', { deletedAt: '2026-02-01 00:00:00' });
+		sqlite.query(`UPDATE emails SET archived_at = '2026-02-01 00:00:00' WHERE id = 'binned'`).run();
+
+		await setEmailFlags(db, 'user-1', ['binned'], { archived: false });
+
+		assert.deepEqual(await idsIn(db, 'user-1', 'trash'), ['binned']);
+		assert.deepEqual(await idsIn(db, 'user-1', 'archive'), []);
+		assert.equal(flags(sqlite, 'binned').archived_at, null);
+		assert.equal(flags(sqlite, 'binned').deleted_at, '2026-02-01 00:00:00');
+	});
+
+	test('an explicit trash or spam flag in the same update still wins', async () => {
+		const { db, add } = setup();
+		add('to-trash', 'user-1');
+		add('to-spam', 'user-1');
+
+		await setEmailFlags(db, 'user-1', ['to-trash'], { archived: true, trashed: true });
+		await setEmailFlags(db, 'user-1', ['to-spam'], { archived: true, spam: true });
+
+		assert.deepEqual(await idsIn(db, 'user-1', 'trash'), ['to-trash']);
+		assert.deepEqual(await idsIn(db, 'user-1', 'spam'), ['to-spam']);
+		assert.deepEqual(await idsIn(db, 'user-1', 'archive'), []);
+	});
 });

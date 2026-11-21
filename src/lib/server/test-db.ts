@@ -16,7 +16,7 @@ type SqliteStatement = {
 	all(...params: unknown[]): Record<string, unknown>[];
 	run(...params: unknown[]): { changes: number; lastInsertRowid: number | bigint };
 };
-type Sqlite = { query(sql: string): SqliteStatement; exec(sql: string): void };
+export type Sqlite = { query(sql: string): SqliteStatement; exec(sql: string): void };
 
 function returnsRows(sql: string): boolean {
 	return /^\s*(SELECT|WITH)\b/i.test(sql) || /\bRETURNING\b/i.test(sql);
