@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import { isRedirect } from '@sveltejs/kit';
 import {
 	authorizationServerMetadata,
 	bearerChallenge,
+	getClient,
+	getUserByOAuthToken,
 	isAllowedRedirectUri,
 	isClientMetadataUrl,
 	isValidCodeChallenge,
@@ -16,6 +19,11 @@ import {
 } from './oauth';
 import { clientBrand, clientInitials, redirectHost } from '../oauth-brand';
 import { loginHref, safeNextPath } from '../next-url';
+import { createTestDb, insertTestUser } from './test-db';
+import { GET as getAuthorizationServerMetadata } from '../../routes/.well-known/oauth-authorization-server/+server';
+import { POST as postRegister } from '../../routes/oauth/register/+server';
+import { actions as authorizeActions, load as loadAuthorize } from '../../routes/oauth/authorize/+page.server';
+import { POST as postToken } from '../../routes/oauth/token/+server';
 
 describe('redirect URIs', () => {
 	test('accepts https, loopback http and private-use schemes', () => {
@@ -152,6 +160,191 @@ describe('client metadata', () => {
 	});
 });
 
+describe('client metadata documents', () => {
+	const clientId = 'https://client.example/oauth/client-metadata.json';
+	const document = {
+		client_id: clientId,
+		client_name: 'Example MCP client',
+		client_uri: 'https://client.example',
+		redirect_uris: ['https://client.example/oauth/callback'],
+		token_endpoint_auth_method: 'none'
+	};
+
+	/** Behaves like fetch on Workers, which throws on redirect: 'error' before sending anything. */
+	function workersFetch(respond: () => Response): typeof fetch {
+		return (async (_input: RequestInfo | URL, init?: RequestInit) => {
+			if (init?.redirect === 'error') throw new TypeError('Invalid redirect value');
+			return respond();
+		}) as typeof fetch;
+	}
+
+	test('a URL client_id is fetched once, then served from D1', async () => {
+		const { db } = createTestDb();
+		const client = await getClient(db, clientId, workersFetch(() => Response.json(document)));
+		assert.equal(client?.client_name, 'Example MCP client');
+		assert.deepEqual(client?.redirect_uris, ['https://client.example/oauth/callback']);
+
+		const stored = await getClient(
+			db,
+			clientId,
+			workersFetch(() => {
+				throw new Error('a fresh client is served from D1');
+			})
+		);
+		assert.equal(stored?.client_name, 'Example MCP client');
+	});
+
+	test('a redirect is refused, not followed', async () => {
+		const { db } = createTestDb();
+		const redirect = () => new Response(null, { status: 302, headers: { location: 'https://evil.example/meta' } });
+		await assert.rejects(
+			getClient(db, clientId, workersFetch(redirect)),
+			(error: unknown) => error instanceof OAuthError && error.code === 'invalid_client'
+		);
+	});
+
+	test('a failed fetch logs the error and the client host, nothing more', async () => {
+		const { db } = createTestDb();
+		const logged: unknown[][] = [];
+		const original = console.error;
+		console.error = (...args: unknown[]) => {
+			logged.push(args);
+		};
+		try {
+			await assert.rejects(
+				getClient(db, `${clientId}?session=secret`, (async () => {
+					throw new TypeError('Network connection lost.');
+				}) as typeof fetch),
+				(error: unknown) =>
+					error instanceof OAuthError &&
+					error.code === 'invalid_client' &&
+					error.message === 'Could not fetch the client metadata document'
+			);
+		} finally {
+			console.error = original;
+		}
+		assert.deepEqual(logged, [
+			['Failed to fetch client metadata document', 'client.example', 'TypeError: Network connection lost.']
+		]);
+	});
+});
+
+describe('dynamic registration fallback', () => {
+	const origin = 'https://mail.example.com';
+	const redirectUri = 'https://client.example/oauth/callback';
+	// RFC 7636 appendix B vector.
+	const verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+	const challenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+	const noFetch = (async () => {
+		throw new Error('a registered client is never fetched');
+	}) as typeof fetch;
+
+	test('a client registers at /oauth/register, authorizes, and redeems the code', async () => {
+		const { db, sqlite } = createTestDb();
+		insertTestUser(sqlite);
+		const platform = { env: { DB: db } };
+		const getClientAddress = () => '203.0.113.7';
+
+		const discovery = await getAuthorizationServerMetadata({
+			url: new URL(`${origin}/.well-known/oauth-authorization-server`)
+		} as never);
+		const metadata = await discovery.json();
+		assert.equal(metadata.client_id_metadata_document_supported, undefined);
+
+		const registration = await postRegister({
+			request: new Request(metadata.registration_endpoint, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					client_name: 'Example MCP client',
+					redirect_uris: [redirectUri],
+					token_endpoint_auth_method: 'none',
+					grant_types: ['authorization_code', 'refresh_token'],
+					response_types: ['code']
+				})
+			}),
+			platform,
+			getClientAddress
+		} as never);
+		assert.equal(registration.status, 201);
+		const { client_id: clientId } = await registration.json();
+		assert.match(clientId, /^qi_client_/);
+
+		const params = {
+			client_id: clientId,
+			redirect_uri: redirectUri,
+			response_type: 'code',
+			code_challenge: challenge,
+			code_challenge_method: 'S256',
+			scope: 'mail:read mail:send',
+			state: 'state-1',
+			resource: `${origin}/mcp`
+		};
+		const authorizeUrl = new URL(`${origin}/oauth/authorize?${new URLSearchParams(params)}`);
+		const locals = { user: { id: 'user-1' } };
+
+		const consent = (await loadAuthorize({
+			url: authorizeUrl,
+			locals,
+			platform,
+			fetch: noFetch,
+			setHeaders: () => {}
+		} as never)) as { invalid: unknown; request: { client: { client_id: string; client_name: string } } | null };
+		assert.equal(consent.invalid, null);
+		assert.equal(consent.request?.client.client_id, clientId);
+		assert.equal(consent.request?.client.client_name, 'Example MCP client');
+
+		let callback: URL | null = null;
+		try {
+			await authorizeActions.default({
+				request: new Request(authorizeUrl, {
+					method: 'POST',
+					headers: { origin },
+					body: new URLSearchParams({ ...params, decision: 'allow' })
+				}),
+				url: authorizeUrl,
+				locals,
+				platform,
+				fetch: noFetch
+			} as never);
+		} catch (thrown) {
+			if (!isRedirect(thrown)) throw thrown;
+			callback = new URL(thrown.location);
+		}
+		assert.ok(callback, 'approving redirects back to the client');
+		assert.equal(`${callback.origin}${callback.pathname}`, redirectUri);
+		assert.equal(callback.searchParams.get('state'), 'state-1');
+		assert.equal(callback.searchParams.get('iss'), origin);
+		const code = callback.searchParams.get('code');
+		assert.ok(code);
+
+		const tokenResponse = await postToken({
+			request: new Request(`${origin}/oauth/token`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/x-www-form-urlencoded' },
+				body: new URLSearchParams({
+					grant_type: 'authorization_code',
+					code,
+					code_verifier: verifier,
+					client_id: clientId,
+					redirect_uri: redirectUri,
+					resource: `${origin}/mcp`
+				})
+			}),
+			platform,
+			url: new URL(`${origin}/oauth/token`),
+			getClientAddress
+		} as never);
+		assert.equal(tokenResponse.status, 200);
+		const tokens = await tokenResponse.json();
+		assert.equal(tokens.scope, 'mail:read mail:send');
+
+		const auth = await getUserByOAuthToken(db, tokens.access_token);
+		assert.equal(auth?.user.id, 'user-1');
+		assert.equal(auth?.clientId, clientId);
+	});
+});
+
 describe('discovery', () => {
 	test('metadata points at this origin', () => {
 		const origin = 'https://mail.alter.rw';
@@ -162,6 +355,12 @@ describe('discovery', () => {
 		assert.equal(as.registration_endpoint, `${origin}/oauth/register`);
 		assert.equal(as.revocation_endpoint, `${origin}/oauth/revoke`);
 		assert.deepEqual(as.code_challenge_methods_supported, ['S256']);
+		assert.deepEqual(as.token_endpoint_auth_methods_supported, ['none']);
+		assert.equal(
+			'client_id_metadata_document_supported' in as,
+			false,
+			'clients register at registration_endpoint instead of sending a metadata document URL'
+		);
 
 		const prm = protectedResourceMetadata(origin);
 		assert.equal(prm.resource, `${origin}/mcp`);
