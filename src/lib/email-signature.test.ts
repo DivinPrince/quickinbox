@@ -138,6 +138,27 @@ import {
 		assert.match(result.html ?? '', /<p>Hi<\/p><div><br><\/div>\n<div data-email-signature="true">Best<\/div>\n<\/html>$/);
 	});
 
+	test('treats a document without </html>, or with a leading comment or XML declaration, as a document', () => {
+		for (const [html, expected] of [
+			['<html><body>hi</body>', /hi<div><br><\/div>\n<div data-email-signature="true">Best<\/div>\n<\/body>$/],
+			['<!-- c --><html><body>hi</body></html>', /hi<div><br><\/div>\n<div data-email-signature="true">Best<\/div>\n<\/body><\/html>$/],
+			[
+				'<?xml version="1.0"?>\n<!DOCTYPE html><html><body>hi</body></html>',
+				/hi<div><br><\/div>\n<div data-email-signature="true">Best<\/div>\n<\/body><\/html>$/
+			]
+		] as const) {
+			assert.match(appendEmailSignature({ text: 'hi', html, signature: 'Best' }).html ?? '', expected, html);
+		}
+	});
+
+	test('appends after an unterminated leading comment', () => {
+		const html = '<!-- open <html><body>hi</body></html>';
+		assert.equal(
+			appendEmailSignature({ text: 'hi', html, signature: 'Best' }).html,
+			`${html}\n<div><br></div>\n<div data-email-signature="true">Best</div>`
+		);
+	});
+
 	test('leaves the message unchanged when the signature is empty', () => {
 		assert.deepEqual(
 			appendEmailSignature({ text: 'Hello', html: '<p>Hello</p>', signature: '   ' }),
