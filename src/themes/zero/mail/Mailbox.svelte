@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 	import { formatRelativeDate } from '$lib/utils/date';
 	import { runMailAction } from '$lib/mail/client';
+	import { confirmIfPermanent } from '$lib/mail/confirm';
 	import { initials, participantName } from '$lib/mail/folders';
 	import { INBOX_CATEGORIES, categoryNavKey, categoryUnread } from '$lib/mail/categories';
 	import { t } from '$lib/i18n';
@@ -142,6 +143,7 @@
 	}
 
 	async function act(action: string, ids: string[]) {
+		if (!confirmIfPermanent(action, ids.length)) return;
 		await runMailAction(action, ids);
 		await invalidateAll();
 	}
@@ -187,7 +189,7 @@
 			else void act(view === 'archive' ? 'unarchive' : 'archive', ids);
 		} else if (event.key === 'd' || event.key === 'Backspace') {
 			event.preventDefault();
-			void act(view === 'trash' ? 'restore' : view === 'spam' ? 'delete' : 'trash', ids);
+			void act(view === 'trash' || view === 'spam' ? 'delete' : 'trash', ids);
 		} else if (event.key === 's') {
 			event.preventDefault();
 			void act(current?.is_starred ? 'unstar' : 'star', ids);
@@ -376,14 +378,28 @@
 									<Icon name="Archive2" size={14} />
 								</button>
 							</Tooltip>
-							<Tooltip text={view === 'trash' ? t('mailbox.restore') : t('nav.bin')}>
+							{#if view === 'trash'}
+								<Tooltip text={t('mailbox.restore')}>
+									<button
+										type="button"
+										aria-label={t('mailbox.restore')}
+										onclick={(event) => {
+											event.stopPropagation();
+											void act('restore', [thread.latest_id]);
+										}}
+									>
+										<Icon name="Inbox" size={14} />
+									</button>
+								</Tooltip>
+							{/if}
+							<Tooltip text={view === 'trash' ? t('mailbox.deletePermanently') : t('nav.bin')}>
 								<button
 									type="button"
 									class="danger"
-									aria-label={view === 'trash' ? t('mailbox.restore') : t('nav.bin')}
+									aria-label={view === 'trash' ? t('mailbox.deletePermanently') : t('nav.bin')}
 									onclick={(event) => {
 										event.stopPropagation();
-										void act(view === 'trash' ? 'restore' : 'trash', [thread.latest_id]);
+										void act(view === 'trash' ? 'delete' : 'trash', [thread.latest_id]);
 									}}
 								>
 									<Icon name="Trash" size={14} />

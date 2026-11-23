@@ -10,6 +10,7 @@
 	import { plural, t } from '$lib/i18n';
 	import { page } from '$app/stores';
 	import { INBOX_CATEGORIES, categoryNavKey, inboxCategoryPath } from '$lib/mail/categories';
+	import { confirmIfPermanent } from '$lib/mail/confirm';
 	import type { MailLabel, OutboundAttachmentInput } from '$lib/types';
 	import LabelChip from '$lib/components/LabelChip.svelte';
 	import type { PageData } from './$types';
@@ -229,6 +230,7 @@
 
 	async function destroy() {
 		if (!latest) return;
+		if (!confirmIfPermanent('delete')) return;
 		await fetch(`/api/mail/${latest.id}`, { method: 'DELETE' });
 		goto('/trash');
 	}
