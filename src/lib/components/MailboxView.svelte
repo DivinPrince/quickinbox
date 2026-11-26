@@ -12,6 +12,7 @@
 	import { haptic, isPrimaryTab } from '$lib/app-chrome';
 	import { INBOX_CATEGORIES, categoryNavKey, categoryUnread } from '$lib/mail/categories';
 	import { plural, t } from '$lib/i18n';
+	import { confirmIfPermanent } from '$lib/mail/confirm';
 	import type {
 		MailAddress,
 		MailLabel,
@@ -153,6 +154,7 @@
 	/** One entry point for every list action, so the UI always refreshes after. */
 	async function run(action: string, ids: string[] = selected, extra: Record<string, unknown> = {}) {
 		if (busy) return;
+		if (!confirmIfPermanent(action, ids.length)) return;
 		actionError = '';
 		busy = true;
 		try {
