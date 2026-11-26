@@ -56,9 +56,26 @@ If you already deployed from this repo, pulling updates only changes the product
 
 ## Choosing a mail provider
 
-One provider is active per deploy, selected by `EMAIL_PROVIDER` (`resend` is
-the default, `cloudflare` is the alternative). Do not point the same domain's
-apex MX at both.
+By default one provider handles both directions, selected by `EMAIL_PROVIDER`
+(`resend` is the default, `cloudflare` is the alternative). Do not point the
+same domain's apex MX at both.
+
+To mix providers — for example receive with Cloudflare Email Routing and send
+with Resend — set the optional `EMAIL_INBOUND` and/or `EMAIL_OUTBOUND` (`resend`,
+`cloudflare`, or `none` to turn that direction off). Each one overrides
+`EMAIL_PROVIDER` for its direction only; an unset or empty one follows
+`EMAIL_PROVIDER`, so existing deployments are unaffected.
+
+```jsonc
+"EMAIL_PROVIDER": "resend",
+"EMAIL_INBOUND": "cloudflare",   // receive via Email Routing
+"EMAIL_OUTBOUND": "resend"       // send via Resend
+```
+
+With `EMAIL_INBOUND=cloudflare`, set `CLOUDFLARE_MAIL_DOMAINS` to your domain(s):
+Cloudflare inbound only accepts mail for the domains listed there. The Resend
+webhook still reports delivery events when Resend sends, but `email.received`
+is only ingested when inbound is Resend.
 
 |                 | [Resend](https://resend.com)             | [Cloudflare Email Service](https://developers.cloudflare.com/email-service/) |
 | --------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |

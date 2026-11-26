@@ -1,4 +1,5 @@
 import type { ExecutionContext } from '@cloudflare/workers-types';
+import { resolveMailKind } from './lib/server/email-provider';
 import {
 	handleCloudflareInbound,
 	type CloudflareInboundEnv,
@@ -27,8 +28,9 @@ export default {
 	},
 
 	async email(message: CloudflareInboundMessage, env: Env, ctx: ExecutionContext) {
-		if (env.EMAIL_PROVIDER?.trim().toLowerCase() !== 'cloudflare') {
-			message.setReject('Cloudflare email provider is not enabled');
+		// Inbound: EMAIL_INBOUND if set, else EMAIL_PROVIDER (as before).
+		if (resolveMailKind(env, 'inbound').kind !== 'cloudflare') {
+			message.setReject('Cloudflare inbound mail is not enabled');
 			return;
 		}
 

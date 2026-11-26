@@ -1,5 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { getEmailProvider, ProviderError } from '$lib/server/context';
+import { getDomainProvider, ProviderError } from '$lib/server/context';
 import { disconnectDomain, getDomain, setCatchallUser, upsertDomain } from '$lib/server/domains';
 
 /** PATCH — set the catch-all owner or re-sync status from the active provider. */
@@ -21,7 +21,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 
 	if (body.refresh) {
 		try {
-			const provider = getEmailProvider(platform);
+			const provider = getDomainProvider(platform);
 			const remote = await provider.getDomain(domain.id);
 			return json({ domain: await upsertDomain(db, remote) });
 		} catch (error) {

@@ -264,7 +264,7 @@
 					{#if !domain.receiving_enabled}
 						<p class="hint">
 							<Icon name="information-line" size={13} />
-							{data.providerKind === 'cloudflare'
+							{data.inboundKind === 'cloudflare'
 								? t('admin.inboundOffRouting')
 								: t('admin.inboundOffMx')}
 						</p>

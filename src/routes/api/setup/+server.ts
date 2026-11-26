@@ -9,7 +9,7 @@ import {
 import { SESSION_DAYS } from '$lib/server/constants';
 import {
 	ConfigError,
-	getEmailProvider,
+	getDomainProvider,
 	safeEmailProviderKind,
 	hasProviderConfigured,
 	ProviderError
@@ -65,7 +65,7 @@ export const POST: RequestHandler = async ({ request, cookies, platform, url }) 
 	}
 
 	try {
-		const provider = getEmailProvider(platform);
+		const provider = getDomainProvider(platform);
 		const domain = await upsertDomain(db, await provider.getDomain(body.domainId));
 
 		const localPart = body.localPart.trim().toLowerCase().replace(/@.*$/, '');

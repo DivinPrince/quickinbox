@@ -187,7 +187,7 @@
 			{#if chosen && !chosen.can_receive}
 				<p class="hint">
 					<Icon name="information-line" size={14} />
-					{receivingHint(data.providerKind, chosen.name)}
+					{receivingHint(data.inboundKind, chosen.name)}
 				</p>
 			{/if}
 
