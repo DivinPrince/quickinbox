@@ -33,6 +33,23 @@ jobs:
       - name: Build
         run: bun run build
 
+  # Shipped migrations are history: a pull request may only add new ones. Its own
+  # job, so a deliberate exception merged red still gets typechecked and built.
+  migrations:
+    name: Check migrations are append-only
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Node built-ins only, so no install step.
+      - name: Check migrations
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-migrations.mjs "$BASE_SHA"
+
   # Production catalogs: GT_API_KEY and GT_PROJECT_ID are repo Actions secrets.
   # Skipped on pull requests so forks never see credentials. On main (or a manual
   # run) the official GT action opens a PR with updated messages/*.json.
